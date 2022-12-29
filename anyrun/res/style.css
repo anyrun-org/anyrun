@@ -1,0 +1,20 @@
+#window {
+  border-radius: 10px;
+}
+
+list#main {
+  background-color: rgba(0, 0, 0, 0);
+  border-radius: 10px;
+}
+
+list#plugin {
+  background-color: rgba(0, 0, 0, 0);
+}
+
+label#match-desc {
+  font-size: 10px;
+}
+
+label#plugin {
+  font-size: 14px;
+}

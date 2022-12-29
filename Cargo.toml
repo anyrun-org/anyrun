@@ -1,0 +1,9 @@
+[workspace]
+members = [
+  "anyrun",
+  "anyrun-plugin",
+  "anyrun-interface",
+  "plugins/applications",
+  "plugins/symbols", 
+  "plugins/web-search",
+]
