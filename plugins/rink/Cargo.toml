@@ -1,5 +1,5 @@
 [package]
-name = "web-search"
+name = "rink"
 version = "0.1.0"
 edition = "2021"
 
@@ -11,3 +11,4 @@ crate-type = ["cdylib"]
 [dependencies]
 anyrun-plugin = { path = "../../anyrun-plugin" }
 abi_stable = "0.11.1"
+rink-core = "0.6"

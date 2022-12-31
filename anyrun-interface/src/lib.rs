@@ -29,15 +29,18 @@ pub struct PluginInfo {
 }
 
 /// Represents a match from a plugin
+///
+/// The `title` and `description` support pango markup.
+/// Refer to [Pango Markup](https://docs.gtk.org/Pango/pango_markup.html) for how to use pango markup.
 #[repr(C)]
 #[derive(StableAbi, Clone)]
 pub struct Match {
     pub title: RString,
     pub description: ROption<RString>,
     /// The icon name from the icon theme in use
-    pub icon: RString,
-    /// For runners to differentiate between the matches.
-    pub id: u64,
+    pub icon: ROption<RString>,
+    /// For runners to differentiate between the matches. Not required.
+    pub id: ROption<u64>,
 }
 
 /// For determining how anyrun should proceed after the plugin has handled a match selection
@@ -48,6 +51,8 @@ pub enum HandleResult {
     Close,
     /// Refresh the items. Useful if the runner wants to alter results in place.
     Refresh,
+    /// Copy the content, due to how copying works it must be done like this.
+    Copy(RVec<u8>),
 }
 
 #[repr(C)]

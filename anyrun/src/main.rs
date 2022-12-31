@@ -1,15 +1,11 @@
-use std::{
-    cell::RefCell,
-    env, fs,
-    path::{Path, PathBuf},
-    rc::Rc,
-    time::Duration,
-};
+use std::{cell::RefCell, env, fs, path::PathBuf, rc::Rc, time::Duration};
 
 use abi_stable::std_types::{ROption, RVec};
-use gtk::{gdk, glib, prelude::*};
-use serde::Deserialize;
 use anyrun_interface::{HandleResult, Match, PluginInfo, PluginRef, PollResult};
+use gtk::{gdk, glib, prelude::*};
+use nix::unistd;
+use serde::Deserialize;
+use wl_clipboard_rs::copy;
 
 #[derive(Deserialize)]
 struct Config {
@@ -17,6 +13,7 @@ struct Config {
     plugins: Vec<PathBuf>,
 }
 
+/// A "view" of plugin's info and matches
 #[derive(Clone)]
 struct PluginView {
     plugin: PluginRef,
@@ -29,11 +26,32 @@ struct Args {
     config_dir: Option<String>,
 }
 
+/// Actions to run after GTK has finished
+enum PostRunAction {
+    Copy(Vec<u8>),
+    None,
+}
+
+/// Some data that needs to be shared between various parts
+struct RuntimeData {
+    args: Args,
+    post_run_action: PostRunAction,
+}
+
+/// The naming scheme for CSS styling
+///
+/// Refer to [GTK 3.0 CSS Overview](https://docs.gtk.org/gtk3/css-overview.html)
+/// and [GTK 3.0 CSS Properties](https://docs.gtk.org/gtk3/css-properties.html) for how to style.
 mod style_names {
+    /// The text entry box
     pub const ENTRY: &str = "entry";
+    /// "Main" widgets (main GtkListBox, main GtkBox)
     pub const MAIN: &str = "main";
+    /// The window
     pub const WINDOW: &str = "window";
+    /// Widgets related to the whole plugin. Including the info box
     pub const PLUGIN: &str = "plugin";
+    /// Widgets for the specific match `MATCH_*` names are for more specific parts.
     pub const MATCH: &str = "match";
 
     pub const MATCH_TITLE: &str = "match-title";
@@ -43,8 +61,9 @@ mod style_names {
 
 fn main() {
     let app = gtk::Application::new(Some("com.kirottu.anyrun"), Default::default());
-    let args: Rc<RefCell<Option<Args>>> = Rc::new(RefCell::new(None));
+    let runtime_data: Rc<RefCell<Option<RuntimeData>>> = Rc::new(RefCell::new(None));
 
+    // Add the launch options to the GTK Application
     app.add_main_option(
         "override-plugins",
         glib::Char('o' as i8),
@@ -62,30 +81,60 @@ fn main() {
         None,
     );
 
-    let args_clone = args.clone();
+    let runtime_data_clone = runtime_data.clone();
     app.connect_handle_local_options(move |_app, dict| {
         let override_plugins = dict.lookup::<Vec<String>>("override-plugins").unwrap();
         let config_dir = dict.lookup::<String>("config-dir").unwrap();
 
-        *args_clone.borrow_mut() = Some(Args {
-            override_plugins,
-            config_dir,
+        *runtime_data_clone.borrow_mut() = Some(RuntimeData {
+            args: Args {
+                override_plugins,
+                config_dir,
+            },
+            post_run_action: PostRunAction::None,
         });
         -1 // Magic GTK number to continue running
     });
 
-    let args_clone = args.clone();
-    app.connect_activate(move |app| activate(app, args_clone.clone()));
+    let runtime_data_clone = runtime_data.clone();
+    app.connect_activate(move |app| activate(app, runtime_data_clone.clone()));
 
     app.run();
+
+    let runtime_data = runtime_data.borrow_mut().take().unwrap();
+
+    // Perform a post run action if one is set
+    match runtime_data.post_run_action {
+        PostRunAction::Copy(bytes) => match unsafe { unistd::fork() } {
+            // The parent process just exits and prints that out
+            Ok(unistd::ForkResult::Parent { .. }) => {
+                println!("Child spawned to serve copy requests.");
+            }
+            // Child process starts serving copy requests
+            Ok(unistd::ForkResult::Child) => {
+                let mut opts = copy::Options::new();
+                opts.foreground(true);
+                opts.copy(
+                    copy::Source::Bytes(bytes.into_boxed_slice()),
+                    copy::MimeType::Autodetect,
+                )
+                .expect("Failed to serve copy bytes");
+            }
+            Err(why) => {
+                println!("Failed to fork for copy sharing: {}", why);
+            }
+        },
+        PostRunAction::None => (),
+    }
 }
 
-fn activate(app: &gtk::Application, args: Rc<RefCell<Option<Args>>>) {
+fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>>>) {
     // Figure out the config dir
-    let config_dir = args
+    let config_dir = runtime_data
         .borrow()
         .as_ref()
         .unwrap()
+        .args
         .config_dir
         .clone()
         .unwrap_or(format!(
@@ -127,13 +176,19 @@ fn activate(app: &gtk::Application, args: Rc<RefCell<Option<Args>>>) {
     );
 
     // Use the plugins in the config file, or the plugins specified with the override
-    let plugins = match &args.borrow().as_ref().unwrap().override_plugins {
-        Some(plugins) => plugins.iter().map(|path| PathBuf::from(path)).collect(),
+    let plugins = match &runtime_data
+        .borrow()
+        .as_ref()
+        .unwrap()
+        .args
+        .override_plugins
+    {
+        Some(plugins) => plugins.iter().map(PathBuf::from).collect(),
         None => config.plugins,
     };
 
     // Make sure at least one plugin is specified
-    if plugins.len() == 0 {
+    if plugins.is_empty() {
         println!("At least one plugin needs to be enabled!");
         app.quit();
     }
@@ -199,10 +254,10 @@ fn activate(app: &gtk::Application, args: Rc<RefCell<Option<Args>>>) {
     for plugin_view in plugins.iter() {
         let plugins_clone = plugins.clone();
         plugin_view.list.connect_row_selected(move |list, row| {
-            if let Some(_) = row {
+            if row.is_some() {
                 let combined_matches = plugins_clone
                     .iter()
-                    .map(|view| {
+                    .flat_map(|view| {
                         view.list.children().into_iter().map(|child| {
                             (
                                 child.dynamic_cast::<gtk::ListBoxRow>().unwrap(),
@@ -210,9 +265,9 @@ fn activate(app: &gtk::Application, args: Rc<RefCell<Option<Args>>>) {
                             )
                         })
                     })
-                    .flatten()
                     .collect::<Vec<(gtk::ListBoxRow, gtk::ListBox)>>();
 
+                // Unselect everything except the new selection
                 for (_, _list) in combined_matches {
                     if _list != *list {
                         _list.select_row(None::<&gtk::ListBoxRow>);
@@ -237,50 +292,61 @@ fn activate(app: &gtk::Application, args: Rc<RefCell<Option<Args>>>) {
 
     // Handle other key presses for selection control and all other things that may be needed
     let entry_clone = entry.clone();
-    let plugins_clone = plugins.clone();
     window.connect_key_press_event(move |window, event| {
         use gdk::keys::constants;
         match event.keyval() {
+            // Close window on escape
             constants::Escape => {
                 window.close();
                 Inhibit(true)
             }
+            // Handle selections
             constants::Down | constants::Tab | constants::Up => {
-                let combined_matches = plugins_clone
+                // Combine all of the matches into a `Vec` to allow for easier handling of the selection
+                let combined_matches = plugins
                     .iter()
-                    .map(|view| {
+                    .flat_map(|view| {
                         view.list.children().into_iter().map(|child| {
                             (
+                                // All children of lists are GtkListBoxRow widgets
                                 child.dynamic_cast::<gtk::ListBoxRow>().unwrap(),
                                 view.list.clone(),
                             )
                         })
                     })
-                    .flatten()
                     .collect::<Vec<(gtk::ListBoxRow, gtk::ListBox)>>();
 
-                let (selected_match, selected_list) = match plugins_clone
+                // Get the selected match
+                let (selected_match, selected_list) = match plugins
                     .iter()
                     .find_map(|view| view.list.selected_row().map(|row| (row, view.list.clone())))
                 {
                     Some(selected) => selected,
                     None => {
-                        if event.keyval() != constants::Up {
-                            combined_matches[0]
+                        // If nothing is selected select either the top or bottom match based on the input
+                        match event.keyval() {
+                            constants::Down | constants::Tab => combined_matches[0]
                                 .1
-                                .select_row(Some(&combined_matches[0].0));
+                                .select_row(Some(&combined_matches[0].0)),
+                            constants::Up => combined_matches[combined_matches.len() - 1]
+                                .1
+                                .select_row(Some(&combined_matches[combined_matches.len() - 1].0)),
+                            _ => unreachable!(),
                         }
                         return Inhibit(true);
                     }
                 };
 
+                // Clear the previous selection
                 selected_list.select_row(None::<&gtk::ListBoxRow>);
 
+                // Get the index of the current selection
                 let index = combined_matches
                     .iter()
                     .position(|(row, _)| *row == selected_match)
                     .unwrap();
 
+                // Move the selection based on the input, loops from top to bottom and vice versa
                 match event.keyval() {
                     constants::Down | constants::Tab => {
                         if index < combined_matches.len() - 1 {
@@ -309,18 +375,19 @@ fn activate(app: &gtk::Application, args: Rc<RefCell<Option<Args>>>) {
 
                 Inhibit(true)
             }
+            // Handle when the selected match is "activated"
             constants::Return => {
-                let (selected_match, plugin) = match plugins_clone.iter().find_map(|view| {
-                    view.list
-                        .selected_row()
-                        .map(|row| (row, view.plugin.clone()))
-                }) {
+                let (selected_match, plugin) = match plugins
+                    .iter()
+                    .find_map(|view| view.list.selected_row().map(|row| (row, view.plugin)))
+                {
                     Some(selected) => selected,
                     None => {
                         return Inhibit(false);
                     }
                 };
 
+                // Perform actions based on the result of handling the selection
                 match plugin.handle_selection()(unsafe {
                     (*selected_match.data::<Match>("match").unwrap().as_ptr()).clone()
                 }) {
@@ -329,8 +396,14 @@ fn activate(app: &gtk::Application, args: Rc<RefCell<Option<Args>>>) {
                         Inhibit(true)
                     }
                     HandleResult::Refresh => {
-                        refresh_matches(entry_clone.text().to_string(), plugins_clone.clone());
+                        refresh_matches(entry_clone.text().to_string(), plugins.clone());
                         Inhibit(false)
+                    }
+                    HandleResult::Copy(bytes) => {
+                        runtime_data.borrow_mut().as_mut().unwrap().post_run_action =
+                            PostRunAction::Copy(bytes.into());
+                        window.close();
+                        Inhibit(true)
                     }
                 }
             }
@@ -338,7 +411,10 @@ fn activate(app: &gtk::Application, args: Rc<RefCell<Option<Args>>>) {
         }
     });
 
-    let main_vbox = gtk::Box::new(gtk::Orientation::Vertical, 10);
+    let main_vbox = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .name(style_names::MAIN)
+        .build();
     main_vbox.add(&entry);
     window.add(&main_vbox);
     window.show_all();
@@ -348,11 +424,13 @@ fn activate(app: &gtk::Application, args: Rc<RefCell<Option<Args>>>) {
 }
 
 fn handle_matches(matches: RVec<Match>, plugin_view: PluginView) {
+    // Clear out the old matches from the list
     for widget in plugin_view.list.children() {
         plugin_view.list.remove(&widget);
     }
 
-    if matches.len() == 0 {
+    // If there are no matches, hide the plugin's results
+    if matches.is_empty() {
         plugin_view.row.hide();
         return;
     }
@@ -364,17 +442,22 @@ fn handle_matches(matches: RVec<Match>, plugin_view: PluginView) {
             .name(style_names::MATCH)
             .hexpand(true)
             .build();
-        hbox.add(
-            &gtk::Image::builder()
-                .icon_name(&_match.icon)
-                .name(style_names::MATCH)
-                .pixel_size(32)
-                .build(),
-        );
+        if let ROption::RSome(icon) = &_match.icon {
+            hbox.add(
+                &gtk::Image::builder()
+                    .icon_name(icon)
+                    .name(style_names::MATCH)
+                    .pixel_size(32)
+                    .build(),
+            );
+        }
         let title = gtk::Label::builder()
             .name(style_names::MATCH_TITLE)
+            .wrap(true)
+            .use_markup(true) // Allow pango markup
             .halign(gtk::Align::Start)
             .valign(gtk::Align::Center)
+            .vexpand(true)
             .label(&_match.title)
             .build();
 
@@ -391,6 +474,8 @@ fn handle_matches(matches: RVec<Match>, plugin_view: PluginView) {
                 title_desc_box.add(
                     &gtk::Label::builder()
                         .name(style_names::MATCH_DESC)
+                        .wrap(true)
+                        .use_markup(true) // Allow pango markup
                         .halign(gtk::Align::Start)
                         .valign(gtk::Align::Center)
                         .label(desc)
@@ -402,7 +487,10 @@ fn handle_matches(matches: RVec<Match>, plugin_view: PluginView) {
                 hbox.add(&title);
             }
         }
-        let row = gtk::ListBoxRow::builder().name(style_names::MATCH).build();
+        let row = gtk::ListBoxRow::builder()
+            .name(style_names::MATCH)
+            .height_request(32)
+            .build();
         row.add(&hbox);
         // GTK data setting is not type checked, so it is unsafe.
         // Only `Match` objects are stored though.
@@ -416,11 +504,13 @@ fn handle_matches(matches: RVec<Match>, plugin_view: PluginView) {
     plugin_view.row.show_all();
 }
 
+/// Create the info box for the plugin
 fn create_info_box(info: &PluginInfo) -> gtk::Box {
     let info_box = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
         .name(style_names::PLUGIN)
         .width_request(200)
+        .height_request(32)
         .expand(false)
         .spacing(10)
         .build();
@@ -428,7 +518,7 @@ fn create_info_box(info: &PluginInfo) -> gtk::Box {
         &gtk::Image::builder()
             .icon_name(&info.icon)
             .name(style_names::PLUGIN)
-            .pixel_size(48)
+            .pixel_size(32)
             .halign(gtk::Align::Start)
             .valign(gtk::Align::Start)
             .build(),
@@ -438,11 +528,23 @@ fn create_info_box(info: &PluginInfo) -> gtk::Box {
             .label(&info.name)
             .name(style_names::PLUGIN)
             .halign(gtk::Align::End)
-            .valign(gtk::Align::Start)
+            .valign(gtk::Align::Center)
             .hexpand(true)
             .build(),
     );
-    info_box
+    // This is so that we can align the plugin name with the icon. GTK would not let it be properly aligned otherwise.
+    let main_box = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .name(style_names::PLUGIN)
+        .build();
+    main_box.add(&info_box);
+    main_box.add(
+        &gtk::Box::builder()
+            .orientation(gtk::Orientation::Horizontal)
+            .name(style_names::PLUGIN)
+            .build(),
+    );
+    main_box
 }
 
 /// Refresh the matches from the plugins
@@ -450,9 +552,14 @@ fn refresh_matches(input: String, plugins: Rc<Vec<PluginView>>) {
     for plugin_view in plugins.iter() {
         let id = plugin_view.plugin.get_matches()(input.clone().into());
         let plugin_view = plugin_view.clone();
-        glib::timeout_add_local(Duration::from_micros(1000), move || {
-            async_match(plugin_view.clone(), id)
-        });
+        // If the input is empty, skip getting matches and just clear everything out.
+        if input.is_empty() {
+            handle_matches(RVec::new(), plugin_view);
+        } else {
+            glib::timeout_add_local(Duration::from_micros(1000), move || {
+                async_match(plugin_view.clone(), id)
+            });
+        }
     }
 }
 

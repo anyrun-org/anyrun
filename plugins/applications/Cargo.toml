@@ -12,3 +12,4 @@ crate-type = ["cdylib"]
 anyrun-plugin = { path = "../../anyrun-plugin" }
 abi_stable = "0.11.1"
 sublime_fuzzy = "0.7.0"
+fuzzy-matcher = "0.3.7"

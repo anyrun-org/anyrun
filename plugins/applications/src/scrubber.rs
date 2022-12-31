@@ -115,7 +115,7 @@ pub fn scrubber() -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std::error::Error>
                 Ok(entry) => entry,
                 Err(_why) => return None,
             };
-            DesktopEntry::from_dir_entry(&entry).map(|val| (val, id))
+            DesktopEntry::from_dir_entry(entry).map(|val| (val, id))
         })
         .collect())
 }

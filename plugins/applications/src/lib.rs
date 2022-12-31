@@ -1,18 +1,16 @@
 use abi_stable::std_types::{ROption, RString, RVec};
-use scrubber::DesktopEntry;
-use std::{process::Command, sync::RwLock, thread};
 use anyrun_plugin::{anyrun_interface::HandleResult, *};
+use fuzzy_matcher::FuzzyMatcher;
+use scrubber::DesktopEntry;
+use std::process::Command;
 
 mod scrubber;
 
-static ENTRIES: RwLock<Vec<(DesktopEntry, u64)>> = RwLock::new(Vec::new());
-
-pub fn handler(selection: Match) -> HandleResult {
-    let entries = ENTRIES.read().unwrap();
+pub fn handler(selection: Match, entries: &mut Vec<(DesktopEntry, u64)>) -> HandleResult {
     let entry = entries
         .iter()
         .find_map(|(entry, id)| {
-            if *id == selection.id {
+            if *id == selection.id.unwrap() {
                 Some(entry)
             } else {
                 None
@@ -27,46 +25,32 @@ pub fn handler(selection: Match) -> HandleResult {
     HandleResult::Close
 }
 
-pub fn init(_config_dir: RString) {
-    thread::spawn(|| {
-        *ENTRIES.write().unwrap() = match scrubber::scrubber() {
-            Ok(results) => results,
-            Err(why) => {
-                println!("Error reading desktop entries: {}", why);
-                return;
-            }
-        };
-    });
+pub fn init(_config_dir: RString) -> Vec<(DesktopEntry, u64)> {
+    scrubber::scrubber().expect("Failed to load desktop entries!")
 }
 
-pub fn get_matches(input: RString) -> RVec<Match> {
-    if input.len() == 0 {
-        return RVec::new();
-    }
-
-    let mut entries = ENTRIES
-        .read()
-        .unwrap()
+pub fn get_matches(input: RString, entries: &mut Vec<(DesktopEntry, u64)>) -> RVec<Match> {
+    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default().smart_case();
+    let mut entries = entries
         .clone()
         .into_iter()
         .filter_map(|(entry, id)| {
-            match sublime_fuzzy::best_match(&input.to_lowercase(), &entry.name.to_lowercase()) {
-                Some(val) => Some((entry, id, val.score())),
-                None => None,
-            }
+            matcher
+                .fuzzy_match(&entry.name, &input)
+                .map(|val| (entry, id, val))
         })
-        .collect::<Vec<(DesktopEntry, u64, isize)>>();
+        .collect::<Vec<_>>();
 
-    entries.sort_by(|a, b| b.1.cmp(&a.1));
+    entries.sort_by(|a, b| b.2.cmp(&a.2));
 
     entries.truncate(5);
     entries
         .into_iter()
         .map(|(entry, id, _)| Match {
             title: entry.name.into(),
-            icon: entry.icon.into(),
+            icon: ROption::RSome(entry.icon.into()),
             description: ROption::RNone,
-            id,
+            id: ROption::RSome(id),
         })
         .collect()
 }
@@ -78,4 +62,4 @@ pub fn info() -> PluginInfo {
     }
 }
 
-plugin!(init, info, get_matches, handler);
+plugin!(init, info, get_matches, handler, Vec<(DesktopEntry, u64)>);
