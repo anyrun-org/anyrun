@@ -56,7 +56,6 @@ mod style_names {
 
     pub const MATCH_TITLE: &str = "match-title";
     pub const MATCH_DESC: &str = "match-desc";
-    pub const TITLE_DESC_BOX: &str = "title-desc-box";
 }
 
 fn main() {
@@ -466,7 +465,7 @@ fn handle_matches(matches: RVec<Match>, plugin_view: PluginView) {
             ROption::RSome(desc) => {
                 let title_desc_box = gtk::Box::builder()
                     .orientation(gtk::Orientation::Vertical)
-                    .name(style_names::TITLE_DESC_BOX)
+                    .name(style_names::MATCH)
                     .hexpand(true)
                     .vexpand(true)
                     .build();
