@@ -1,5 +1,146 @@
-# AnyRun
+# anyrun
 
 A wayland native krunner-like runner, made with customizability in mind.
 
+# Features
 
+- Style customizability with GTK+ CSS
+  - More info in [Styling](#Styling)
+- Can do basically anything
+  - As long as it can work with input and selection
+  - Hence the name anyrun
+- Easy to make plugins
+  - You only need 4 functions!
+  - See [Rink](plugins/rink) for a simple example. More info in the documentation of the [anyrun-plugin](anyrun-plugin) crate. 
+- Responsive
+  - Asynchronous running of plugin functions
+- Wayland native
+  - GTK layer shell for overlaying the window
+  - data-control for managing the clipboard
+
+# Usage
+
+## Plugins
+
+Anyrun requires plugins to function, as they provide the results for input. The list of plugins in this repository is as follows:
+
+- [Applications](plugins/applications)
+  - Search and run system & user specific desktop entries
+- [Symbols](plugins/symbols)
+  - Search unicode symbols
+  - [User defined symbols](plugins/symbols/README.md#User-defined-symbols)
+- [Rink](plugins/rink)
+  - Calculator & unit conversion
+- [Shell](plugins/shell)
+  - Run shell commands
+
+## Configuration
+
+The default configuration directory is `$HOME/.config/anyrun` the structure of the config directory is as follows and should be respected by plugins:
+
+```
+- anyrun
+  - plugins
+    <plugin dynamic libraries>
+  config.ron
+  style.css
+  <any plugin specific config files>
+
+```
+
+The config file has the following structure, and as seen in the name uses the `ron` language:
+```ron
+Config(
+  width: 800, // The width of the window
+  plugins: [
+    "libapplications.so", // Relative paths are looked up in the <config dir>/plugins/ directory
+    "/home/kirottu/Projects/anyrun/target/debug/libsymbols.so", // Absolute paths are well, asbolute and loaded as is. Useful for development.
+  ]
+)
+
+```
+
+## Styling
+
+Anyrun supports [GTK+ CSS](https://docs.gtk.org/gtk3/css-overview.html) styling. The names for the different widgets and widgets associated with them are as follows:
+
+- `entry`: The entry box
+  - `GtkEntry`
+- `window`: The window
+  - `GtkWindow`
+- `main`: "Main" parts of the layout
+  - `GtkListBox`: The main list containing the plugins
+  - `GtkBox`: The box combining the main list and the entry box
+- `plugin`: Anything for the entire plugin
+  - `GtkLabel`: The name of the plugin
+  - `GtkBox`: The different boxes in the plugin view
+  - `GtkImage`: The icon of the plugin
+- `match`: Widgets of a specific match
+  - `GtkBox`: The main box of the match and the box containing the title and the description if present
+  - `GtkImage`: The icon of the match (if present)
+- `match-title`: Specific for the title of the match
+  - `GtkLabel`
+- `match-desc`: Specific for the description of the match
+  - `GtkLabel`
+
+## Arguments
+
+The custom arguments for anyrun are as follows:
+
+- `--config-dir`, `-c`: Override the configuration directory
+- `--override-plugins`, `-o`: Override the plugins to be used, provided in the same way as in the config file.
+
+# Plugin development
+
+The plugin API is intentionally very simple to use. This is all you need for a plugin:
+
+`Cargo.toml`:
+```toml
+#[package] omitted
+[lib]
+crate-type = ["cdylib"] # Required to build a dynamic library that can be loaded by anyrun
+
+[dependencies]
+anyrun-plugin = { git = "https://github.com/Kirottu/anyrun" }
+abi_stable = "0.11.1"
+# Any other dependencies you may have
+```
+
+`lib.rs`:
+```rs
+use abi_stable::std_types::{RString, RVec, ROption};
+use anyrun_plugin::{plugin, PluginInfo, Match, HandleResult};
+
+fn init(config_dir: RString) {
+  // Your initialization code. This is run in another thread.
+  // The return type is the data you want to share between functions
+}
+
+fn info() -> PluginInfo {
+  PluginInfo {
+    name: "Demo".into(),
+    icon: "help-about".into(), // Icon from the icon theme
+  }
+}
+
+fn get_matches(input: RString, data: &mut ()) -> RVec<Match> {
+  // The logic to get matches from the input text in the `input` argument.
+  // The `data` is a mutable reference to the shared data type later specified. 
+  vec![Match {
+    title: "Test match".into(),
+    icon: ROption::RSome("help-about"),
+    description: ROption::RSome("Test match for the plugin API demo"),
+    id: ROption::RNone, // The ID can be used for identifying the match later, is not required
+  }].into()
+}
+
+fn handler(selection: Match, data: &mut ()) -> HandleResult {
+  // Handle the selected match and return how anyrun should proceed
+  HandleResult::Close
+}
+
+// The type of the data we want to store is the last one, we don't need it in this one so it can be the unit type.
+plugin!(init, info, get_matches, handler, ());
+```
+
+And that's it! That's all of the API needed to make runners. Refer to the plugins in the [plugins](plugins) folder for more examples.
