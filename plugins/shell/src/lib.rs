@@ -7,12 +7,14 @@ use serde::Deserialize;
 #[derive(Deserialize)]
 struct Config {
     prefix: String,
+    shell: Option<String>,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Config {
             prefix: ":sh".to_string(),
+            shell: None,
         }
     }
 }
@@ -39,8 +41,14 @@ fn get_matches(input: RString, config: &mut Config) -> RVec<Match> {
             vec![Match {
                 title: command.into(),
                 description: ROption::RSome(
-                    env::var("SHELL")
-                        .unwrap_or_else(|_| "No shell!".to_string())
+                    config
+                        .shell
+                        .clone()
+                        .unwrap_or_else(|| {
+                            env::var("SHELL").unwrap_or_else(|_| {
+                                "The shell could not be determined!".to_string()
+                            })
+                        })
                         .into(),
                 ),
                 icon: ROption::RNone,
