@@ -24,7 +24,7 @@ A wayland native krunner-like runner, made with customizability in mind.
 
 Clone the repository, and install the `anyrun` binary with `cargo install --path anyrun/` inside the project's directory.
 
-After that, build the plugins you want and configure anyrun as explained in [Configuration](Usage#Configuration).
+After that, build the plugins you want and configure anyrun as explained in [Configuration](#Configuration).
 
 ## Plugins
 
