@@ -20,11 +20,43 @@ A wayland native krunner-like runner, made with customizability in mind.
 
 # Usage
 
+## Dependencies
+
+Anyrun mainly depends various GTK libraries, and rust of course for building the project. Rust you can get with [rustup](https://rustup.rs). The rest are statically linked in the binary.
+Here are the libraries you need to have to build & run it:
+- `gtk-layer-shell (libgtk-layer-shell)`
+- `gtk3 (libgtk-3 libgdk-3)`
+- `pango (libpango-1.0)`
+- `cairo (libcairo libcairo-gobject)`
+- `gdk-pixbuf2 (libgdk_pixbuf-2.0)`
+- `glib2 (libgobject-2.0 libgio-2.0 libglib-2.0)`
+
 ## Installation
 
-Clone the repository, and install the `anyrun` binary with `cargo install --path anyrun/` inside the project's directory.
+Make sure all of the dependencies are installed, and then run the following commands in order:
 
-After that, build the plugins you want and configure anyrun as explained in [Configuration](#Configuration).
+```sh
+git clone https://github.com/Kirottu/anyrun.git # Clone the repository
+cd anyrun # Change the active directory to it
+cargo build --release # Build all the packages
+cargo install --path anyrun/ # Install the anyrun binary
+mkdir -p ~/.config/anyrun/plugins # Create the config directory and the plugins subdirectory
+cp target/release/*.so ~/.config/anyrun/plugins # Copy all of the built plugins to the correct directory
+```
+
+After that you need to create the configuration file and place it in `~/.config/anyrun/config.ron`. A config file with all of the included plugins is as follows:
+```ron
+Config(
+  width: 800,
+  plugins: [
+    "libapplications.so",
+    "libsymbols.so",
+    "libshell.so",
+    "libtranslate.so",
+  ],
+)
+```
+
 
 ## Plugins
 
@@ -61,7 +93,7 @@ Config(
   plugins: [
     "libapplications.so", // Relative paths are looked up in the <config dir>/plugins/ directory
     "/home/kirottu/Projects/anyrun/target/debug/libsymbols.so", // Absolute paths are well, asbolute and loaded as is. Useful for development.
-  ]
+  ],
 )
 
 ```
