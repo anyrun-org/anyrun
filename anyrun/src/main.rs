@@ -422,7 +422,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
     main_list.show();
 }
 
-fn handle_matches(matches: RVec<Match>, plugin_view: PluginView) {
+fn handle_matches(plugin_view: PluginView, plugins: Rc<Vec<PluginView>>, matches: RVec<Match>) {
     // Clear out the old matches from the list
     for widget in plugin_view.list.children() {
         plugin_view.list.remove(&widget);
@@ -501,6 +501,22 @@ fn handle_matches(matches: RVec<Match>, plugin_view: PluginView) {
 
     // Refresh the items in the view
     plugin_view.row.show_all();
+
+    let combined_matches = plugins
+        .iter()
+        .flat_map(|view| {
+            view.list.children().into_iter().map(|child| {
+                (
+                    child.dynamic_cast::<gtk::ListBoxRow>().unwrap(),
+                    view.list.clone(),
+                )
+            })
+        })
+        .collect::<Vec<(gtk::ListBoxRow, gtk::ListBox)>>();
+
+    if let Some((row, list)) = combined_matches.get(0) {
+        list.select_row(Some(row));
+    }
 }
 
 /// Create the info box for the plugin
@@ -551,22 +567,23 @@ fn refresh_matches(input: String, plugins: Rc<Vec<PluginView>>) {
     for plugin_view in plugins.iter() {
         let id = plugin_view.plugin.get_matches()(input.clone().into());
         let plugin_view = plugin_view.clone();
+        let plugins = plugins.clone();
         // If the input is empty, skip getting matches and just clear everything out.
         if input.is_empty() {
-            handle_matches(RVec::new(), plugin_view);
+            handle_matches(plugin_view, plugins, RVec::new());
         } else {
             glib::timeout_add_local(Duration::from_micros(1000), move || {
-                async_match(plugin_view.clone(), id)
+                async_match(plugin_view.clone(), plugins.clone(), id)
             });
         }
     }
 }
 
 /// Handle the asynchronously running match task
-fn async_match(plugin_view: PluginView, id: u64) -> glib::Continue {
+fn async_match(plugin_view: PluginView, plugins: Rc<Vec<PluginView>>, id: u64) -> glib::Continue {
     match plugin_view.plugin.poll_matches()(id) {
         PollResult::Ready(matches) => {
-            handle_matches(matches, plugin_view);
+            handle_matches(plugin_view, plugins, matches);
             glib::Continue(false)
         }
         PollResult::Pending => glib::Continue(true),
