@@ -1,7 +1,35 @@
 use abi_stable::std_types::{ROption, RString, RVec};
 use anyrun_plugin::{anyrun_interface::HandleResult, plugin, Match, PluginInfo};
+use rink_core::{ast, date, gnu_units, CURRENCY_FILE};
 
-fn init(_config_dir: RString) {}
+fn init(_config_dir: RString) -> rink_core::Context {
+    let mut ctx = rink_core::Context::new();
+
+    let units = gnu_units::parse_str(rink_core::DEFAULT_FILE.unwrap());
+    let dates = date::parse_datefile(rink_core::DATES_FILE);
+
+    let mut currency_defs = Vec::new();
+
+    match reqwest::blocking::get("https://rinkcalc.app/data/currency.json") {
+        Ok(response) => match response.json::<ast::Defs>() {
+            Ok(mut live_defs) => {
+                currency_defs.append(&mut live_defs.defs);
+            }
+            Err(why) => println!("Error parsing currency json: {}", why),
+        },
+        Err(why) => println!("Error fetching up-to-date currency conversions: {}", why),
+    }
+
+    currency_defs.append(&mut gnu_units::parse_str(CURRENCY_FILE).defs);
+
+    ctx.load(units);
+    ctx.load(ast::Defs {
+        defs: currency_defs,
+    });
+    ctx.load_dates(dates);
+
+    ctx
+}
 
 fn info() -> PluginInfo {
     PluginInfo {
@@ -10,9 +38,8 @@ fn info() -> PluginInfo {
     }
 }
 
-fn get_matches(input: RString, _: &mut ()) -> RVec<Match> {
-    let mut ctx = rink_core::simple_context().unwrap();
-    match rink_core::one_line(&mut ctx, &input) {
+fn get_matches(input: RString, ctx: &mut rink_core::Context) -> RVec<Match> {
+    match rink_core::one_line(ctx, &input) {
         Ok(result) => vec![Match {
             title: result.into(),
             icon: ROption::RNone,
@@ -24,8 +51,8 @@ fn get_matches(input: RString, _: &mut ()) -> RVec<Match> {
     }
 }
 
-fn handler(selection: Match, _: &mut ()) -> HandleResult {
+fn handler(selection: Match, _: &mut rink_core::Context) -> HandleResult {
     HandleResult::Copy(selection.title.into_bytes())
 }
 
-plugin!(init, info, get_matches, handler, ());
+plugin!(init, info, get_matches, handler, rink_core::Context);
