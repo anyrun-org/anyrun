@@ -37,6 +37,7 @@ pub fn get_matches(input: RString, entries: &mut Vec<(DesktopEntry, u64)>) -> RV
         .filter_map(|(entry, id)| {
             matcher
                 .fuzzy_match(&entry.name, &input)
+                .max(matcher.fuzzy_match(&entry.exec, &input))
                 .map(|val| (entry, id, val))
         })
         .collect::<Vec<_>>();
