@@ -2,7 +2,7 @@ use std::{cell::RefCell, env, fs, path::PathBuf, rc::Rc, time::Duration};
 
 use abi_stable::std_types::{ROption, RVec};
 use anyrun_interface::{HandleResult, Match, PluginInfo, PluginRef, PollResult};
-use gtk::{gdk, glib, prelude::*};
+use gtk::{gdk, gdk_pixbuf, glib, prelude::*};
 use nix::unistd;
 use serde::Deserialize;
 use wl_clipboard_rs::copy;
@@ -442,13 +442,26 @@ fn handle_matches(plugin_view: PluginView, plugins: Rc<Vec<PluginView>>, matches
             .hexpand(true)
             .build();
         if let ROption::RSome(icon) = &_match.icon {
-            hbox.add(
-                &gtk::Image::builder()
-                    .icon_name(icon)
-                    .name(style_names::MATCH)
-                    .pixel_size(32)
-                    .build(),
-            );
+            let mut builder = gtk::Image::builder()
+                .name(style_names::MATCH)
+                .pixel_size(32);
+
+            let path = PathBuf::from(icon.as_str());
+
+            // If the icon path is absolute, load that file
+            if path.is_absolute() {
+                match gdk_pixbuf::Pixbuf::from_file_at_size(icon.as_str(), 32, 32) {
+                    Ok(pixbuf) => builder = builder.pixbuf(&pixbuf),
+                    Err(why) => {
+                        println!("Failed to load icon file: {}", why);
+                        builder = builder.icon_name("image-missing"); // Set "broken" icon
+                    }
+                }
+            } else {
+                builder = builder.icon_name(icon);
+            }
+
+            hbox.add(&builder.build());
         }
         let title = gtk::Label::builder()
             .name(style_names::MATCH_TITLE)
