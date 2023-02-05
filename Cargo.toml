@@ -8,5 +8,4 @@ members = [
   "plugins/rink",
   "plugins/shell",
   "plugins/translate",
-  "plugins/randr",
 ]
