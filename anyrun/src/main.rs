@@ -159,6 +159,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
     gtk_layer_shell::init_for_window(&window);
     gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Top, true);
     gtk_layer_shell::set_keyboard_mode(&window, gtk_layer_shell::KeyboardMode::Exclusive);
+    gtk_layer_shell::set_layer(&window, gtk_layer_shell::Layer::Overlay);
 
     // Try to load custom CSS, if it fails load the default CSS
     let provider = gtk::CssProvider::new();
