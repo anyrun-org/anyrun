@@ -48,6 +48,7 @@ After that you need to create the configuration file and place it in `~/.config/
 ```ron
 Config(
   width: 800,
+  position: Top,
   plugins: [
     "libapplications.so",
     "libsymbols.so",
