@@ -8,9 +8,16 @@ use serde::Deserialize;
 use wl_clipboard_rs::copy;
 
 #[derive(Deserialize)]
+enum Position {
+    Top,
+    Center,
+}
+
+#[derive(Deserialize)]
 struct Config {
     width: u32,
     plugins: Vec<PathBuf>,
+    position: Position,
 }
 
 /// A "view" of plugin's info and matches
@@ -157,7 +164,13 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
 
     // Init GTK layer shell
     gtk_layer_shell::init_for_window(&window);
-    gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Top, true);
+
+    // Anchor based on configured position
+    match config.position {
+        Position::Top => gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Top, true),
+        Position::Center => (),
+    }
+
     gtk_layer_shell::set_keyboard_mode(&window, gtk_layer_shell::KeyboardMode::Exclusive);
     gtk_layer_shell::set_layer(&window, gtk_layer_shell::Layer::Overlay);
 
