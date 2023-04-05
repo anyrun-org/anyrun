@@ -312,9 +312,28 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
         refresh_matches(entry.text().to_string(), runtime_data_clone.clone())
     });
 
+    let anchor_set = Rc::new(RefCell::new(false));
+
     // Handle other key presses for selection control and all other things that may be needed
     let entry_clone = entry.clone();
     window.connect_key_press_event(move |window, event| {
+        // Set margin & anchor properly after the window is already present, otherwise GTK can't figure out the right monitor
+        if matches!(config.position, Position::Center) && !*anchor_set.borrow() {
+            let monitor = window
+                .display()
+                .monitor_at_window(&window.window().unwrap())
+                .unwrap();
+
+            gtk_layer_shell::set_anchor(window, gtk_layer_shell::Edge::Top, true);
+            gtk_layer_shell::set_margin(
+                window,
+                gtk_layer_shell::Edge::Top,
+                monitor.geometry().height() / 2 - entry_clone.allocated_height() - 2,
+            );
+
+            *anchor_set.borrow_mut() = true;
+        }
+
         use gdk::keys::constants;
         match event.keyval() {
             // Close window on escape
