@@ -65,6 +65,9 @@ mod style_names {
     pub const MATCH_DESC: &str = "match-desc";
 }
 
+/// Default config directory
+pub const DEFAULT_CONFIG_DIR: &str = "/etc/anyrun";
+
 fn main() {
     let app = gtk::Application::new(Some("com.kirottu.anyrun"), Default::default());
     let runtime_data: Rc<RefCell<Option<RuntimeData>>> = Rc::new(RefCell::new(None));
@@ -127,7 +130,7 @@ fn main() {
                 .expect("Failed to serve copy bytes");
             }
             Err(why) => {
-                println!("Failed to fork for copy sharing: {}", why);
+                eprintln!("Failed to fork for copy sharing: {}", why);
             }
         },
         PostRunAction::None => (),
@@ -136,24 +139,24 @@ fn main() {
 
 fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>>>) {
     // Figure out the config dir
-    let config_dir = runtime_data
-        .borrow()
-        .as_ref()
-        .unwrap()
-        .args
-        .config_dir
-        .clone()
-        .unwrap_or(format!(
-            "{}/.config/anyrun",
-            env::var("HOME").expect("Could not determine home directory! Is $HOME set?")
-        ));
-
+    let user_dir = format!(
+        "{}/.config/anyrun",
+        env::var("HOME").expect("Could not determine home directory! Is $HOME set?")
+    );
+    let config_dir =
+        if let Some(config_dir) = &runtime_data.borrow().as_ref().unwrap().args.config_dir {
+            config_dir.clone()
+        } else if PathBuf::from(&user_dir).exists() {
+            user_dir
+        } else {
+            DEFAULT_CONFIG_DIR.to_string()
+        };
     // Load config
     let config: Config = ron::from_str(
         &fs::read_to_string(format!("{}/config.ron", config_dir))
-            .expect("Unable to read config file!"),
+            .expect("Unable to read config file"),
     )
-    .expect("Config file malformed!");
+    .expect("Config file malformed");
 
     // Create the main window
     let window = gtk::ApplicationWindow::builder()
@@ -177,7 +180,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
     // Try to load custom CSS, if it fails load the default CSS
     let provider = gtk::CssProvider::new();
     if let Err(why) = provider.load_from_path(&format!("{}/style.css", config_dir)) {
-        println!("Failed to load custom CSS: {}", why);
+        eprintln!("Failed to load custom CSS: {}", why);
         provider
             .load_from_data(include_bytes!("../res/style.css"))
             .unwrap();
@@ -202,7 +205,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
 
     // Make sure at least one plugin is specified
     if plugins.is_empty() {
-        println!("At least one plugin needs to be enabled!");
+        eprintln!("At least one plugin needs to be enabled!");
         app.quit();
     }
 
@@ -217,19 +220,21 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
         plugins
             .iter()
             .map(|plugin_path| {
+                let mut user_path = PathBuf::from(&format!("{}/plugins", config_dir));
+                let mut global_path = PathBuf::from("/etc/anyrun/plugins");
+                user_path.extend(plugin_path.iter());
+                global_path.extend(plugin_path.iter());
+
                 // Load the plugin's dynamic library.
-                let plugin = abi_stable::library::lib_header_from_path(
-                    if plugin_path.is_absolute() {
-                        plugin_path.clone()
-                    } else {
-                        let mut path = PathBuf::from(&format!("{}/plugins", config_dir));
-                        path.extend(plugin_path.iter());
-                        path
-                    }
-                    .as_path(),
-                )
+                let plugin = if plugin_path.is_absolute() {
+                    abi_stable::library::lib_header_from_path(plugin_path)
+                } else if user_path.exists() {
+                    abi_stable::library::lib_header_from_path(&user_path)
+                } else {
+                    abi_stable::library::lib_header_from_path(&global_path)
+                }
                 .and_then(|plugin| plugin.init_root_module::<PluginRef>())
-                .unwrap();
+                .expect("Failed to load plugin");
 
                 // Run the plugin's init code to init static resources etc.
                 plugin.init()(config_dir.clone().into());
