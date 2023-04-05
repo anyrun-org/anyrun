@@ -1,4 +1,4 @@
-use std::{cell::RefCell, env, fs, path::PathBuf, rc::Rc, time::Duration};
+use std::{cell::RefCell, env, fs, mem, path::PathBuf, rc::Rc, time::Duration};
 
 use abi_stable::std_types::{ROption, RVec};
 use anyrun_interface::{HandleResult, Match, PluginInfo, PluginRef, PollResult};
@@ -42,6 +42,9 @@ enum PostRunAction {
 /// Some data that needs to be shared between various parts
 struct RuntimeData {
     args: Args,
+    /// A plugin may request exclusivity which is set with this
+    exclusive: Option<PluginView>,
+    plugins: Vec<PluginView>,
     post_run_action: PostRunAction,
 }
 
@@ -100,6 +103,8 @@ fn main() {
                 override_plugins,
                 config_dir,
             },
+            exclusive: None,
+            plugins: Vec::new(),
             post_run_action: PostRunAction::None,
         });
         -1 // Magic GTK number to continue running
@@ -216,61 +221,60 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
         .build();
 
     // Load plugins from the paths specified in the config file
-    let plugins = Rc::new(
-        plugins
-            .iter()
-            .map(|plugin_path| {
-                let mut user_path = PathBuf::from(&format!("{}/plugins", config_dir));
-                let mut global_path = PathBuf::from("/etc/anyrun/plugins");
-                user_path.extend(plugin_path.iter());
-                global_path.extend(plugin_path.iter());
+    runtime_data.borrow_mut().as_mut().unwrap().plugins = plugins
+        .iter()
+        .map(|plugin_path| {
+            // Load the plugin's dynamic library.
+            let mut user_path = PathBuf::from(&format!("{}/plugins", config_dir));
+            let mut global_path = PathBuf::from("/etc/anyrun/plugins");
+            user_path.extend(plugin_path.iter());
+            global_path.extend(plugin_path.iter());
 
-                // Load the plugin's dynamic library.
-                let plugin = if plugin_path.is_absolute() {
-                    abi_stable::library::lib_header_from_path(plugin_path)
-                } else if user_path.exists() {
-                    abi_stable::library::lib_header_from_path(&user_path)
-                } else {
-                    abi_stable::library::lib_header_from_path(&global_path)
-                }
-                .and_then(|plugin| plugin.init_root_module::<PluginRef>())
-                .expect("Failed to load plugin");
+            // Load the plugin's dynamic library.
+            let plugin = if plugin_path.is_absolute() {
+                abi_stable::library::lib_header_from_path(plugin_path)
+            } else if user_path.exists() {
+                abi_stable::library::lib_header_from_path(&user_path)
+            } else {
+                abi_stable::library::lib_header_from_path(&global_path)
+            }
+            .and_then(|plugin| plugin.init_root_module::<PluginRef>())
+            .expect("Failed to load plugin");
 
-                // Run the plugin's init code to init static resources etc.
-                plugin.init()(config_dir.clone().into());
+            // Run the plugin's init code to init static resources etc.
+            plugin.init()(config_dir.clone().into());
 
-                let plugin_box = gtk::Box::builder()
+            let plugin_box = gtk::Box::builder()
+                .orientation(gtk::Orientation::Horizontal)
+                .spacing(10)
+                .name(style_names::PLUGIN)
+                .build();
+            plugin_box.add(&create_info_box(&plugin.info()()));
+            plugin_box.add(
+                &gtk::Separator::builder()
                     .orientation(gtk::Orientation::Horizontal)
-                    .spacing(10)
                     .name(style_names::PLUGIN)
-                    .build();
-                plugin_box.add(&create_info_box(&plugin.info()()));
-                plugin_box.add(
-                    &gtk::Separator::builder()
-                        .orientation(gtk::Orientation::Horizontal)
-                        .name(style_names::PLUGIN)
-                        .build(),
-                );
-                let list = gtk::ListBox::builder()
-                    .name(style_names::PLUGIN)
-                    .hexpand(true)
-                    .build();
+                    .build(),
+            );
+            let list = gtk::ListBox::builder()
+                .name(style_names::PLUGIN)
+                .hexpand(true)
+                .build();
 
-                plugin_box.add(&list);
+            plugin_box.add(&list);
 
-                let row = gtk::ListBoxRow::builder().name(style_names::PLUGIN).build();
-                row.add(&plugin_box);
+            let row = gtk::ListBoxRow::builder().name(style_names::PLUGIN).build();
+            row.add(&plugin_box);
 
-                main_list.add(&row);
+            main_list.add(&row);
 
-                PluginView { plugin, row, list }
-            })
-            .collect::<Vec<PluginView>>(),
-    );
+            PluginView { plugin, row, list }
+        })
+        .collect::<Vec<PluginView>>();
 
     // Connect selection events to avoid completely messing up selection logic
-    for plugin_view in plugins.iter() {
-        let plugins_clone = plugins.clone();
+    for plugin_view in runtime_data.borrow().as_ref().unwrap().plugins.iter() {
+        let plugins_clone = runtime_data.borrow().as_ref().unwrap().plugins.clone();
         plugin_view.list.connect_row_selected(move |list, row| {
             if row.is_some() {
                 let combined_matches = plugins_clone
@@ -303,9 +307,9 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
         .build();
 
     // Refresh the matches when text input changes
-    let plugins_clone = plugins.clone();
+    let runtime_data_clone = runtime_data.clone();
     entry.connect_changed(move |entry| {
-        refresh_matches(entry.text().to_string(), plugins_clone.clone())
+        refresh_matches(entry.text().to_string(), runtime_data_clone.clone())
     });
 
     // Handle other key presses for selection control and all other things that may be needed
@@ -321,7 +325,11 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
             // Handle selections
             constants::Down | constants::Tab | constants::Up => {
                 // Combine all of the matches into a `Vec` to allow for easier handling of the selection
-                let combined_matches = plugins
+                let combined_matches = runtime_data
+                    .borrow()
+                    .as_ref()
+                    .unwrap()
+                    .plugins
                     .iter()
                     .flat_map(|view| {
                         view.list.children().into_iter().map(|child| {
@@ -335,7 +343,11 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
                     .collect::<Vec<(gtk::ListBoxRow, gtk::ListBox)>>();
 
                 // Get the selected match
-                let (selected_match, selected_list) = match plugins
+                let (selected_match, selected_list) = match runtime_data
+                    .borrow()
+                    .as_ref()
+                    .unwrap()
+                    .plugins
                     .iter()
                     .find_map(|view| view.list.selected_row().map(|row| (row, view.list.clone())))
                 {
@@ -395,9 +407,14 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
             }
             // Handle when the selected match is "activated"
             constants::Return => {
-                let (selected_match, plugin) = match plugins
+                let mut _runtime_data = runtime_data.borrow_mut();
+
+                let (selected_match, plugin_view) = match _runtime_data
+                    .as_ref()
+                    .unwrap()
+                    .plugins
                     .iter()
-                    .find_map(|view| view.list.selected_row().map(|row| (row, view.plugin)))
+                    .find_map(|view| view.list.selected_row().map(|row| (row, view)))
                 {
                     Some(selected) => selected,
                     None => {
@@ -406,19 +423,25 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
                 };
 
                 // Perform actions based on the result of handling the selection
-                match plugin.handle_selection()(unsafe {
+                match plugin_view.plugin.handle_selection()(unsafe {
                     (*selected_match.data::<Match>("match").unwrap().as_ptr()).clone()
                 }) {
                     HandleResult::Close => {
                         window.close();
                         Inhibit(true)
                     }
-                    HandleResult::Refresh => {
-                        refresh_matches(entry_clone.text().to_string(), plugins.clone());
+                    HandleResult::Refresh(exclusive) => {
+                        if exclusive {
+                            _runtime_data.as_mut().unwrap().exclusive = Some(plugin_view.clone());
+                        } else {
+                            _runtime_data.as_mut().unwrap().exclusive = None;
+                        }
+                        mem::drop(_runtime_data); // Drop the mutable borrow
+                        refresh_matches(entry_clone.text().into(), runtime_data.clone());
                         Inhibit(false)
                     }
                     HandleResult::Copy(bytes) => {
-                        runtime_data.borrow_mut().as_mut().unwrap().post_run_action =
+                        _runtime_data.as_mut().unwrap().post_run_action =
                             PostRunAction::Copy(bytes.into());
                         window.close();
                         Inhibit(true)
@@ -441,7 +464,11 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
     main_list.show();
 }
 
-fn handle_matches(plugin_view: PluginView, plugins: Rc<Vec<PluginView>>, matches: RVec<Match>) {
+fn handle_matches(
+    plugin_view: PluginView,
+    runtime_data: Rc<RefCell<Option<RuntimeData>>>,
+    matches: RVec<Match>,
+) {
     // Clear out the old matches from the list
     for widget in plugin_view.list.children() {
         plugin_view.list.remove(&widget);
@@ -534,7 +561,11 @@ fn handle_matches(plugin_view: PluginView, plugins: Rc<Vec<PluginView>>, matches
     // Refresh the items in the view
     plugin_view.row.show_all();
 
-    let combined_matches = plugins
+    let combined_matches = runtime_data
+        .borrow()
+        .as_ref()
+        .unwrap()
+        .plugins
         .iter()
         .flat_map(|view| {
             view.list.children().into_iter().map(|child| {
@@ -595,27 +626,40 @@ fn create_info_box(info: &PluginInfo) -> gtk::Box {
 }
 
 /// Refresh the matches from the plugins
-fn refresh_matches(input: String, plugins: Rc<Vec<PluginView>>) {
-    for plugin_view in plugins.iter() {
+fn refresh_matches(input: String, runtime_data: Rc<RefCell<Option<RuntimeData>>>) {
+    for plugin_view in runtime_data.borrow().as_ref().unwrap().plugins.iter() {
         let id = plugin_view.plugin.get_matches()(input.clone().into());
         let plugin_view = plugin_view.clone();
-        let plugins = plugins.clone();
+        let runtime_data_clone = runtime_data.clone();
         // If the input is empty, skip getting matches and just clear everything out.
         if input.is_empty() {
-            handle_matches(plugin_view, plugins, RVec::new());
+            handle_matches(plugin_view, runtime_data_clone, RVec::new());
+        // If a plugin has requested exclusivity, respect it
+        } else if let Some(exclusive) = &runtime_data.borrow().as_ref().unwrap().exclusive {
+            if plugin_view.plugin.info() == exclusive.plugin.info() {
+                glib::timeout_add_local(Duration::from_micros(1000), move || {
+                    async_match(plugin_view.clone(), runtime_data_clone.clone(), id)
+                });
+            } else {
+                handle_matches(plugin_view.clone(), runtime_data_clone, RVec::new());
+            }
         } else {
             glib::timeout_add_local(Duration::from_micros(1000), move || {
-                async_match(plugin_view.clone(), plugins.clone(), id)
+                async_match(plugin_view.clone(), runtime_data_clone.clone(), id)
             });
         }
     }
 }
 
 /// Handle the asynchronously running match task
-fn async_match(plugin_view: PluginView, plugins: Rc<Vec<PluginView>>, id: u64) -> glib::Continue {
+fn async_match(
+    plugin_view: PluginView,
+    runtime_data: Rc<RefCell<Option<RuntimeData>>>,
+    id: u64,
+) -> glib::Continue {
     match plugin_view.plugin.poll_matches()(id) {
         PollResult::Ready(matches) => {
-            handle_matches(plugin_view, plugins, matches);
+            handle_matches(plugin_view, runtime_data, matches);
             glib::Continue(false)
         }
         PollResult::Pending => glib::Continue(true),

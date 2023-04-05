@@ -50,7 +50,8 @@ pub enum HandleResult {
     /// Shut down the program
     Close,
     /// Refresh the items. Useful if the runner wants to alter results in place.
-    Refresh,
+    /// The inner value can set an exclusive mode for the plugin.
+    Refresh(bool),
     /// Copy the content, due to how copying works it must be done like this.
     Copy(RVec<u8>),
 }

@@ -7,5 +7,6 @@ members = [
   "plugins/symbols",
   "plugins/rink",
   "plugins/shell",
+  "plugins/kidex",
   "plugins/translate",
 ]

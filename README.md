@@ -76,6 +76,8 @@ Anyrun requires plugins to function, as they provide the results for input. The 
   - Calculator & unit conversion
 - [Shell](plugins/shell)
   - Run shell commands
+- [Kidex](plugins/kidex)
+  - File search provided by [Kidex](https://github.com/Kirottu/kidex)
 
 ## Configuration
 
