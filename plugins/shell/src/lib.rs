@@ -34,7 +34,7 @@ fn info() -> PluginInfo {
 }
 
 fn get_matches(input: RString, config: &mut Config) -> RVec<Match> {
-    let prefix_with_delim = format!("{} ", config.prefix);
+    let prefix_with_delim = format!("{}", config.prefix);
     if input.starts_with(&prefix_with_delim) {
         let (_, command) = input.split_once(&prefix_with_delim).unwrap();
         if !command.is_empty() {
