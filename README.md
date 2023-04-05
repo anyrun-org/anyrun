@@ -33,6 +33,10 @@ Here are the libraries you need to have to build & run it:
 
 ## Installation
 
+If you use an Arch based distro, you can install the AUR package [anyrun-git](https://aur.archlinux.org/packages/anyrun-git).
+
+### Manual installation
+
 Make sure all of the dependencies are installed, and then run the following commands in order:
 
 ```sh
@@ -91,6 +95,7 @@ The config file has the following structure, and as seen in the name uses the `r
 ```ron
 Config(
   width: 800, // The width of the window
+  position: Top,
   plugins: [
     "libapplications.so", // Relative paths are looked up in the <config dir>/plugins/ directory
     "/home/kirottu/Projects/anyrun/target/debug/libsymbols.so", // Absolute paths are well, asbolute and loaded as is. Useful for development.
