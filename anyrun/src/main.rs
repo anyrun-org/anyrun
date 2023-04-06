@@ -18,6 +18,7 @@ struct Config {
     width: u32,
     plugins: Vec<PathBuf>,
     position: Position,
+    hide_icons: bool,
 }
 
 /// A "view" of plugin's info and matches
@@ -249,7 +250,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
                 .spacing(10)
                 .name(style_names::PLUGIN)
                 .build();
-            plugin_box.add(&create_info_box(&plugin.info()()));
+            plugin_box.add(&create_info_box(&plugin.info()(), config.hide_icons));
             plugin_box.add(
                 &gtk::Separator::builder()
                     .orientation(gtk::Orientation::Horizontal)
@@ -309,7 +310,11 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
     // Refresh the matches when text input changes
     let runtime_data_clone = runtime_data.clone();
     entry.connect_changed(move |entry| {
-        refresh_matches(entry.text().to_string(), runtime_data_clone.clone())
+        refresh_matches(
+            entry.text().to_string(),
+            runtime_data_clone.clone(),
+            config.hide_icons,
+        )
     });
 
     let anchor_set = Rc::new(RefCell::new(false));
@@ -456,7 +461,11 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
                             _runtime_data.as_mut().unwrap().exclusive = None;
                         }
                         mem::drop(_runtime_data); // Drop the mutable borrow
-                        refresh_matches(entry_clone.text().into(), runtime_data.clone());
+                        refresh_matches(
+                            entry_clone.text().into(),
+                            runtime_data.clone(),
+                            config.hide_icons,
+                        );
                         Inhibit(false)
                     }
                     HandleResult::Copy(bytes) => {
@@ -487,6 +496,7 @@ fn handle_matches(
     plugin_view: PluginView,
     runtime_data: Rc<RefCell<Option<RuntimeData>>>,
     matches: RVec<Match>,
+    hide_icons: bool,
 ) {
     // Clear out the old matches from the list
     for widget in plugin_view.list.children() {
@@ -506,27 +516,29 @@ fn handle_matches(
             .name(style_names::MATCH)
             .hexpand(true)
             .build();
-        if let ROption::RSome(icon) = &_match.icon {
-            let mut builder = gtk::Image::builder()
-                .name(style_names::MATCH)
-                .pixel_size(32);
+        if !hide_icons {
+            if let ROption::RSome(icon) = &_match.icon {
+                let mut builder = gtk::Image::builder()
+                    .name(style_names::MATCH)
+                    .pixel_size(32);
 
-            let path = PathBuf::from(icon.as_str());
+                let path = PathBuf::from(icon.as_str());
 
-            // If the icon path is absolute, load that file
-            if path.is_absolute() {
-                match gdk_pixbuf::Pixbuf::from_file_at_size(icon.as_str(), 32, 32) {
-                    Ok(pixbuf) => builder = builder.pixbuf(&pixbuf),
-                    Err(why) => {
-                        println!("Failed to load icon file: {}", why);
-                        builder = builder.icon_name("image-missing"); // Set "broken" icon
+                // If the icon path is absolute, load that file
+                if path.is_absolute() {
+                    match gdk_pixbuf::Pixbuf::from_file_at_size(icon.as_str(), 32, 32) {
+                        Ok(pixbuf) => builder = builder.pixbuf(&pixbuf),
+                        Err(why) => {
+                            println!("Failed to load icon file: {}", why);
+                            builder = builder.icon_name("image-missing"); // Set "broken" icon
+                        }
                     }
+                } else {
+                    builder = builder.icon_name(icon);
                 }
-            } else {
-                builder = builder.icon_name(icon);
-            }
 
-            hbox.add(&builder.build());
+                hbox.add(&builder.build());
+            }
         }
         let title = gtk::Label::builder()
             .name(style_names::MATCH_TITLE)
@@ -602,7 +614,7 @@ fn handle_matches(
 }
 
 /// Create the info box for the plugin
-fn create_info_box(info: &PluginInfo) -> gtk::Box {
+fn create_info_box(info: &PluginInfo, hide_icons: bool) -> gtk::Box {
     let info_box = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
         .name(style_names::PLUGIN)
@@ -611,15 +623,17 @@ fn create_info_box(info: &PluginInfo) -> gtk::Box {
         .expand(false)
         .spacing(10)
         .build();
-    info_box.add(
-        &gtk::Image::builder()
-            .icon_name(&info.icon)
-            .name(style_names::PLUGIN)
-            .pixel_size(32)
-            .halign(gtk::Align::Start)
-            .valign(gtk::Align::Start)
-            .build(),
-    );
+    if !hide_icons {
+        info_box.add(
+            &gtk::Image::builder()
+                .icon_name(&info.icon)
+                .name(style_names::PLUGIN)
+                .pixel_size(32)
+                .halign(gtk::Align::Start)
+                .valign(gtk::Align::Start)
+                .build(),
+        );
+    }
     info_box.add(
         &gtk::Label::builder()
             .label(&info.name)
@@ -645,26 +659,45 @@ fn create_info_box(info: &PluginInfo) -> gtk::Box {
 }
 
 /// Refresh the matches from the plugins
-fn refresh_matches(input: String, runtime_data: Rc<RefCell<Option<RuntimeData>>>) {
+fn refresh_matches(
+    input: String,
+    runtime_data: Rc<RefCell<Option<RuntimeData>>>,
+    hide_icons: bool,
+) {
     for plugin_view in runtime_data.borrow().as_ref().unwrap().plugins.iter() {
         let id = plugin_view.plugin.get_matches()(input.clone().into());
         let plugin_view = plugin_view.clone();
         let runtime_data_clone = runtime_data.clone();
         // If the input is empty, skip getting matches and just clear everything out.
         if input.is_empty() {
-            handle_matches(plugin_view, runtime_data_clone, RVec::new());
+            handle_matches(plugin_view, runtime_data_clone, RVec::new(), hide_icons);
         // If a plugin has requested exclusivity, respect it
         } else if let Some(exclusive) = &runtime_data.borrow().as_ref().unwrap().exclusive {
             if plugin_view.plugin.info() == exclusive.plugin.info() {
                 glib::timeout_add_local(Duration::from_micros(1000), move || {
-                    async_match(plugin_view.clone(), runtime_data_clone.clone(), id)
+                    async_match(
+                        plugin_view.clone(),
+                        runtime_data_clone.clone(),
+                        id,
+                        hide_icons,
+                    )
                 });
             } else {
-                handle_matches(plugin_view.clone(), runtime_data_clone, RVec::new());
+                handle_matches(
+                    plugin_view.clone(),
+                    runtime_data_clone,
+                    RVec::new(),
+                    hide_icons,
+                );
             }
         } else {
             glib::timeout_add_local(Duration::from_micros(1000), move || {
-                async_match(plugin_view.clone(), runtime_data_clone.clone(), id)
+                async_match(
+                    plugin_view.clone(),
+                    runtime_data_clone.clone(),
+                    id,
+                    hide_icons,
+                )
             });
         }
     }
@@ -675,10 +708,11 @@ fn async_match(
     plugin_view: PluginView,
     runtime_data: Rc<RefCell<Option<RuntimeData>>>,
     id: u64,
+    hide_icons: bool,
 ) -> glib::Continue {
     match plugin_view.plugin.poll_matches()(id) {
         PollResult::Ready(matches) => {
-            handle_matches(plugin_view, runtime_data, matches);
+            handle_matches(plugin_view, runtime_data, matches, hide_icons);
             glib::Continue(false)
         }
         PollResult::Pending => glib::Continue(true),
