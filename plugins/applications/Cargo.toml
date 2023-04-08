@@ -13,3 +13,5 @@ anyrun-plugin = { path = "../../anyrun-plugin" }
 abi_stable = "0.11.1"
 sublime_fuzzy = "0.7.0"
 fuzzy-matcher = "0.3.7"
+ron = "0.8.0"
+serde = { version = "1.0.159", features = ["derive"] }

@@ -2,7 +2,13 @@ use abi_stable::std_types::{ROption, RString, RVec};
 use anyrun_plugin::{anyrun_interface::HandleResult, *};
 use fuzzy_matcher::FuzzyMatcher;
 use scrubber::DesktopEntry;
-use std::process::Command;
+use serde::Deserialize;
+use std::{fs, process::Command};
+
+#[derive(Deserialize, Default)]
+pub struct Config {
+    desktop_actions: bool,
+}
 
 mod scrubber;
 
@@ -25,8 +31,22 @@ pub fn handler(selection: Match, entries: &mut Vec<(DesktopEntry, u64)>) -> Hand
     HandleResult::Close
 }
 
-pub fn init(_config_dir: RString) -> Vec<(DesktopEntry, u64)> {
-    scrubber::scrubber().expect("Failed to load desktop entries!")
+pub fn init(config_dir: RString) -> Vec<(DesktopEntry, u64)> {
+    let config: Config = match fs::read_to_string(format!("{}/applications.ron", config_dir)) {
+        Ok(content) => ron::from_str(&content).unwrap_or_else(|why| {
+            eprintln!("Error parsing applications plugin config: {}", why);
+            Config::default()
+        }),
+        Err(why) => {
+            eprintln!("Error reading applications plugin config: {}", why);
+            Config::default()
+        }
+    };
+
+    scrubber::scrubber(config).unwrap_or_else(|why| {
+        eprintln!("Failed to load desktop entries: {}", why);
+        Vec::new()
+    })
 }
 
 pub fn get_matches(input: RString, entries: &mut Vec<(DesktopEntry, u64)>) -> RVec<Match> {
