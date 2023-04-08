@@ -1,4 +1,6 @@
-# User defined symbols
+# Symbols
+
+## User defined symbols
 
 User defined symbols are defined in the `symbols.ron` file inside the anyrun configuration directory. The structure of the file is as follows:
 ```ron
