@@ -98,6 +98,7 @@ The config file has the following structure, and as seen in the name uses the `r
 Config(
   width: 800, // The width of the window
   position: Top,
+  hide_icons: false,
   plugins: [
     "libapplications.so", // Relative paths are looked up in the <config dir>/plugins/ directory
     "/home/kirottu/Projects/anyrun/target/debug/libsymbols.so", // Absolute paths are well, asbolute and loaded as is. Useful for development.
