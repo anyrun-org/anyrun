@@ -53,6 +53,7 @@ After that you need to create the configuration file and place it in `~/.config/
 Config(
   width: 800,
   position: Top,
+  hide_icons: false,
   plugins: [
     "libapplications.so",
     "libsymbols.so",
