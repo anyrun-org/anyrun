@@ -16,6 +16,7 @@ enum Position {
 #[derive(Deserialize)]
 struct Config {
     width: u32,
+    height: u32,
     plugins: Vec<PathBuf>,
     position: Position,
     hide_icons: bool,
@@ -170,6 +171,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
         .application(app)
         .name(style_names::WINDOW)
         .width_request(config.width as i32)
+        .height_request(config.height as i32)
         .build();
 
     // Init GTK layer shell
