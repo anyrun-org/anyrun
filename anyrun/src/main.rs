@@ -8,16 +8,9 @@ use serde::Deserialize;
 use wl_clipboard_rs::copy;
 
 #[derive(Deserialize)]
-enum Position {
-    Top,
-    Center,
-}
-
-#[derive(Deserialize)]
 struct Config {
     width: u32,
     plugins: Vec<PathBuf>,
-    position: Position,
     hide_icons: bool,
     hide_plugin_info: bool,
 }
@@ -169,17 +162,17 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
     let window = gtk::ApplicationWindow::builder()
         .application(app)
         .name(style_names::WINDOW)
-        .width_request(config.width as i32)
         .build();
 
     // Init GTK layer shell
     gtk_layer_shell::init_for_window(&window);
 
-    // Anchor based on configured position
-    match config.position {
-        Position::Top => gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Top, true),
-        Position::Center => (),
-    }
+    // Make layer-window fullscreen
+    gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Top, true);
+    gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Bottom, true);
+    gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Left, true);
+    gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Right, true);
+    gtk_layer_shell::set_exclusive_zone(&window, -1);
 
     gtk_layer_shell::set_keyboard_mode(&window, gtk_layer_shell::KeyboardMode::Exclusive);
     gtk_layer_shell::set_layer(&window, gtk_layer_shell::Layer::Overlay);
@@ -320,28 +313,9 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
         )
     });
 
-    let anchor_set = Rc::new(RefCell::new(false));
-
     // Handle other key presses for selection control and all other things that may be needed
     let entry_clone = entry.clone();
     window.connect_key_press_event(move |window, event| {
-        // Set margin & anchor properly after the window is already present, otherwise GTK can't figure out the right monitor
-        if matches!(config.position, Position::Center) && !*anchor_set.borrow() {
-            let monitor = window
-                .display()
-                .monitor_at_window(&window.window().unwrap())
-                .unwrap();
-
-            gtk_layer_shell::set_anchor(window, gtk_layer_shell::Edge::Top, true);
-            gtk_layer_shell::set_margin(
-                window,
-                gtk_layer_shell::Edge::Top,
-                monitor.geometry().height() / 2 - entry_clone.allocated_height() - 2,
-            );
-
-            *anchor_set.borrow_mut() = true;
-        }
-
         use gdk::keys::constants;
         match event.keyval() {
             // Close window on escape
@@ -485,6 +459,8 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
 
     let main_vbox = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
+        .halign(gtk::Align::Center)
+        .width_request(config.width as i32)
         .name(style_names::MAIN)
         .build();
     main_vbox.add(&entry);

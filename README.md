@@ -54,7 +54,6 @@ After that you need to create the configuration file and place it in `~/.config/
 ```ron
 Config(
   width: 800,
-  position: Top,
   hide_icons: false,
   hide_plugin_info: false,
   plugins: [
@@ -101,7 +100,6 @@ The config file has the following structure, and as seen in the name uses the `r
 ```ron
 Config(
   width: 800, // The width of the window
-  position: Top,
   hide_icons: false,
   hide_plugin_info: false,
   plugins: [
