@@ -19,6 +19,7 @@ struct Config {
     plugins: Vec<PathBuf>,
     position: Position,
     hide_icons: bool,
+    hide_plugin_info: bool,
 }
 
 /// A "view" of plugin's info and matches
@@ -250,13 +251,15 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
                 .spacing(10)
                 .name(style_names::PLUGIN)
                 .build();
-            plugin_box.add(&create_info_box(&plugin.info()(), config.hide_icons));
-            plugin_box.add(
-                &gtk::Separator::builder()
-                    .orientation(gtk::Orientation::Horizontal)
-                    .name(style_names::PLUGIN)
-                    .build(),
-            );
+            if !config.hide_plugin_info {
+                plugin_box.add(&create_info_box(&plugin.info()(), config.hide_icons));
+                plugin_box.add(
+                    &gtk::Separator::builder()
+                        .orientation(gtk::Orientation::Horizontal)
+                        .name(style_names::PLUGIN)
+                        .build(),
+                );
+            }
             let list = gtk::ListBox::builder()
                 .name(style_names::PLUGIN)
                 .hexpand(true)

@@ -11,7 +11,7 @@ A wayland native krunner-like runner, made with customizability in mind.
   - Hence the name anyrun
 - Easy to make plugins
   - You only need 4 functions!
-  - See [Rink](plugins/rink) for a simple example. More info in the documentation of the [anyrun-plugin](anyrun-plugin) crate. 
+  - See [Rink](plugins/rink) for a simple example. More info in the documentation of the [anyrun-plugin](anyrun-plugin) crate.
 - Responsive
   - Asynchronous running of plugin functions
 - Wayland native
@@ -24,6 +24,7 @@ A wayland native krunner-like runner, made with customizability in mind.
 
 Anyrun mainly depends various GTK libraries, and rust of course for building the project. Rust you can get with [rustup](https://rustup.rs). The rest are statically linked in the binary.
 Here are the libraries you need to have to build & run it:
+
 - `gtk-layer-shell (libgtk-layer-shell)`
 - `gtk3 (libgtk-3 libgdk-3)`
 - `pango (libpango-1.0)`
@@ -49,10 +50,13 @@ cp target/release/*.so ~/.config/anyrun/plugins # Copy all of the built plugins 
 ```
 
 After that you need to create the configuration file and place it in `~/.config/anyrun/config.ron`. A config file with all of the included plugins is as follows:
+
 ```ron
 Config(
   width: 800,
   position: Top,
+  hide_icons: false,
+  hide_plugin_info: false,
   plugins: [
     "libapplications.so",
     "libsymbols.so",
@@ -61,7 +65,6 @@ Config(
   ],
 )
 ```
-
 
 ## Plugins
 
@@ -94,10 +97,13 @@ The default configuration directory is `$HOME/.config/anyrun` the structure of t
 ```
 
 The config file has the following structure, and as seen in the name uses the `ron` language:
+
 ```ron
 Config(
   width: 800, // The width of the window
   position: Top,
+  hide_icons: false,
+  hide_plugin_info: false,
   plugins: [
     "libapplications.so", // Relative paths are looked up in the <config dir>/plugins/ directory
     "/home/kirottu/Projects/anyrun/target/debug/libsymbols.so", // Absolute paths are well, asbolute and loaded as is. Useful for development.
@@ -141,6 +147,7 @@ The custom arguments for anyrun are as follows:
 The plugin API is intentionally very simple to use. This is all you need for a plugin:
 
 `Cargo.toml`:
+
 ```toml
 #[package] omitted
 [lib]
@@ -153,6 +160,7 @@ abi_stable = "0.11.1"
 ```
 
 `lib.rs`:
+
 ```rs
 use abi_stable::std_types::{RString, RVec, ROption};
 use anyrun_plugin::{plugin, PluginInfo, Match, HandleResult};
@@ -171,7 +179,7 @@ fn info() -> PluginInfo {
 
 fn get_matches(input: RString, data: &mut ()) -> RVec<Match> {
   // The logic to get matches from the input text in the `input` argument.
-  // The `data` is a mutable reference to the shared data type later specified. 
+  // The `data` is a mutable reference to the shared data type later specified.
   vec![Match {
     title: "Test match".into(),
     icon: ROption::RSome("help-about"),

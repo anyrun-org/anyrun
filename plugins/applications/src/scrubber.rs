@@ -31,11 +31,15 @@ impl DesktopEntry {
             let mut line = None;
             let mut new_sections = Vec::new();
 
-            for section in sections.iter() {
+            for (i, section) in sections.iter().enumerate() {
                 if let Some(line) = line {
                     let mut section = section.to_vec();
                     section.insert(0, line);
-                    section.pop();
+
+                    // Only pop the last redundant entry if it isn't the last item
+                    if i < sections.len() - 1 {
+                        section.pop();
+                    }
                     new_sections.push(section);
                 }
                 line = Some(section.last().unwrap_or(&""));
