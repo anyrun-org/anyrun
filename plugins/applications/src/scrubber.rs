@@ -6,6 +6,7 @@ use crate::Config;
 pub struct DesktopEntry {
     pub exec: String,
     pub name: String,
+    pub desc: Option<String>,
     pub icon: String,
 }
 
@@ -68,6 +69,7 @@ impl DesktopEntry {
                                 exec
                             },
                             name: map.get("Name")?.to_string(),
+                            desc: None,
                             icon: map
                                 .get("Icon")
                                 .unwrap_or(&"application-x-executable")
@@ -108,9 +110,10 @@ impl DesktopEntry {
                                 None => continue,
                             },
                             name: match map.get("Name") {
-                                Some(name) => format!("{}: {}", entry.name, name),
+                                Some(name) => name.to_string(),
                                 None => continue,
                             },
+                            desc: Some(entry.name.clone()),
                             icon: entry.icon.clone(),
                         })
                     }

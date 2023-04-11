@@ -70,7 +70,7 @@ pub fn get_matches(input: RString, entries: &mut Vec<(DesktopEntry, u64)>) -> RV
         .map(|(entry, id, _)| Match {
             title: entry.name.into(),
             icon: ROption::RSome(entry.icon.into()),
-            description: ROption::RNone,
+            description: entry.desc.map(|desc| desc.into()).into(),
             id: ROption::RSome(id),
         })
         .collect()
