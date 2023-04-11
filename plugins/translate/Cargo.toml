@@ -11,7 +11,7 @@ crate-type = ["cdylib"]
 [dependencies]
 anyrun-plugin = { path = "../../anyrun-plugin" }
 abi_stable = "0.11.1"
-reqwest = { version = "0.11.13", features = ["blocking", "json"] }
+reqwest = { version = "0.11.13", default-features = false, features = ["blocking", "json", "rustls"] }
 fuzzy-matcher = "0.3.7"
 tokio = { version = "1.25.0", features = ["rt"] }
 futures = "0.3.25"
