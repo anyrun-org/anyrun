@@ -9,8 +9,8 @@ use wl_clipboard_rs::copy;
 
 #[derive(Deserialize)]
 struct Config {
-    width: u32,
-    vertical_offset: i32,
+    width: RelativeNum,
+    vertical_offset: RelativeNum,
     position: Position,
     plugins: Vec<PathBuf>,
     hide_icons: bool,
@@ -25,6 +25,13 @@ enum Layer {
     Bottom,
     Top,
     Overlay,
+}
+
+// Could have a better name
+#[derive(Deserialize)]
+enum RelativeNum {
+    Absolute(i32),
+    Fraction(f32),
 }
 
 /// A "view" of plugin's info and matches
@@ -490,23 +497,33 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
 
     // Create widgets here for proper positioning
     window.connect_configure_event(move |window, event| {
+        let width = match config.width {
+            RelativeNum::Absolute(width) => width,
+            RelativeNum::Fraction(fraction) => (event.size().0 as f32 * fraction) as i32,
+        };
         // The GtkFixed widget is used for absolute positioning of the main box
         let fixed = gtk::Fixed::builder().build();
         let main_vbox = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .halign(gtk::Align::Center)
             .vexpand(false)
-            .width_request(config.width as i32)
+            .width_request(width)
             .name(style_names::MAIN)
             .build();
         main_vbox.add(&entry);
+
+        let vertical_offset = match config.vertical_offset {
+            RelativeNum::Absolute(offset) => offset,
+            RelativeNum::Fraction(fraction) => (event.size().1 as f32 * fraction) as i32,
+        };
+
         fixed.put(
             &main_vbox,
-            (event.size().0 - config.width) as i32 / 2,
+            (event.size().0 as i32 - width) / 2,
             match config.position {
-                Position::Top => config.vertical_offset,
+                Position::Top => vertical_offset,
                 Position::Center => {
-                    (event.size().1 as i32 - entry.allocated_height()) / 2 + config.vertical_offset
+                    (event.size().1 as i32 - entry.allocated_height()) / 2 + vertical_offset
                 }
             },
         );
