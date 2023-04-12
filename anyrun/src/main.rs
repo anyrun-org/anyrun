@@ -10,6 +10,8 @@ use wl_clipboard_rs::copy;
 #[derive(Deserialize)]
 struct Config {
     width: u32,
+    vertical_offset: i32,
+    position: Position,
     plugins: Vec<PathBuf>,
     hide_icons: bool,
     hide_plugin_info: bool,
@@ -26,6 +28,12 @@ struct PluginView {
 struct Args {
     override_plugins: Option<Vec<String>>,
     config_dir: Option<String>,
+}
+
+#[derive(Deserialize)]
+enum Position {
+    Top,
+    Center,
 }
 
 /// Actions to run after GTK has finished
@@ -457,18 +465,44 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
         }
     });
 
-    let main_vbox = gtk::Box::builder()
-        .orientation(gtk::Orientation::Vertical)
-        .halign(gtk::Align::Center)
-        .width_request(config.width as i32)
-        .name(style_names::MAIN)
-        .build();
-    main_vbox.add(&entry);
-    window.add(&main_vbox);
     window.show_all();
-    // Add and show the list later, to avoid showing empty plugin categories on launch
-    main_vbox.add(&main_list);
-    main_list.show();
+
+    window.connect_event(|window, event| {
+        println!("{:?}, {:?}", event, window.allocated_size());
+        Inhibit(false)
+    });
+
+    // Create widgets here for proper positioning
+    window.connect_configure_event(move |window, event| {
+        let fixed = gtk::Fixed::builder().build();
+        let main_vbox = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .halign(gtk::Align::Center)
+            .vexpand(false)
+            .width_request(config.width as i32)
+            .name(style_names::MAIN)
+            .build();
+        main_vbox.add(&entry);
+        fixed.put(
+            &main_vbox,
+            (event.size().0 - config.width) as i32 / 2,
+            match config.position {
+                Position::Top => config.vertical_offset,
+                Position::Center => {
+                    (event.size().1 as i32 - entry.allocated_height()) / 2 + config.vertical_offset
+                }
+            },
+        );
+        window.add(&fixed);
+        window.show_all();
+
+        // Add and show the list later, to avoid showing empty plugin categories on launch
+        main_vbox.add(&main_list);
+        main_list.show();
+        entry.grab_focus();
+        println!("{:?}", event.size());
+        false
+    });
 }
 
 fn handle_matches(

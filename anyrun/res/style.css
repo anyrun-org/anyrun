@@ -1,5 +1,10 @@
 #window {
+  background-color: rgba(0, 0, 0, 0);
+}
+
+box#main {
   border-radius: 10px;
+  background-color: #242424;
 }
 
 list#main {
