@@ -54,8 +54,9 @@ After that you need to create the configuration file and place it in `~/.config/
 ```ron
 Config(
   width: 800,
-  position: Top,
   hide_icons: false,
+  ignore_exclusive_zones: true, // ignore exclusive zones, f.e. Waybar
+  layer: Overlay, // GTK Layer: Bottom, Top, Background, Overlay
   hide_plugin_info: false,
   plugins: [
     "libapplications.so",
@@ -101,8 +102,9 @@ The config file has the following structure, and as seen in the name uses the `r
 ```ron
 Config(
   width: 800, // The width of the window
-  position: Top,
   hide_icons: false,
+  ignore_exclusive_zones: true, // ignore exclusive zones, f.e. Waybar
+  layer: Overlay, // GTK Layer: Bottom, Top, Background, Overlay
   hide_plugin_info: false,
   plugins: [
     "libapplications.so", // Relative paths are looked up in the <config dir>/plugins/ directory
