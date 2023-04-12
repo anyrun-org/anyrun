@@ -15,6 +15,16 @@ struct Config {
     plugins: Vec<PathBuf>,
     hide_icons: bool,
     hide_plugin_info: bool,
+    ignore_exclusive_zones: bool,
+    layer: Layer,
+}
+
+#[derive(Deserialize)]
+enum Layer {
+    Background,
+    Bottom,
+    Top,
+    Overlay,
 }
 
 /// A "view" of plugin's info and matches
@@ -180,10 +190,21 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
     gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Bottom, true);
     gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Left, true);
     gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Right, true);
-    gtk_layer_shell::set_exclusive_zone(&window, -1);
+
+    if config.ignore_exclusive_zones {
+        gtk_layer_shell::set_exclusive_zone(&window, -1);
+    }
 
     gtk_layer_shell::set_keyboard_mode(&window, gtk_layer_shell::KeyboardMode::Exclusive);
-    gtk_layer_shell::set_layer(&window, gtk_layer_shell::Layer::Overlay);
+
+    match config.layer {
+        Layer::Background => {
+            gtk_layer_shell::set_layer(&window, gtk_layer_shell::Layer::Background)
+        }
+        Layer::Bottom => gtk_layer_shell::set_layer(&window, gtk_layer_shell::Layer::Bottom),
+        Layer::Top => gtk_layer_shell::set_layer(&window, gtk_layer_shell::Layer::Top),
+        Layer::Overlay => gtk_layer_shell::set_layer(&window, gtk_layer_shell::Layer::Overlay),
+    };
 
     // Try to load custom CSS, if it fails load the default CSS
     let provider = gtk::CssProvider::new();
@@ -307,7 +328,6 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
     // Text entry box
     let entry = gtk::Entry::builder()
         .hexpand(true)
-        .has_focus(true)
         .name(style_names::ENTRY)
         .build();
 
@@ -465,15 +485,12 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
         }
     });
 
+    // Show the window initially, so it gets allocated and configured
     window.show_all();
-
-    window.connect_event(|window, event| {
-        println!("{:?}, {:?}", event, window.allocated_size());
-        Inhibit(false)
-    });
 
     // Create widgets here for proper positioning
     window.connect_configure_event(move |window, event| {
+        // The GtkFixed widget is used for absolute positioning of the main box
         let fixed = gtk::Fixed::builder().build();
         let main_vbox = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
@@ -499,8 +516,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
         // Add and show the list later, to avoid showing empty plugin categories on launch
         main_vbox.add(&main_list);
         main_list.show();
-        entry.grab_focus();
-        println!("{:?}", event.size());
+        entry.grab_focus(); // Grab the focus so typing is immediately accepted by the entry box
         false
     });
 }
