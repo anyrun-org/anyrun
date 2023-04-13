@@ -53,9 +53,9 @@ After that you need to create the configuration file and place it in `~/.config/
 
 ```ron
 Config(
-  width: 800,
+  width: Absolute(800),
   position: Top,
-  vertical_offset: 0, // How much the runner is shifted vertically
+  vertical_offset: Absolute(0), // How much the runner is shifted vertically
   hide_icons: false,
   ignore_exclusive_zones: true, // ignore exclusive zones, f.e. Waybar
   layer: Overlay, // GTK Layer: Bottom, Top, Background, Overlay
@@ -103,9 +103,9 @@ The config file has the following structure, and as seen in the name uses the `r
 
 ```ron
 Config(
-  width: 800, // The width of the window
+  width: Absolute(800), // The width of the window
   position: Top,
-  vertical_offset: 0, // How much the runner is shifted vertically
+  vertical_offset: Absolute(0), // How much the runner is shifted vertically
   hide_icons: false,
   ignore_exclusive_zones: true, // ignore exclusive zones, f.e. Waybar
   layer: Overlay, // GTK Layer: Bottom, Top, Background, Overlay
