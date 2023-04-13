@@ -57,7 +57,7 @@ Config(
   position: Top,
   vertical_offset: Absolute(0), // How much the runner is shifted vertically
   hide_icons: false,
-  ignore_exclusive_zones: true, // ignore exclusive zones, f.e. Waybar
+  ignore_exclusive_zones: false, // ignore exclusive zones, f.e. Waybar
   layer: Overlay, // GTK Layer: Bottom, Top, Background, Overlay
   hide_plugin_info: false,
   plugins: [
@@ -107,7 +107,7 @@ Config(
   position: Top,
   vertical_offset: Absolute(0), // How much the runner is shifted vertically
   hide_icons: false,
-  ignore_exclusive_zones: true, // ignore exclusive zones, f.e. Waybar
+  ignore_exclusive_zones: false, // ignore exclusive zones, f.e. Waybar
   layer: Overlay, // GTK Layer: Bottom, Top, Background, Overlay
   hide_plugin_info: false,
   plugins: [

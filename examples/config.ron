@@ -1,0 +1,15 @@
+Config(
+  width: Absolute(800),
+  position: Top,
+  vertical_offset: Absolute(0), // How much the runner is shifted vertically
+  hide_icons: false,
+  ignore_exclusive_zones: false, // ignore exclusive zones, f.e. Waybar
+  layer: Overlay, // GTK Layer: Bottom, Top, Background, Overlay
+  hide_plugin_info: false,
+  plugins: [
+    "libapplications.so",
+    "libsymbols.so",
+    "libshell.so",
+    "libtranslate.so",
+  ],
+)
