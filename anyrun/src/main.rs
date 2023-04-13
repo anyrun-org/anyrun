@@ -8,18 +8,30 @@ use serde::Deserialize;
 use wl_clipboard_rs::copy;
 
 #[derive(Deserialize)]
-enum Position {
-    Top,
-    Center,
+struct Config {
+    width: RelativeNum,
+    vertical_offset: RelativeNum,
+    position: Position,
+    plugins: Vec<PathBuf>,
+    hide_icons: bool,
+    hide_plugin_info: bool,
+    ignore_exclusive_zones: bool,
+    layer: Layer,
 }
 
 #[derive(Deserialize)]
-struct Config {
-    width: u32,
-    plugins: Vec<PathBuf>,
-    position: Position,
-    hide_icons: bool,
-    hide_plugin_info: bool,
+enum Layer {
+    Background,
+    Bottom,
+    Top,
+    Overlay,
+}
+
+// Could have a better name
+#[derive(Deserialize)]
+enum RelativeNum {
+    Absolute(i32),
+    Fraction(f32),
 }
 
 /// A "view" of plugin's info and matches
@@ -33,6 +45,12 @@ struct PluginView {
 struct Args {
     override_plugins: Option<Vec<String>>,
     config_dir: Option<String>,
+}
+
+#[derive(Deserialize)]
+enum Position {
+    Top,
+    Center,
 }
 
 /// Actions to run after GTK has finished
@@ -169,20 +187,31 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
     let window = gtk::ApplicationWindow::builder()
         .application(app)
         .name(style_names::WINDOW)
-        .width_request(config.width as i32)
         .build();
 
     // Init GTK layer shell
     gtk_layer_shell::init_for_window(&window);
 
-    // Anchor based on configured position
-    match config.position {
-        Position::Top => gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Top, true),
-        Position::Center => (),
+    // Make layer-window fullscreen
+    gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Top, true);
+    gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Bottom, true);
+    gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Left, true);
+    gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Right, true);
+
+    if config.ignore_exclusive_zones {
+        gtk_layer_shell::set_exclusive_zone(&window, -1);
     }
 
     gtk_layer_shell::set_keyboard_mode(&window, gtk_layer_shell::KeyboardMode::Exclusive);
-    gtk_layer_shell::set_layer(&window, gtk_layer_shell::Layer::Overlay);
+
+    match config.layer {
+        Layer::Background => {
+            gtk_layer_shell::set_layer(&window, gtk_layer_shell::Layer::Background)
+        }
+        Layer::Bottom => gtk_layer_shell::set_layer(&window, gtk_layer_shell::Layer::Bottom),
+        Layer::Top => gtk_layer_shell::set_layer(&window, gtk_layer_shell::Layer::Top),
+        Layer::Overlay => gtk_layer_shell::set_layer(&window, gtk_layer_shell::Layer::Overlay),
+    };
 
     // Try to load custom CSS, if it fails load the default CSS
     let provider = gtk::CssProvider::new();
@@ -306,7 +335,6 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
     // Text entry box
     let entry = gtk::Entry::builder()
         .hexpand(true)
-        .has_focus(true)
         .name(style_names::ENTRY)
         .build();
 
@@ -320,28 +348,9 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
         )
     });
 
-    let anchor_set = Rc::new(RefCell::new(false));
-
     // Handle other key presses for selection control and all other things that may be needed
     let entry_clone = entry.clone();
     window.connect_key_press_event(move |window, event| {
-        // Set margin & anchor properly after the window is already present, otherwise GTK can't figure out the right monitor
-        if matches!(config.position, Position::Center) && !*anchor_set.borrow() {
-            let monitor = window
-                .display()
-                .monitor_at_window(&window.window().unwrap())
-                .unwrap();
-
-            gtk_layer_shell::set_anchor(window, gtk_layer_shell::Edge::Top, true);
-            gtk_layer_shell::set_margin(
-                window,
-                gtk_layer_shell::Edge::Top,
-                monitor.geometry().height() / 2 - entry_clone.allocated_height() - 2,
-            );
-
-            *anchor_set.borrow_mut() = true;
-        }
-
         use gdk::keys::constants;
         match event.keyval() {
             // Close window on escape
@@ -483,16 +492,50 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
         }
     });
 
-    let main_vbox = gtk::Box::builder()
-        .orientation(gtk::Orientation::Vertical)
-        .name(style_names::MAIN)
-        .build();
-    main_vbox.add(&entry);
-    window.add(&main_vbox);
+    // Show the window initially, so it gets allocated and configured
     window.show_all();
-    // Add and show the list later, to avoid showing empty plugin categories on launch
-    main_vbox.add(&main_list);
-    main_list.show();
+
+    // Create widgets here for proper positioning
+    window.connect_configure_event(move |window, event| {
+        let width = match config.width {
+            RelativeNum::Absolute(width) => width,
+            RelativeNum::Fraction(fraction) => (event.size().0 as f32 * fraction) as i32,
+        };
+        // The GtkFixed widget is used for absolute positioning of the main box
+        let fixed = gtk::Fixed::builder().build();
+        let main_vbox = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .halign(gtk::Align::Center)
+            .vexpand(false)
+            .width_request(width)
+            .name(style_names::MAIN)
+            .build();
+        main_vbox.add(&entry);
+
+        let vertical_offset = match config.vertical_offset {
+            RelativeNum::Absolute(offset) => offset,
+            RelativeNum::Fraction(fraction) => (event.size().1 as f32 * fraction) as i32,
+        };
+
+        fixed.put(
+            &main_vbox,
+            (event.size().0 as i32 - width) / 2,
+            match config.position {
+                Position::Top => vertical_offset,
+                Position::Center => {
+                    (event.size().1 as i32 - entry.allocated_height()) / 2 + vertical_offset
+                }
+            },
+        );
+        window.add(&fixed);
+        window.show_all();
+
+        // Add and show the list later, to avoid showing empty plugin categories on launch
+        main_vbox.add(&main_list);
+        main_list.show();
+        entry.grab_focus(); // Grab the focus so typing is immediately accepted by the entry box
+        false
+    });
 }
 
 fn handle_matches(
