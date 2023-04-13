@@ -12,4 +12,4 @@ crate-type = ["cdylib"]
 anyrun-plugin = { path = "../../anyrun-plugin" }
 abi_stable = "0.11.1"
 rink-core = "0.6"
-reqwest = { version = "0.11.13", default-features = false, features = ["blocking", "json", "rustls"] }
+reqwest = { version = "0.11.13", default-features = false, features = ["blocking", "json", "rustls-tls"] }
