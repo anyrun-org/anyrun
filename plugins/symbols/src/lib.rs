@@ -70,10 +70,22 @@ fn get_matches(input: RString, symbols: &mut Vec<Symbol>) -> RVec<Match> {
 
     symbols.truncate(3);
 
+    // escape certain characters for pango markup
+    fn escape_chr(chr: &str) -> &str {
+        match chr {
+            "&" => "&amp;",
+            "<" => "&lt;",
+            ">" => "&gt;",
+            "\"" => "&quot;",
+            "'" => "&apos;",
+            chr => chr,
+        }
+    }
+
     symbols
         .into_iter()
         .map(|(symbol, _)| Match {
-            title: symbol.chr.into(),
+            title: escape_chr(&symbol.chr).into(),
             description: ROption::RSome(symbol.name.into()),
             icon: ROption::RNone,
             id: ROption::RNone,
