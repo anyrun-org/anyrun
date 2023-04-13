@@ -4,7 +4,7 @@
 
 box#main {
   border-radius: 10px;
-  background-color: #242424;
+  background-color: @theme_bg_color;
 }
 
 list#main {
