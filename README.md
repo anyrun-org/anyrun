@@ -47,26 +47,7 @@ cargo build --release # Build all the packages
 cargo install --path anyrun/ # Install the anyrun binary
 mkdir -p ~/.config/anyrun/plugins # Create the config directory and the plugins subdirectory
 cp target/release/*.so ~/.config/anyrun/plugins # Copy all of the built plugins to the correct directory
-```
-
-After that you need to create the configuration file and place it in `~/.config/anyrun/config.ron`. A config file with all of the included plugins is as follows:
-
-```ron
-Config(
-  width: Absolute(800),
-  position: Top,
-  vertical_offset: Absolute(0), // How much the runner is shifted vertically
-  hide_icons: false,
-  ignore_exclusive_zones: false, // ignore exclusive zones, f.e. Waybar
-  layer: Overlay, // GTK Layer: Bottom, Top, Background, Overlay
-  hide_plugin_info: false,
-  plugins: [
-    "libapplications.so",
-    "libsymbols.so",
-    "libshell.so",
-    "libtranslate.so",
-  ],
-)
+cp examples/config.ron ~/.config/anyrun/config.ron # Copy the default config file
 ```
 
 ## Plugins
@@ -99,24 +80,7 @@ The default configuration directory is `$HOME/.config/anyrun` the structure of t
 
 ```
 
-The config file has the following structure, and as seen in the name uses the `ron` language:
-
-```ron
-Config(
-  width: Absolute(800), // The width of the window
-  position: Top,
-  vertical_offset: Absolute(0), // How much the runner is shifted vertically
-  hide_icons: false,
-  ignore_exclusive_zones: false, // ignore exclusive zones, f.e. Waybar
-  layer: Overlay, // GTK Layer: Bottom, Top, Background, Overlay
-  hide_plugin_info: false,
-  plugins: [
-    "libapplications.so", // Relative paths are looked up in the <config dir>/plugins/ directory
-    "/home/kirottu/Projects/anyrun/target/debug/libsymbols.so", // Absolute paths are well, asbolute and loaded as is. Useful for development.
-  ],
-)
-
-```
+The [default config file](examples/config.ron) contains the default values, and annotates all configuration options with comments on what they are and how to use them.
 
 ## Styling
 
