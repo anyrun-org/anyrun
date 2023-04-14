@@ -55,10 +55,14 @@ pub fn get_matches(input: RString, entries: &mut Vec<(DesktopEntry, u64)>) -> RV
         .clone()
         .into_iter()
         .filter_map(|(entry, id)| {
-            matcher
-                .fuzzy_match(&entry.name, &input)
-                .max(matcher.fuzzy_match(&entry.exec, &input))
-                .map(|val| (entry, id, val))
+            let score = matcher.fuzzy_match(&entry.name, &input).unwrap_or(0)
+                + matcher.fuzzy_match(&entry.exec, &input).unwrap_or(0);
+
+            if score > 0 {
+                Some((entry, id, score))
+            } else {
+                None
+            }
         })
         .collect::<Vec<_>>();
 
