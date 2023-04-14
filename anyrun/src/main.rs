@@ -391,6 +391,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
                     None => {
                         // If nothing is selected select either the top or bottom match based on the input
                         match event.keyval() {
+                            _ if combined_matches.is_empty() => (),
                             constants::Down | constants::Tab => combined_matches[0]
                                 .1
                                 .select_row(Some(&combined_matches[0].0)),
