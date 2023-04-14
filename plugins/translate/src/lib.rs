@@ -217,6 +217,7 @@ fn get_matches(input: RString, data: &mut RuntimeData) -> RVec<Match> {
                                     }).expect("Google API returned unknown language code!"),
                                     name)
                                 .into()),
+                            use_pango: false,
                             icon: ROption::RNone,
                             id: ROption::RNone
                         }
