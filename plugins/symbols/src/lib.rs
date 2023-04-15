@@ -75,6 +75,7 @@ fn get_matches(input: RString, symbols: &mut Vec<Symbol>) -> RVec<Match> {
         .map(|(symbol, _)| Match {
             title: symbol.chr.into(),
             description: ROption::RSome(symbol.name.into()),
+            use_pango: false,
             icon: ROption::RNone,
             id: ROption::RNone,
         })

@@ -73,8 +73,9 @@ pub fn get_matches(input: RString, entries: &mut Vec<(DesktopEntry, u64)>) -> RV
         .into_iter()
         .map(|(entry, id, _)| Match {
             title: entry.name.into(),
-            icon: ROption::RSome(entry.icon.into()),
             description: entry.desc.map(|desc| desc.into()).into(),
+            use_pango: false,
+            icon: ROption::RSome(entry.icon.into()),
             id: ROption::RSome(id),
         })
         .collect()

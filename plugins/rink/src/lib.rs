@@ -42,8 +42,9 @@ fn get_matches(input: RString, ctx: &mut rink_core::Context) -> RVec<Match> {
     match rink_core::one_line(ctx, &input) {
         Ok(result) => vec![Match {
             title: result.into(),
-            icon: ROption::RNone,
             description: ROption::RNone,
+            use_pango: false,
+            icon: ROption::RNone,
             id: ROption::RNone,
         }]
         .into(),

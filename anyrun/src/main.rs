@@ -589,7 +589,7 @@ fn handle_matches(
         let title = gtk::Label::builder()
             .name(style_names::MATCH_TITLE)
             .wrap(true)
-            .use_markup(true) // Allow pango markup
+            .use_markup(_match.use_pango)
             .halign(gtk::Align::Start)
             .valign(gtk::Align::Center)
             .vexpand(true)
@@ -610,7 +610,7 @@ fn handle_matches(
                     &gtk::Label::builder()
                         .name(style_names::MATCH_DESC)
                         .wrap(true)
-                        .use_markup(true) // Allow pango markup
+                        .use_markup(_match.use_pango)
                         .halign(gtk::Align::Start)
                         .valign(gtk::Align::Center)
                         .label(desc)

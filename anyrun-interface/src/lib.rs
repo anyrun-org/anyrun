@@ -30,13 +30,15 @@ pub struct PluginInfo {
 
 /// Represents a match from a plugin
 ///
-/// The `title` and `description` support pango markup.
+/// The `title` and `description` support pango markup when `use_pango` is set to true.
 /// Refer to [Pango Markup](https://docs.gtk.org/Pango/pango_markup.html) for how to use pango markup.
 #[repr(C)]
 #[derive(StableAbi, Clone)]
 pub struct Match {
     pub title: RString,
     pub description: ROption<RString>,
+    /// Whether the title and description should be interpreted as pango markup.
+    pub use_pango: bool,
     /// The icon name from the icon theme in use
     pub icon: ROption<RString>,
     /// For runners to differentiate between the matches. Not required.

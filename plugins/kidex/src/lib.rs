@@ -77,18 +77,21 @@ pub fn get_matches(input: RString, state: &mut State) -> RVec<Match> {
                 Match {
                     title: "Open File".into(),
                     description: ROption::RSome(path.clone().into()),
+                    use_pango: false,
                     id: ROption::RSome(IndexAction::Open as u64),
                     icon: ROption::RSome("document-open".into()),
                 },
                 Match {
                     title: "Copy Path".into(),
                     description: ROption::RSome(path.into()),
+                    use_pango: false,
                     id: ROption::RSome(IndexAction::CopyPath as u64),
                     icon: ROption::RSome("edit-copy".into()),
                 },
                 Match {
                     title: "Back".into(),
                     description: ROption::RNone,
+                    use_pango: false,
                     id: ROption::RSome(IndexAction::Back as u64),
                     icon: ROption::RSome("edit-undo".into()),
                 },
@@ -119,16 +122,17 @@ pub fn get_matches(input: RString, state: &mut State) -> RVec<Match> {
                         .file_name()
                         .map(|name| name.to_string_lossy().into())
                         .unwrap_or("N/A".into()),
-                    icon: ROption::RSome(if entry_index.directory {
-                        "folder".into()
-                    } else {
-                        "text-x-generic".into()
-                    }),
                     description: entry_index
                         .path
                         .parent()
                         .map(|path| path.display().to_string().into())
                         .into(),
+                    use_pango: false,
+                    icon: ROption::RSome(if entry_index.directory {
+                        "folder".into()
+                    } else {
+                        "text-x-generic".into()
+                    }),
                     id: ROption::RSome(id as u64),
                 })
                 .collect()
