@@ -390,14 +390,16 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
                     Some(selected) => selected,
                     None => {
                         // If nothing is selected select either the top or bottom match based on the input
-                        match event.keyval() {
-                            constants::Down | constants::Tab => combined_matches[0]
-                                .1
-                                .select_row(Some(&combined_matches[0].0)),
-                            constants::Up => combined_matches[combined_matches.len() - 1]
-                                .1
-                                .select_row(Some(&combined_matches[combined_matches.len() - 1].0)),
-                            _ => unreachable!(),
+                        if !combined_matches.is_empty() {
+                            match event.keyval() {
+                                constants::Down | constants::Tab => combined_matches[0]
+                                    .1
+                                    .select_row(Some(&combined_matches[0].0)),
+                                constants::Up => combined_matches[combined_matches.len() - 1]
+                                    .1
+                                    .select_row(Some(&combined_matches[combined_matches.len() - 1].0)),
+                                _ => unreachable!(),
+                            }
                         }
                         return Inhibit(true);
                     }
