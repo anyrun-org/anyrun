@@ -13,12 +13,14 @@ use std::{
 pub struct Config {
     desktop_actions: bool,
     history_size: u32,
+    history_weight: u32,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Config {
             desktop_actions: false,
+            history_weight: 2,
             history_size: 10,
         }
     }
@@ -27,11 +29,12 @@ impl Default for Config {
 mod scrubber;
 
 #[derive(Deserialize, Serialize, Default)]
-pub struct History(HashMap<String, VecDeque<DesktopEntry>>);
+pub struct History(HashMap<RString, VecDeque<DesktopEntry>>);
 
 pub struct State {
     entries: Vec<(DesktopEntry, u64)>,
     config: Config,
+    cache_path: String,
     history: History,
 }
 
@@ -48,10 +51,14 @@ impl State {
             }
         };
 
-        let history: History = if let Ok(Ok(Ok(history))) = env::var("HOME").map(|home| {
-            fs::read_to_string(format!("{}/.cache/anyrun-applications-history", home))
-                .map(|content| ron::from_str(&content))
-        }) {
+        let cache_path = format!(
+            "{}/.cache/anyrun-applications-history",
+            env::var("HOME").expect("Unable to determine HOME directory")
+        );
+
+        let history: History = if let Ok(Ok(history)) =
+            fs::read_to_string(&cache_path).map(|content| ron::from_str(&content))
+        {
             history
         } else {
             History::default()
@@ -65,12 +72,13 @@ impl State {
         State {
             config,
             history,
+            cache_path,
             entries,
         }
     }
 }
 
-pub fn handler(selection: Match, state: &mut State) -> HandleResult {
+pub fn handler(selection: Match, input: RString, state: &mut State) -> HandleResult {
     let entry = state
         .entries
         .iter()
@@ -81,10 +89,23 @@ pub fn handler(selection: Match, state: &mut State) -> HandleResult {
                 None
             }
         })
-        .unwrap();
+        .unwrap()
+        .clone();
 
     if let Err(why) = Command::new("sh").arg("-c").arg(&entry.exec).spawn() {
         println!("Error running desktop entry: {}", why);
+    }
+
+    let history_entry = state.history.0.entry(input).or_insert(VecDeque::new());
+
+    history_entry.push_front(entry);
+    history_entry.truncate(state.config.history_size as usize);
+
+    if let Err(why) = fs::write(
+        &state.cache_path,
+        ron::to_string(&state.history).expect("Failed to serialize history!"),
+    ) {
+        eprintln!("Failed to write history: {}", why);
     }
 
     HandleResult::Close
@@ -95,6 +116,7 @@ pub fn init(config_dir: RString) -> State {
 }
 
 pub fn get_matches(input: RString, state: &mut State) -> RVec<Match> {
+    let history_entry = state.history.0.get(&input);
     let matcher = fuzzy_matcher::skim::SkimMatcherV2::default().smart_case();
     let mut entries = state
         .entries
@@ -102,7 +124,17 @@ pub fn get_matches(input: RString, state: &mut State) -> RVec<Match> {
         .into_iter()
         .filter_map(|(entry, id)| {
             let score = matcher.fuzzy_match(&entry.name, &input).unwrap_or(0)
-                + matcher.fuzzy_match(&entry.exec, &input).unwrap_or(0);
+                + matcher.fuzzy_match(&entry.exec, &input).unwrap_or(0)
+                + match history_entry {
+                    Some(history_entry) => {
+                        history_entry
+                            .iter()
+                            .filter(|_entry| **_entry == entry)
+                            .count() as u32
+                            * state.config.history_weight
+                    }
+                    None => 0,
+                } as i64;
 
             if score > 0 {
                 Some((entry, id, score))

@@ -52,7 +52,7 @@ fn get_matches(input: RString, ctx: &mut rink_core::Context) -> RVec<Match> {
     }
 }
 
-fn handler(selection: Match, _: &mut rink_core::Context) -> HandleResult {
+fn handler(selection: Match, _input: RString, _: &mut rink_core::Context) -> HandleResult {
     HandleResult::Copy(selection.title.into_bytes())
 }
 

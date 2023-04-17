@@ -26,7 +26,7 @@ impl From<u64> for IndexAction {
     }
 }
 
-pub fn handler(selection: Match, state: &mut State) -> HandleResult {
+pub fn handler(selection: Match, _input: RString, state: &mut State) -> HandleResult {
     match &state.selection {
         Some(index_entry) => match selection.id.unwrap().into() {
             IndexAction::Open => {

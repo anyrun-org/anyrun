@@ -82,7 +82,7 @@ fn get_matches(input: RString, symbols: &mut Vec<Symbol>) -> RVec<Match> {
         .collect()
 }
 
-fn handler(selection: Match, _symbols: &mut Vec<Symbol>) -> HandleResult {
+fn handler(selection: Match, _input: RString, _symbols: &mut Vec<Symbol>) -> HandleResult {
     HandleResult::Copy(selection.title.into_bytes())
 }
 

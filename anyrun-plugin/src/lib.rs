@@ -105,9 +105,11 @@ macro_rules! plugin {
         #[::abi_stable::sabi_extern_fn]
         fn anyrun_internal_handle_selection(
             selection: ::anyrun_plugin::anyrun_interface::Match,
+            input: ::abi_stable::std_types::RString,
         ) -> ::anyrun_plugin::anyrun_interface::HandleResult {
             $handler(
                 selection,
+                input,
                 ANYRUN_INTERNAL_DATA.lock().unwrap().as_mut().unwrap(),
             )
         }

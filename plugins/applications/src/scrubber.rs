@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::Config;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub struct DesktopEntry {
     pub exec: String,
     pub name: String,

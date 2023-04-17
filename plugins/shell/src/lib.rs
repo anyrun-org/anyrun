@@ -64,7 +64,7 @@ fn get_matches(input: RString, config: &mut Config) -> RVec<Match> {
     }
 }
 
-fn handler(selection: Match, _config: &mut Config) -> HandleResult {
+fn handler(selection: Match, _input: RString, _config: &mut Config) -> HandleResult {
     if let Err(why) = Command::new(selection.description.unwrap().as_str())
         .arg("-c")
         .arg(selection.title.as_str())

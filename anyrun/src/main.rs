@@ -459,9 +459,10 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
                 };
 
                 // Perform actions based on the result of handling the selection
-                match plugin_view.plugin.handle_selection()(unsafe {
-                    (*selected_match.data::<Match>("match").unwrap().as_ptr()).clone()
-                }) {
+                match plugin_view.plugin.handle_selection()(
+                    unsafe { (*selected_match.data::<Match>("match").unwrap().as_ptr()).clone() },
+                    entry_clone.text().to_string().into(),
+                ) {
                     HandleResult::Close => {
                         window.close();
                         Inhibit(true)

@@ -150,7 +150,7 @@ fn get_matches(input: RString, data: &mut RuntimeData) -> RVec<Match> {
         return RVec::new();
     }
 
-    // Ignore the prefix
+    // Ignore the prefix,backe
     let input = &input[data.config.prefix.len()..];
     let (lang, text) = match input.split_once(' ') {
         Some(split) => split,
@@ -227,7 +227,7 @@ fn get_matches(input: RString, data: &mut RuntimeData) -> RVec<Match> {
     })
 }
 
-fn handler(selection: Match, _data: &mut RuntimeData) -> HandleResult {
+fn handler(selection: Match, _input: RString, _data: &mut RuntimeData) -> HandleResult {
     HandleResult::Copy(selection.title.into_bytes())
 }
 

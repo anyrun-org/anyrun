@@ -16,7 +16,7 @@ pub struct Plugin {
     pub info: extern "C" fn() -> PluginInfo,
     pub get_matches: extern "C" fn(RString) -> u64,
     pub poll_matches: extern "C" fn(u64) -> PollResult,
-    pub handle_selection: extern "C" fn(Match) -> HandleResult,
+    pub handle_selection: extern "C" fn(Match, RString) -> HandleResult,
 }
 
 /// Info of the plugin. Used for the main UI
