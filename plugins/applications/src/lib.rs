@@ -2,18 +2,77 @@ use abi_stable::std_types::{ROption, RString, RVec};
 use anyrun_plugin::{anyrun_interface::HandleResult, *};
 use fuzzy_matcher::FuzzyMatcher;
 use scrubber::DesktopEntry;
-use serde::Deserialize;
-use std::{fs, process::Command};
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::{HashMap, VecDeque},
+    env, fs,
+    process::Command,
+};
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize)]
 pub struct Config {
     desktop_actions: bool,
+    history_size: u32,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            desktop_actions: false,
+            history_size: 10,
+        }
+    }
 }
 
 mod scrubber;
 
-pub fn handler(selection: Match, entries: &mut Vec<(DesktopEntry, u64)>) -> HandleResult {
-    let entry = entries
+#[derive(Deserialize, Serialize, Default)]
+pub struct History(HashMap<String, VecDeque<DesktopEntry>>);
+
+pub struct State {
+    entries: Vec<(DesktopEntry, u64)>,
+    config: Config,
+    history: History,
+}
+
+impl State {
+    fn new(config_dir: RString) -> Self {
+        let config: Config = match fs::read_to_string(format!("{}/applications.ron", config_dir)) {
+            Ok(content) => ron::from_str(&content).unwrap_or_else(|why| {
+                eprintln!("Error parsing applications plugin config: {}", why);
+                Config::default()
+            }),
+            Err(why) => {
+                eprintln!("Error reading applications plugin config: {}", why);
+                Config::default()
+            }
+        };
+
+        let history: History = if let Ok(Ok(Ok(history))) = env::var("HOME").map(|home| {
+            fs::read_to_string(format!("{}/.cache/anyrun-applications-history", home))
+                .map(|content| ron::from_str(&content))
+        }) {
+            history
+        } else {
+            History::default()
+        };
+
+        let entries = scrubber::scrubber(&config).unwrap_or_else(|why| {
+            eprintln!("Failed to load desktop entries: {}", why);
+            Vec::new()
+        });
+
+        State {
+            config,
+            history,
+            entries,
+        }
+    }
+}
+
+pub fn handler(selection: Match, state: &mut State) -> HandleResult {
+    let entry = state
+        .entries
         .iter()
         .find_map(|(entry, id)| {
             if *id == selection.id.unwrap() {
@@ -31,27 +90,14 @@ pub fn handler(selection: Match, entries: &mut Vec<(DesktopEntry, u64)>) -> Hand
     HandleResult::Close
 }
 
-pub fn init(config_dir: RString) -> Vec<(DesktopEntry, u64)> {
-    let config: Config = match fs::read_to_string(format!("{}/applications.ron", config_dir)) {
-        Ok(content) => ron::from_str(&content).unwrap_or_else(|why| {
-            eprintln!("Error parsing applications plugin config: {}", why);
-            Config::default()
-        }),
-        Err(why) => {
-            eprintln!("Error reading applications plugin config: {}", why);
-            Config::default()
-        }
-    };
-
-    scrubber::scrubber(config).unwrap_or_else(|why| {
-        eprintln!("Failed to load desktop entries: {}", why);
-        Vec::new()
-    })
+pub fn init(config_dir: RString) -> State {
+    State::new(config_dir)
 }
 
-pub fn get_matches(input: RString, entries: &mut Vec<(DesktopEntry, u64)>) -> RVec<Match> {
+pub fn get_matches(input: RString, state: &mut State) -> RVec<Match> {
     let matcher = fuzzy_matcher::skim::SkimMatcherV2::default().smart_case();
-    let mut entries = entries
+    let mut entries = state
+        .entries
         .clone()
         .into_iter()
         .filter_map(|(entry, id)| {
@@ -88,4 +134,4 @@ pub fn info() -> PluginInfo {
     }
 }
 
-plugin!(init, info, get_matches, handler, Vec<(DesktopEntry, u64)>);
+plugin!(init, info, get_matches, handler, State);
