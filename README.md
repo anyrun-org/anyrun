@@ -36,6 +36,37 @@ Here are the libraries you need to have to build & run it:
 
 If you use an Arch based distro, you can install the AUR package [anyrun-git](https://aur.archlinux.org/packages/anyrun-git).
 
+### Nix
+
+You can use the flake:
+
+```nix
+# flake.nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    anyrun.url = "github:Kirottu/anyrun";
+    anyrun.inputs.nixpkgs.follows = "nixpkgs";
+  };
+
+  outputs = { self, nixpkgs, anyrun }: let
+    pkgs = import nixpkgs {
+      system = system;
+      overlays = [anyrun.overlay];
+      allowUnfree = true;
+    };
+  in {
+    nixosConfigurations.HOSTNAME = nixpkgs.lib.nixosSystem {
+      # ...
+
+      system.packages = [ pkgs.anyrun ];
+
+      # ...
+    };
+  };
+}
+```
+
 ### Manual installation
 
 Make sure all of the dependencies are installed, and then run the following commands in order:
