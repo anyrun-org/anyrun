@@ -65,6 +65,9 @@ Anyrun requires plugins to function, as they provide the results for input. The 
   - Run shell commands
 - [Kidex](plugins/kidex)
   - File search provided by [Kidex](https://github.com/Kirottu/kidex)
+- [Randr](plugins/randr)
+  - Rotate and resize; quickly change monitor configurations on the fly.
+  - TODO: Only supports Hyprland, needs support for other compositors.
 
 ## Configuration
 
