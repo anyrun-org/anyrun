@@ -34,7 +34,8 @@ Here are the libraries you need to have to build & run it:
 
 ## Installation
 
-If you use an Arch based distro, you can install the AUR package [anyrun-git](https://aur.archlinux.org/packages/anyrun-git).
+### Arch
+On Arch/Arch-based distros you can install the AUR package [anyrun-git](https://aur.archlinux.org/packages/anyrun-git).
 
 ### Nix
 
