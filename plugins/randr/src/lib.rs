@@ -52,6 +52,11 @@ pub fn handler(_match: Match, state: &mut State) -> HandleResult {
             HandleResult::Refresh(true)
         }
         InnerState::Position(mon) => {
+            if _match.id.unwrap() == u64::MAX {
+                state.inner = InnerState::None;
+                return HandleResult::Refresh(false);
+            }
+
             let rel_id = (_match.id.unwrap() >> 32) as u32;
             let action = _match.id.unwrap() as u32;
 
@@ -84,7 +89,7 @@ pub fn get_matches(input: RString, state: &mut State) -> RVec<Match> {
                     format!("{}x{} at {}x{}", mon.width, mon.height, mon.x, mon.y).into(),
                 ),
                 use_pango: false,
-                icon: ROption::RNone,
+                icon: ROption::RSome("object-flip-horizontal".into()),
                 id: ROption::RSome(mon.id),
             })
             .collect::<RVec<_>>(),
@@ -110,7 +115,7 @@ pub fn get_matches(input: RString, state: &mut State) -> RVec<Match> {
                                 title: format!("{} {}", configure.to_string(), _mon.name).into(),
                                 description: ROption::RNone,
                                 use_pango: false,
-                                icon: ROption::RNone,
+                                icon: ROption::RSome(configure.icon().into()),
                                 // Store 2 32 bit IDs in the single 64 bit integer, a bit of a hack
                                 id: ROption::RSome(_mon.id << 32 | Into::<u64>::into(configure)),
                             })
@@ -125,9 +130,18 @@ pub fn get_matches(input: RString, state: &mut State) -> RVec<Match> {
                 title: "Reset position".into(),
                 description: ROption::RNone,
                 use_pango: false,
-                icon: ROption::RNone,
+                icon: ROption::RSome(Configure::Zero.icon().into()),
                 id: ROption::RSome((&Configure::Zero).into()),
             });
+
+            vec.push(Match {
+                title: "Back".into(),
+                description: ROption::RSome("Return to the previous menu".into()),
+                use_pango: false,
+                icon: ROption::RSome("edit-undo".into()),
+                id: ROption::RSome(u64::MAX),
+            });
+
             vec
         }
     }

@@ -34,6 +34,17 @@ impl<'a> Configure<'a> {
             _ => unreachable!(),
         }
     }
+
+    pub fn icon(&self) -> &'static str {
+        match self {
+            Configure::Mirror(_) => "edit-copy",
+            Configure::LeftOf(_) => "go-previous",
+            Configure::RightOf(_) => "go-next",
+            Configure::Below(_) => "go-down",
+            Configure::Above(_) => "go-up",
+            Configure::Zero => "go-home",
+        }
+    }
 }
 
 impl<'a> ToString for Configure<'a> {
