@@ -1,11 +1,25 @@
-use std::env;
+use std::{env, fs};
 
 use abi_stable::std_types::{ROption, RString, RVec};
 use anyrun_plugin::{anyrun_interface::HandleResult, plugin, Match, PluginInfo};
 use fuzzy_matcher::FuzzyMatcher;
 use randr::{dummy::Dummy, hyprland::Hyprland, Configure, Monitor, Randr};
+use serde::Deserialize;
 
 mod randr;
+
+#[derive(Deserialize)]
+struct Config {
+    prefix: String,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            prefix: ":dp".to_string(),
+        }
+    }
+}
 
 enum InnerState {
     None,
@@ -14,10 +28,11 @@ enum InnerState {
 
 pub struct State {
     randr: Box<dyn Randr + Send + Sync>,
+    config: Config,
     inner: InnerState,
 }
 
-pub fn init(_config_dir: RString) -> State {
+pub fn init(config_dir: RString) -> State {
     // Determine which Randr implementation should be used
     let randr: Box<dyn Randr + Send + Sync> = if env::var("HYPRLAND_INSTANCE_SIGNATURE").is_ok() {
         Box::new(Hyprland::new())
@@ -27,6 +42,13 @@ pub fn init(_config_dir: RString) -> State {
 
     State {
         randr,
+        config: match fs::read_to_string(format!("{}/randr.ron", config_dir)) {
+            Ok(content) => ron::from_str(&content).unwrap_or_default(),
+            Err(why) => {
+                eprintln!("Error reading Randr config file: {}", why);
+                Config::default()
+            }
+        },
         inner: InnerState::None,
     }
 }
@@ -77,6 +99,12 @@ pub fn handler(_match: Match, state: &mut State) -> HandleResult {
 }
 
 pub fn get_matches(input: RString, state: &mut State) -> RVec<Match> {
+    if !input.starts_with(&state.config.prefix) {
+        return RVec::new();
+    }
+
+    let input = &input[state.config.prefix.len()..].trim();
+
     let matcher = fuzzy_matcher::skim::SkimMatcherV2::default().smart_case();
     let mut vec = match &state.inner {
         InnerState::None => state
@@ -148,7 +176,7 @@ pub fn get_matches(input: RString, state: &mut State) -> RVec<Match> {
     .into_iter()
     .filter_map(|_match| {
         matcher
-            .fuzzy_match(&_match.title, &input)
+            .fuzzy_match(&_match.title, input)
             .map(|score| (_match, score))
     })
     .collect::<Vec<_>>();
