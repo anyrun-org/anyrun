@@ -198,6 +198,8 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
     gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Left, true);
     gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Right, true);
 
+    gtk_layer_shell::set_namespace(&window, "anyrun");
+
     if config.ignore_exclusive_zones {
         gtk_layer_shell::set_exclusive_zone(&window, -1);
     }
@@ -397,7 +399,9 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
                                     .select_row(Some(&combined_matches[0].0)),
                                 constants::Up => combined_matches[combined_matches.len() - 1]
                                     .1
-                                    .select_row(Some(&combined_matches[combined_matches.len() - 1].0)),
+                                    .select_row(Some(
+                                        &combined_matches[combined_matches.len() - 1].0,
+                                    )),
                                 _ => unreachable!(),
                             }
                         }
