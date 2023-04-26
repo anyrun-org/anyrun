@@ -2,7 +2,11 @@ use std::{cell::RefCell, env, fs, mem, path::PathBuf, rc::Rc, time::Duration};
 
 use abi_stable::std_types::{ROption, RVec};
 use anyrun_interface::{HandleResult, Match, PluginInfo, PluginRef, PollResult};
-use gtk::{gdk, gdk_pixbuf, glib, prelude::*};
+use gtk4::{
+    gdk, gdk_pixbuf,
+    glib::{self, signal::Inhibit},
+    prelude::*,
+};
 use nix::unistd;
 use serde::Deserialize;
 use wl_clipboard_rs::copy;
@@ -38,8 +42,8 @@ enum RelativeNum {
 #[derive(Clone)]
 struct PluginView {
     plugin: PluginRef,
-    row: gtk::ListBoxRow,
-    list: gtk::ListBox,
+    row: gtk4::ListBoxRow,
+    list: gtk4::ListBox,
 }
 
 struct Args {
@@ -53,7 +57,7 @@ enum Position {
     Center,
 }
 
-/// Actions to run after GTK has finished
+/// Actions to run after GTK4 has finished
 enum PostRunAction {
     Copy(Vec<u8>),
     None,
@@ -70,12 +74,12 @@ struct RuntimeData {
 
 /// The naming scheme for CSS styling
 ///
-/// Refer to [GTK 3.0 CSS Overview](https://docs.gtk.org/gtk3/css-overview.html)
-/// and [GTK 3.0 CSS Properties](https://docs.gtk.org/gtk3/css-properties.html) for how to style.
+/// 4Refer to [GTK 3.0 CSS Overview](https://docs.gtk.org/gtk3/css-overview.html)
+/// and [GTK4 3.0 CSS Properties](https://docs.gtk4.org/gtk43/css-properties.html) for how to style.
 mod style_names {
     /// The text entry box
     pub const ENTRY: &str = "entry";
-    /// "Main" widgets (main GtkListBox, main GtkBox)
+    /// "Main" widgets (main Gtk4ListBox, main Gtk4Box)
     pub const MAIN: &str = "main";
     /// The window
     pub const WINDOW: &str = "window";
@@ -92,10 +96,10 @@ mod style_names {
 pub const DEFAULT_CONFIG_DIR: &str = "/etc/anyrun";
 
 fn main() {
-    let app = gtk::Application::new(Some("com.kirottu.anyrun"), Default::default());
+    let app = gtk4::Application::new(Some("com.kirottu.anyrun"), Default::default());
     let runtime_data: Rc<RefCell<Option<RuntimeData>>> = Rc::new(RefCell::new(None));
 
-    // Add the launch options to the GTK Application
+    // Append the launch options to the GTK4 Application
     app.add_main_option(
         "override-plugins",
         glib::Char('o' as i8),
@@ -127,7 +131,7 @@ fn main() {
             plugins: Vec::new(),
             post_run_action: PostRunAction::None,
         });
-        -1 // Magic GTK number to continue running
+        -1 // Magic GTK4 number to continue running
     });
 
     let runtime_data_clone = runtime_data.clone();
@@ -162,7 +166,7 @@ fn main() {
     }
 }
 
-fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>>>) {
+fn activate(app: &gtk4::Application, runtime_data: Rc<RefCell<Option<RuntimeData>>>) {
     // Figure out the config dir
     let user_dir = format!(
         "{}/.config/anyrun",
@@ -184,49 +188,48 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
     .expect("Config file malformed");
 
     // Create the main window
-    let window = gtk::ApplicationWindow::builder()
+    let window = gtk4::ApplicationWindow::builder()
         .application(app)
         .name(style_names::WINDOW)
         .build();
 
-    // Init GTK layer shell
-    gtk_layer_shell::init_for_window(&window);
+    // Init GTK4 layer shell
+    gtk4_layer_shell::init_for_window(&window);
 
     // Make layer-window fullscreen
-    gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Top, true);
-    gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Bottom, true);
-    gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Left, true);
-    gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Right, true);
+    gtk4_layer_shell::set_anchor(&window, gtk4_layer_shell::Edge::Top, true);
+    gtk4_layer_shell::set_anchor(&window, gtk4_layer_shell::Edge::Bottom, true);
+    gtk4_layer_shell::set_anchor(&window, gtk4_layer_shell::Edge::Left, true);
+    gtk4_layer_shell::set_anchor(&window, gtk4_layer_shell::Edge::Right, true);
 
-    gtk_layer_shell::set_namespace(&window, "anyrun");
+    gtk4_layer_shell::set_namespace(&window, "anyrun");
 
     if config.ignore_exclusive_zones {
-        gtk_layer_shell::set_exclusive_zone(&window, -1);
+        gtk4_layer_shell::set_exclusive_zone(&window, -1);
     }
 
-    gtk_layer_shell::set_keyboard_mode(&window, gtk_layer_shell::KeyboardMode::Exclusive);
+    gtk4_layer_shell::set_keyboard_mode(&window, gtk4_layer_shell::KeyboardMode::Exclusive);
 
     match config.layer {
         Layer::Background => {
-            gtk_layer_shell::set_layer(&window, gtk_layer_shell::Layer::Background)
+            gtk4_layer_shell::set_layer(&window, gtk4_layer_shell::Layer::Background)
         }
-        Layer::Bottom => gtk_layer_shell::set_layer(&window, gtk_layer_shell::Layer::Bottom),
-        Layer::Top => gtk_layer_shell::set_layer(&window, gtk_layer_shell::Layer::Top),
-        Layer::Overlay => gtk_layer_shell::set_layer(&window, gtk_layer_shell::Layer::Overlay),
+        Layer::Bottom => gtk4_layer_shell::set_layer(&window, gtk4_layer_shell::Layer::Bottom),
+        Layer::Top => gtk4_layer_shell::set_layer(&window, gtk4_layer_shell::Layer::Top),
+        Layer::Overlay => gtk4_layer_shell::set_layer(&window, gtk4_layer_shell::Layer::Overlay),
     };
 
     // Try to load custom CSS, if it fails load the default CSS
-    let provider = gtk::CssProvider::new();
-    if let Err(why) = provider.load_from_path(&format!("{}/style.css", config_dir)) {
-        eprintln!("Failed to load custom CSS: {}", why);
-        provider
-            .load_from_data(include_bytes!("../res/style.css"))
-            .unwrap();
+    let provider = gtk4::CssProvider::new();
+    if let Ok(content) = fs::read_to_string(format!("{}/style.css", config_dir)) {
+        provider.load_from_data(&content);
+    } else {
+        provider.load_from_data(include_str!("../res/style.css"));
     }
-    gtk::StyleContext::add_provider_for_screen(
-        &gdk::Screen::default().expect("Failed to get GDK screen for CSS provider!"),
+    gtk4::style_context_add_provider_for_display(
+        &gdk::Display::default().expect("Failed to get GDK display for CSS provider!"),
         &provider,
-        gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+        gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
     );
 
     // Use the plugins in the config file, or the plugins specified with the override
@@ -248,8 +251,8 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
     }
 
     // Create the main list of plugin views
-    let main_list = gtk::ListBox::builder()
-        .selection_mode(gtk::SelectionMode::None)
+    let main_list = gtk4::ListBox::builder()
+        .selection_mode(gtk4::SelectionMode::None)
         .name(style_names::MAIN)
         .build();
 
@@ -277,31 +280,33 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
             // Run the plugin's init code to init static resources etc.
             plugin.init()(config_dir.clone().into());
 
-            let plugin_box = gtk::Box::builder()
-                .orientation(gtk::Orientation::Horizontal)
+            let plugin_box = gtk4::Box::builder()
+                .orientation(gtk4::Orientation::Horizontal)
                 .spacing(10)
                 .name(style_names::PLUGIN)
                 .build();
             if !config.hide_plugin_info {
-                plugin_box.add(&create_info_box(&plugin.info()(), config.hide_icons));
-                plugin_box.add(
-                    &gtk::Separator::builder()
-                        .orientation(gtk::Orientation::Horizontal)
+                plugin_box.append(&create_info_box(&plugin.info()(), config.hide_icons));
+                plugin_box.append(
+                    &gtk4::Separator::builder()
+                        .orientation(gtk4::Orientation::Horizontal)
                         .name(style_names::PLUGIN)
                         .build(),
                 );
             }
-            let list = gtk::ListBox::builder()
+            let list = gtk4::ListBox::builder()
                 .name(style_names::PLUGIN)
                 .hexpand(true)
                 .build();
 
-            plugin_box.add(&list);
+            plugin_box.append(&list);
 
-            let row = gtk::ListBoxRow::builder().name(style_names::PLUGIN).build();
-            row.add(&plugin_box);
+            let row = gtk4::ListBoxRow::builder()
+                .name(style_names::PLUGIN)
+                .build();
+            row.set_child(Some(&plugin_box));
 
-            main_list.add(&row);
+            main_list.append(&row);
 
             PluginView { plugin, row, list }
         })
@@ -312,22 +317,10 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
         let plugins_clone = runtime_data.borrow().as_ref().unwrap().plugins.clone();
         plugin_view.list.connect_row_selected(move |list, row| {
             if row.is_some() {
-                let combined_matches = plugins_clone
-                    .iter()
-                    .flat_map(|view| {
-                        view.list.children().into_iter().map(|child| {
-                            (
-                                child.dynamic_cast::<gtk::ListBoxRow>().unwrap(),
-                                view.list.clone(),
-                            )
-                        })
-                    })
-                    .collect::<Vec<(gtk::ListBoxRow, gtk::ListBox)>>();
-
                 // Unselect everything except the new selection
-                for (_, _list) in combined_matches {
-                    if _list != *list {
-                        _list.select_row(None::<&gtk::ListBoxRow>);
+                for view in &plugins_clone {
+                    if view.list != *list {
+                        view.list.select_row(None::<&gtk4::ListBoxRow>);
                     }
                 }
             }
@@ -335,7 +328,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
     }
 
     // Text entry box
-    let entry = gtk::Entry::builder()
+    let entry = gtk4::Entry::builder()
         .hexpand(true)
         .name(style_names::ENTRY)
         .build();
@@ -351,17 +344,19 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
     });
 
     // Handle other key presses for selection control and all other things that may be needed
+
+    let event_controller_key = gtk4::EventControllerKey::new();
+
     let entry_clone = entry.clone();
-    window.connect_key_press_event(move |window, event| {
-        use gdk::keys::constants;
-        match event.keyval() {
+    event_controller_key.connect_key_pressed(move |_, key, _, _| {
+        match key {
             // Close window on escape
-            constants::Escape => {
+            gdk::Key::Escape => {
                 window.close();
                 Inhibit(true)
             }
             // Handle selections
-            constants::Down | constants::Tab | constants::Up => {
+            gdk::Key::Down | gdk::Key::Tab | gdk::Key::Up => {
                 // Combine all of the matches into a `Vec` to allow for easier handling of the selection
                 let combined_matches = runtime_data
                     .borrow()
@@ -372,13 +367,13 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
                     .flat_map(|view| {
                         view.list.children().into_iter().map(|child| {
                             (
-                                // All children of lists are GtkListBoxRow widgets
-                                child.dynamic_cast::<gtk::ListBoxRow>().unwrap(),
+                                // All children of lists are Gtk4ListBoxRow widgets
+                                child.dynamic_cast::<gtk4::ListBoxRow>().unwrap(),
                                 view.list.clone(),
                             )
                         })
                     })
-                    .collect::<Vec<(gtk::ListBoxRow, gtk::ListBox)>>();
+                    .collect::<Vec<(gtk4::ListBoxRow, gtk4::ListBox)>>();
 
                 // Get the selected match
                 let (selected_match, selected_list) = match runtime_data
@@ -393,11 +388,11 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
                     None => {
                         // If nothing is selected select either the top or bottom match based on the input
                         if !combined_matches.is_empty() {
-                            match event.keyval() {
-                                constants::Down | constants::Tab => combined_matches[0]
+                            match key {
+                                gdk::Key::Down | gdk::Key::Tab => combined_matches[0]
                                     .1
                                     .select_row(Some(&combined_matches[0].0)),
-                                constants::Up => combined_matches[combined_matches.len() - 1]
+                                gdk::Key::Up => combined_matches[combined_matches.len() - 1]
                                     .1
                                     .select_row(Some(
                                         &combined_matches[combined_matches.len() - 1].0,
@@ -410,7 +405,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
                 };
 
                 // Clear the previous selection
-                selected_list.select_row(None::<&gtk::ListBoxRow>);
+                selected_list.select_row(None::<&gtk4::ListBoxRow>);
 
                 // Get the index of the current selection
                 let index = combined_matches
@@ -419,8 +414,8 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
                     .unwrap();
 
                 // Move the selection based on the input, loops from top to bottom and vice versa
-                match event.keyval() {
-                    constants::Down | constants::Tab => {
+                match key {
+                    gdk::Key::Down | gdk::Key::Tab => {
                         if index < combined_matches.len() - 1 {
                             combined_matches[index + 1]
                                 .1
@@ -431,7 +426,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
                                 .select_row(Some(&combined_matches[0].0));
                         }
                     }
-                    constants::Up => {
+                    gdk::Key::Up => {
                         if index > 0 {
                             combined_matches[index - 1]
                                 .1
@@ -448,7 +443,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
                 Inhibit(true)
             }
             // Handle when the selected match is "activated"
-            constants::Return => {
+            gdk::Key::Return => {
                 let mut _runtime_data = runtime_data.borrow_mut();
 
                 let (selected_match, plugin_view) = match _runtime_data
@@ -499,49 +494,50 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
     });
 
     // Show the window initially, so it gets allocated and configured
-    window.show_all();
+    window.show();
 
     // Create widgets here for proper positioning
-    window.connect_configure_event(move |window, event| {
-        let width = match config.width {
-            RelativeNum::Absolute(width) => width,
-            RelativeNum::Fraction(fraction) => (event.size().0 as f32 * fraction) as i32,
-        };
-        // The GtkFixed widget is used for absolute positioning of the main box
-        let fixed = gtk::Fixed::builder().build();
-        let main_vbox = gtk::Box::builder()
-            .orientation(gtk::Orientation::Vertical)
-            .halign(gtk::Align::Center)
-            .vexpand(false)
-            .width_request(width)
-            .name(style_names::MAIN)
-            .build();
-        main_vbox.add(&entry);
+    window
+        .surface()
+        .connect_notify(Some("state"), move |surface, _| {
+            let width = match config.width {
+                RelativeNum::Absolute(width) => width,
+                RelativeNum::Fraction(fraction) => (surface.width() as f32 * fraction) as i32,
+            };
+            // The Gtk4Fixed widget is used for absolute positioning of the main box
+            let fixed = gtk4::Fixed::builder().build();
+            let main_vbox = gtk4::Box::builder()
+                .orientation(gtk4::Orientation::Vertical)
+                .halign(gtk4::Align::Center)
+                .vexpand(false)
+                .width_request(width)
+                .name(style_names::MAIN)
+                .build();
+            main_vbox.append(&entry);
 
-        let vertical_offset = match config.vertical_offset {
-            RelativeNum::Absolute(offset) => offset,
-            RelativeNum::Fraction(fraction) => (event.size().1 as f32 * fraction) as i32,
-        };
+            let vertical_offset = match config.vertical_offset {
+                RelativeNum::Absolute(offset) => offset,
+                RelativeNum::Fraction(fraction) => (surface.height() as f32 * fraction) as i32,
+            } as f64;
 
-        fixed.put(
-            &main_vbox,
-            (event.size().0 as i32 - width) / 2,
-            match config.position {
-                Position::Top => vertical_offset,
-                Position::Center => {
-                    (event.size().1 as i32 - entry.allocated_height()) / 2 + vertical_offset
-                }
-            },
-        );
-        window.add(&fixed);
-        window.show_all();
+            fixed.put(
+                &main_vbox,
+                (surface.width() - width) as f64 / 2.0,
+                match config.position {
+                    Position::Top => vertical_offset as f64,
+                    Position::Center => {
+                        (surface.height() - entry.allocated_height()) as f64 / 2.0 + vertical_offset
+                    }
+                },
+            );
+            window.set_child(Some(&fixed));
+            window.show();
 
-        // Add and show the list later, to avoid showing empty plugin categories on launch
-        main_vbox.add(&main_list);
-        main_list.show();
-        entry.grab_focus(); // Grab the focus so typing is immediately accepted by the entry box
-        false
-    });
+            // Append and show the list later, to avoid showing empty plugin categories on launch
+            main_vbox.append(&main_list);
+            main_list.show();
+            entry.grab_focus(); // Grab the focus so typing is immediately accepted by the entry box
+        });
 }
 
 fn handle_matches(
@@ -551,8 +547,8 @@ fn handle_matches(
     hide_icons: bool,
 ) {
     // Clear out the old matches from the list
-    for widget in plugin_view.list.children() {
-        plugin_view.list.remove(&widget);
+    while let Some(child) = plugin_view.list.row_at_index(0) {
+        plugin_view.list.remove(&child);
     }
 
     // If there are no matches, hide the plugin's results
@@ -562,87 +558,81 @@ fn handle_matches(
     }
 
     for _match in matches {
-        let hbox = gtk::Box::builder()
-            .orientation(gtk::Orientation::Horizontal)
+        let hbox = gtk4::Box::builder()
+            .orientation(gtk4::Orientation::Horizontal)
             .spacing(10)
             .name(style_names::MATCH)
             .hexpand(true)
             .build();
         if !hide_icons {
             if let ROption::RSome(icon) = &_match.icon {
-                let mut builder = gtk::Image::builder()
+                let mut builder = gtk4::Image::builder()
                     .name(style_names::MATCH)
                     .pixel_size(32);
 
                 let path = PathBuf::from(icon.as_str());
 
                 // If the icon path is absolute, load that file
-                if path.is_absolute() {
-                    match gdk_pixbuf::Pixbuf::from_file_at_size(icon.as_str(), 32, 32) {
-                        Ok(pixbuf) => builder = builder.pixbuf(&pixbuf),
-                        Err(why) => {
-                            println!("Failed to load icon file: {}", why);
-                            builder = builder.icon_name("image-missing"); // Set "broken" icon
-                        }
-                    }
+                builder = if path.is_absolute() {
+                    builder.file(path.to_string_lossy())
                 } else {
-                    builder = builder.icon_name(icon);
-                }
+                    builder.icon_name(icon.to_string())
+                };
 
-                hbox.add(&builder.build());
+                hbox.append(&builder.build());
             }
         }
-        let title = gtk::Label::builder()
+        let title = gtk4::Label::builder()
             .name(style_names::MATCH_TITLE)
             .wrap(true)
             .use_markup(_match.use_pango)
-            .halign(gtk::Align::Start)
-            .valign(gtk::Align::Center)
+            .halign(gtk4::Align::Start)
+            .valign(gtk4::Align::Center)
             .vexpand(true)
-            .label(&_match.title)
+            .label(_match.title.to_string())
             .build();
 
         // If a description is present, make a box with it and the title
         match &_match.description {
             ROption::RSome(desc) => {
-                let title_desc_box = gtk::Box::builder()
-                    .orientation(gtk::Orientation::Vertical)
+                let title_desc_box = gtk4::Box::builder()
+                    .orientation(gtk4::Orientation::Vertical)
                     .name(style_names::MATCH)
                     .hexpand(true)
                     .vexpand(true)
                     .build();
-                title_desc_box.add(&title);
-                title_desc_box.add(
-                    &gtk::Label::builder()
+                title_desc_box.append(&title);
+                title_desc_box.append(
+                    &gtk4::Label::builder()
                         .name(style_names::MATCH_DESC)
                         .wrap(true)
                         .use_markup(_match.use_pango)
-                        .halign(gtk::Align::Start)
-                        .valign(gtk::Align::Center)
-                        .label(desc)
+                        .halign(gtk4::Align::Start)
+                        .valign(gtk4::Align::Center)
+                        .label(desc.to_string())
                         .build(),
                 );
-                hbox.add(&title_desc_box);
+                hbox.append(&title_desc_box);
             }
             ROption::RNone => {
-                hbox.add(&title);
+                hbox.append(&title);
             }
         }
-        let row = gtk::ListBoxRow::builder()
+        let row = gtk4::ListBoxRow::builder()
             .name(style_names::MATCH)
             .height_request(32)
             .build();
-        row.add(&hbox);
-        // GTK data setting is not type checked, so it is unsafe.
+        row.set_child(Some(&hbox));
+        // GTK4 data setting is not type checked, so it is unsafe.
         // Only `Match` objects are stored though.
         unsafe {
             row.set_data("match", _match);
         }
-        plugin_view.list.add(&row);
+        plugin_view.list.append(&row);
     }
 
     // Refresh the items in the view
-    plugin_view.row.show_all();
+    plugin_view.row.show();
 
     let combined_matches = runtime_data
         .borrow()
@@ -653,12 +643,12 @@ fn handle_matches(
         .flat_map(|view| {
             view.list.children().into_iter().map(|child| {
                 (
-                    child.dynamic_cast::<gtk::ListBoxRow>().unwrap(),
+                    child.dynamic_cast::<gtk4::ListBoxRow>().unwrap(),
                     view.list.clone(),
                 )
             })
         })
-        .collect::<Vec<(gtk::ListBoxRow, gtk::ListBox)>>();
+        .co4llect::<Vec<(gtk::ListBoxRow, gtk::ListBox)>>();
 
     if let Some((row, list)) = combined_matches.get(0) {
         list.select_row(Some(row));
@@ -666,44 +656,43 @@ fn handle_matches(
 }
 
 /// Create the info box for the plugin
-fn create_info_box(info: &PluginInfo, hide_icons: bool) -> gtk::Box {
-    let info_box = gtk::Box::builder()
-        .orientation(gtk::Orientation::Horizontal)
+fn create_info_box(info: &PluginInfo, hide_icons: bool) -> gtk4::Box {
+    let info_box = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Horizontal)
         .name(style_names::PLUGIN)
         .width_request(200)
         .height_request(32)
-        .expand(false)
         .spacing(10)
         .build();
     if !hide_icons {
-        info_box.add(
-            &gtk::Image::builder()
+        info_box.append(
+            &gtk4::Image::builder()
                 .icon_name(&info.icon)
                 .name(style_names::PLUGIN)
                 .pixel_size(32)
-                .halign(gtk::Align::Start)
-                .valign(gtk::Align::Start)
+                .halign(gtk4::Align::Start)
+                .valign(gtk4::Align::Start)
                 .build(),
         );
     }
-    info_box.add(
-        &gtk::Label::builder()
+    info_box.append(
+        &gtk4::Label::builder()
             .label(&info.name)
             .name(style_names::PLUGIN)
-            .halign(gtk::Align::End)
-            .valign(gtk::Align::Center)
+            .halign(gtk4::Align::End)
+            .valign(gtk4::Align::Center)
             .hexpand(true)
             .build(),
     );
-    // This is so that we can align the plugin name with the icon. GTK would not let it be properly aligned otherwise.
-    let main_box = gtk::Box::builder()
-        .orientation(gtk::Orientation::Vertical)
+    // This is so that we can align the plugin name with the icon. GTK4 would not let it be properly aligned otherwise.
+    let main_box = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Vertical)
         .name(style_names::PLUGIN)
         .build();
-    main_box.add(&info_box);
-    main_box.add(
-        &gtk::Box::builder()
-            .orientation(gtk::Orientation::Horizontal)
+    main_box.append(&info_box);
+    main_box.append(
+        &gtk4::Box::builder()
+            .orientation(gtk4::Orientation::Horizontal)
             .name(style_names::PLUGIN)
             .build(),
     );
@@ -726,7 +715,7 @@ fn refresh_matches(
         // If a plugin has requested exclusivity, respect it
         } else if let Some(exclusive) = &runtime_data.borrow().as_ref().unwrap().exclusive {
             if plugin_view.plugin.info() == exclusive.plugin.info() {
-                glib::timeout_add_local(Duration::from_micros(1000), move || {
+                glib::timeout_append_local(Duration::from_micros(1000), move || {
                     async_match(
                         plugin_view.clone(),
                         runtime_data_clone.clone(),
@@ -743,7 +732,7 @@ fn refresh_matches(
                 );
             }
         } else {
-            glib::timeout_add_local(Duration::from_micros(1000), move || {
+            glib::timeout_append_local(Duration::from_micros(1000), move || {
                 async_match(
                     plugin_view.clone(),
                     runtime_data_clone.clone(),
