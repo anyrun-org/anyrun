@@ -208,7 +208,7 @@ fn activate(app: &gtk4::Application, runtime_data: Rc<RefCell<Option<RuntimeData
         gtk4_layer_shell::set_exclusive_zone(&window, -1);
     }
 
-    gtk4_layer_shell::set_keyboard_mode(&window, gtk4_layer_shell::KeyboardMode::Exclusive);
+    gtk4_layer_shell::set_keyboard_mode(&window, gtk4_layer_shell::KeyboardMode::OnDemand);
 
     match config.layer {
         Layer::Background => {
@@ -348,11 +348,12 @@ fn activate(app: &gtk4::Application, runtime_data: Rc<RefCell<Option<RuntimeData
     let event_controller_key = gtk4::EventControllerKey::new();
 
     let entry_clone = entry.clone();
+    let window_clone = window.clone();
     event_controller_key.connect_key_pressed(move |_, key, _, _| {
         match key {
             // Close window on escape
             gdk::Key::Escape => {
-                window.close();
+                window_clone.close();
                 Inhibit(true)
             }
             // Handle selections
@@ -365,13 +366,17 @@ fn activate(app: &gtk4::Application, runtime_data: Rc<RefCell<Option<RuntimeData
                     .plugins
                     .iter()
                     .flat_map(|view| {
-                        view.list.children().into_iter().map(|child| {
-                            (
-                                // All children of lists are Gtk4ListBoxRow widgets
-                                child.dynamic_cast::<gtk4::ListBoxRow>().unwrap(),
-                                view.list.clone(),
-                            )
-                        })
+                        let mut vec = Vec::new();
+
+                        for i in 0.. {
+                            if let Some(child) = view.list.row_at_index(i) {
+                                vec.push((child, view.list.clone()));
+                            } else {
+                                break;
+                            }
+                        }
+
+                        vec
                     })
                     .collect::<Vec<(gtk4::ListBoxRow, gtk4::ListBox)>>();
 
@@ -464,7 +469,7 @@ fn activate(app: &gtk4::Application, runtime_data: Rc<RefCell<Option<RuntimeData
                     (*selected_match.data::<Match>("match").unwrap().as_ptr()).clone()
                 }) {
                     HandleResult::Close => {
-                        window.close();
+                        window_clone.close();
                         Inhibit(true)
                     }
                     HandleResult::Refresh(exclusive) => {
@@ -484,7 +489,7 @@ fn activate(app: &gtk4::Application, runtime_data: Rc<RefCell<Option<RuntimeData
                     HandleResult::Copy(bytes) => {
                         _runtime_data.as_mut().unwrap().post_run_action =
                             PostRunAction::Copy(bytes.into());
-                        window.close();
+                        window_clone.close();
                         Inhibit(true)
                     }
                 }
@@ -493,51 +498,76 @@ fn activate(app: &gtk4::Application, runtime_data: Rc<RefCell<Option<RuntimeData
         }
     });
 
+    // Create widgets here for proper positioning
+
+    let event_controller_focus = gtk4::EventControllerFocus::new();
+
+    let window_clone = window.clone();
+
+    //event_controller_focus.connect_enter(move |event_controller| {
+    println!(
+        "{} {}",
+        window_clone.allocated_width(),
+        window_clone.allocated_height()
+    );
+
+    let width = match config.width {
+        RelativeNum::Absolute(width) => width,
+        RelativeNum::Fraction(fraction) => {
+            (window_clone.allocated_width() as f32 * fraction) as i32
+        }
+    };
+    // The GtkFixed widget is used for absolute positioning of the main box
+    let fixed = gtk4::Fixed::builder().build();
+    let main_vbox = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Vertical)
+        .halign(gtk4::Align::Center)
+        .vexpand(false)
+        .width_request(width)
+        .name(style_names::MAIN)
+        .build();
+    main_vbox.append(&entry);
+
+    let vertical_offset = match config.vertical_offset {
+        RelativeNum::Absolute(offset) => offset,
+        RelativeNum::Fraction(fraction) => {
+            (window_clone.allocated_height() as f32 * fraction) as i32
+        }
+    } as f64;
+
+    fixed.put(
+        &main_vbox,
+        (window_clone.allocated_width() - width) as f64 / 2.0,
+        match config.position {
+            Position::Top => vertical_offset as f64,
+            Position::Center => {
+                (window_clone.allocated_height() - entry.allocated_height()) as f64 / 2.0
+                    + vertical_offset
+            }
+        },
+    );
+    window_clone.set_child(Some(&fixed));
+    window_clone.show();
+
+    // Append and show the list later, to avoid showing empty plugin categories on launch
+    main_vbox.append(&main_list);
+    main_list.show();
+    entry.grab_focus(); // Grab the focus so typing is immediately accepted by the entry box
+                        //});
+
+    let event_controller_legacy = gtk4::EventControllerLegacy::new();
+
+    event_controller_legacy.connect_event(|_, event| {
+        println!("{:?}", event);
+        Inhibit(false)
+    });
+
+    window.add_controller(event_controller_legacy);
+    window.add_controller(event_controller_focus);
+    window.add_controller(event_controller_key);
+
     // Show the window initially, so it gets allocated and configured
     window.show();
-
-    // Create widgets here for proper positioning
-    window
-        .surface()
-        .connect_notify(Some("state"), move |surface, _| {
-            let width = match config.width {
-                RelativeNum::Absolute(width) => width,
-                RelativeNum::Fraction(fraction) => (surface.width() as f32 * fraction) as i32,
-            };
-            // The Gtk4Fixed widget is used for absolute positioning of the main box
-            let fixed = gtk4::Fixed::builder().build();
-            let main_vbox = gtk4::Box::builder()
-                .orientation(gtk4::Orientation::Vertical)
-                .halign(gtk4::Align::Center)
-                .vexpand(false)
-                .width_request(width)
-                .name(style_names::MAIN)
-                .build();
-            main_vbox.append(&entry);
-
-            let vertical_offset = match config.vertical_offset {
-                RelativeNum::Absolute(offset) => offset,
-                RelativeNum::Fraction(fraction) => (surface.height() as f32 * fraction) as i32,
-            } as f64;
-
-            fixed.put(
-                &main_vbox,
-                (surface.width() - width) as f64 / 2.0,
-                match config.position {
-                    Position::Top => vertical_offset as f64,
-                    Position::Center => {
-                        (surface.height() - entry.allocated_height()) as f64 / 2.0 + vertical_offset
-                    }
-                },
-            );
-            window.set_child(Some(&fixed));
-            window.show();
-
-            // Append and show the list later, to avoid showing empty plugin categories on launch
-            main_vbox.append(&main_list);
-            main_list.show();
-            entry.grab_focus(); // Grab the focus so typing is immediately accepted by the entry box
-        });
 }
 
 fn handle_matches(
@@ -634,24 +664,11 @@ fn handle_matches(
     // Refresh the items in the view
     plugin_view.row.show();
 
-    let combined_matches = runtime_data
-        .borrow()
-        .as_ref()
-        .unwrap()
-        .plugins
-        .iter()
-        .flat_map(|view| {
-            view.list.children().into_iter().map(|child| {
-                (
-                    child.dynamic_cast::<gtk4::ListBoxRow>().unwrap(),
-                    view.list.clone(),
-                )
-            })
-        })
-        .co4llect::<Vec<(gtk::ListBoxRow, gtk::ListBox)>>();
-
-    if let Some((row, list)) = combined_matches.get(0) {
-        list.select_row(Some(row));
+    // Select the topmost item
+    for view in &runtime_data.borrow().as_ref().unwrap().plugins {
+        if let Some(row) = view.list.row_at_index(0) {
+            view.list.select_row(Some(&row));
+        }
     }
 }
 
@@ -667,7 +684,7 @@ fn create_info_box(info: &PluginInfo, hide_icons: bool) -> gtk4::Box {
     if !hide_icons {
         info_box.append(
             &gtk4::Image::builder()
-                .icon_name(&info.icon)
+                .icon_name(info.icon.to_string())
                 .name(style_names::PLUGIN)
                 .pixel_size(32)
                 .halign(gtk4::Align::Start)
@@ -677,7 +694,7 @@ fn create_info_box(info: &PluginInfo, hide_icons: bool) -> gtk4::Box {
     }
     info_box.append(
         &gtk4::Label::builder()
-            .label(&info.name)
+            .label(info.name.to_string())
             .name(style_names::PLUGIN)
             .halign(gtk4::Align::End)
             .valign(gtk4::Align::Center)
@@ -715,7 +732,7 @@ fn refresh_matches(
         // If a plugin has requested exclusivity, respect it
         } else if let Some(exclusive) = &runtime_data.borrow().as_ref().unwrap().exclusive {
             if plugin_view.plugin.info() == exclusive.plugin.info() {
-                glib::timeout_append_local(Duration::from_micros(1000), move || {
+                glib::timeout_add_local(Duration::from_micros(1000), move || {
                     async_match(
                         plugin_view.clone(),
                         runtime_data_clone.clone(),
@@ -732,7 +749,7 @@ fn refresh_matches(
                 );
             }
         } else {
-            glib::timeout_append_local(Duration::from_micros(1000), move || {
+            glib::timeout_add_local(Duration::from_micros(1000), move || {
                 async_match(
                     plugin_view.clone(),
                     runtime_data_clone.clone(),
