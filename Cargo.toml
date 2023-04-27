@@ -10,4 +10,5 @@ members = [
   "plugins/kidex",
   "plugins/translate",
   "plugins/randr",
+  "plugins/stdin",
 ]

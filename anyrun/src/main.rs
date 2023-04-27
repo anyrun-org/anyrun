@@ -1,4 +1,12 @@
-use std::{cell::RefCell, env, fs, mem, path::PathBuf, rc::Rc, time::Duration};
+use std::{
+    cell::RefCell,
+    env, fs,
+    io::{self, Write},
+    mem,
+    path::PathBuf,
+    rc::Rc,
+    time::Duration,
+};
 
 use abi_stable::std_types::{ROption, RVec};
 use anyrun_interface::{HandleResult, Match, PluginInfo, PluginRef, PollResult};
@@ -489,6 +497,13 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
                     HandleResult::Copy(bytes) => {
                         _runtime_data.as_mut().unwrap().post_run_action =
                             PostRunAction::Copy(bytes.into());
+                        window.close();
+                        Inhibit(true)
+                    }
+                    HandleResult::Stdout(bytes) => {
+                        if let Err(why) = io::stdout().lock().write_all(&bytes) {
+                            eprintln!("Error outputting content to stdout: {}", why);
+                        }
                         window.close();
                         Inhibit(true)
                     }

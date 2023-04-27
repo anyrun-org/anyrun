@@ -56,6 +56,8 @@ pub enum HandleResult {
     Refresh(bool),
     /// Copy the content, due to how copying works it must be done like this.
     Copy(RVec<u8>),
+    /// Output the content to stdout, printing to stdout has issues in plugins.
+    Stdout(RVec<u8>),
 }
 
 #[repr(C)]
