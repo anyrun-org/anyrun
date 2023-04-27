@@ -227,12 +227,13 @@ fn get_matches(input: RString, data: &mut ()) -> RVec<Match> {
   vec![Match {
     title: "Test match".into(),
     icon: ROption::RSome("help-about"),
+    use_pango: false,
     description: ROption::RSome("Test match for the plugin API demo"),
     id: ROption::RNone, // The ID can be used for identifying the match later, is not required
   }].into()
 }
 
-fn handler(selection: Match, data: &mut ()) -> HandleResult {
+fn handler(selection: Match, input: RString, data: &mut ()) -> HandleResult {
   // Handle the selected match and return how anyrun should proceed
   HandleResult::Close
 }
