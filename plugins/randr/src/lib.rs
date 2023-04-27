@@ -60,7 +60,7 @@ pub fn info() -> PluginInfo {
     }
 }
 
-pub fn handler(_match: Match, state: &mut State) -> HandleResult {
+pub fn handler(_match: Match, _input: RString, state: &mut State) -> HandleResult {
     match &state.inner {
         InnerState::None => {
             state.inner = InnerState::Position(
