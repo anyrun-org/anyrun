@@ -33,9 +33,7 @@ Here are the libraries you need to have to build & run it:
 - `glib2 (libgobject-2.0 libgio-2.0 libglib-2.0)`
 
 ## Installation
-
-### Arch
-On Arch/Arch-based distros you can install the AUR package [anyrun-git](https://aur.archlinux.org/packages/anyrun-git).
+[![Packaging status](https://repology.org/badge/vertical-allrepos/anyrun.svg)](https://repology.org/project/anyrun/versions)
 
 ### Nix
 
