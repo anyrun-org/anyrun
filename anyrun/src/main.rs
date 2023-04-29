@@ -610,6 +610,7 @@ fn handle_matches(
         let title = gtk::Label::builder()
             .name(style_names::MATCH_TITLE)
             .wrap(true)
+            .xalign(0.0)
             .use_markup(_match.use_pango)
             .halign(gtk::Align::Start)
             .valign(gtk::Align::Center)
