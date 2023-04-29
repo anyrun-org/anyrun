@@ -32,8 +32,8 @@ macro_rules! plugin {
         > = ::std::sync::Mutex::new(None);
         static ANYRUN_INTERNAL_ID_COUNTER: ::std::sync::atomic::AtomicU64 =
             ::std::sync::atomic::AtomicU64::new(0);
-        static ANYRUN_INTERNAL_DATA: ::std::sync::Mutex<Option<$type>> =
-            ::std::sync::Mutex::new(None);
+        static ANYRUN_INTERNAL_DATA: ::std::sync::RwLock<Option<$type>> =
+            ::std::sync::RwLock::new(None);
 
         #[::abi_stable::export_root_module]
         fn anyrun_internal_init_root_module() -> ::anyrun_plugin::anyrun_interface::PluginRef {
@@ -51,7 +51,7 @@ macro_rules! plugin {
         #[::abi_stable::sabi_extern_fn]
         fn anyrun_internal_init(config_dir: ::abi_stable::std_types::RString) {
             ::std::thread::spawn(|| {
-                *ANYRUN_INTERNAL_DATA.lock().unwrap() = Some($init(config_dir));
+                *ANYRUN_INTERNAL_DATA.write().unwrap() = Some($init(config_dir));
             });
         }
 
@@ -68,7 +68,7 @@ macro_rules! plugin {
                 .store(current_id + 1, ::std::sync::atomic::Ordering::Relaxed);
 
             let handle = ::std::thread::spawn(move || {
-                if let Some(data) = ANYRUN_INTERNAL_DATA.lock().unwrap().as_mut() {
+                if let Some(data) = ANYRUN_INTERNAL_DATA.read().unwrap().as_ref() {
                     $get_matches(input, data)
                 } else {
                     ::abi_stable::std_types::RVec::new()
@@ -108,7 +108,7 @@ macro_rules! plugin {
         ) -> ::anyrun_plugin::anyrun_interface::HandleResult {
             $handler(
                 selection,
-                ANYRUN_INTERNAL_DATA.lock().unwrap().as_mut().unwrap(),
+                ANYRUN_INTERNAL_DATA.write().unwrap().as_mut().unwrap(),
             )
         }
     };

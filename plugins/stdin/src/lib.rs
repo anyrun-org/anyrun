@@ -12,7 +12,7 @@ fn handler(_match: Match, _lines: &mut Vec<String>) -> HandleResult {
     HandleResult::Stdout(_match.title.into_bytes())
 }
 
-fn get_matches(input: RString, lines: &mut Vec<String>) -> RVec<Match> {
+fn get_matches(input: RString, lines: &Vec<String>) -> RVec<Match> {
     let matcher = fuzzy_matcher::skim::SkimMatcherV2::default().smart_case();
 
     let mut lines = lines

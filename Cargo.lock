@@ -421,6 +421,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "dictionary"
+version = "0.1.0"
+dependencies = [
+ "abi_stable",
+ "anyrun-plugin",
+ "reqwest",
+ "serde",
+]
+
+[[package]]
 name = "doc-comment"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1528,11 +1538,11 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.11.13"
+version = "0.11.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68cc60575865c7831548863cc02356512e3f1dc2f3f82cb837d7fc4cc8f3c97c"
+checksum = "13293b639a097af28fc8a90f22add145a9c954e49d77da06263d58cf44d5fb91"
 dependencies = [
- "base64 0.13.1",
+ "base64 0.21.0",
  "bytes",
  "encoding_rs",
  "futures-core",

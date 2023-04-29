@@ -98,7 +98,7 @@ pub fn handler(_match: Match, state: &mut State) -> HandleResult {
     }
 }
 
-pub fn get_matches(input: RString, state: &mut State) -> RVec<Match> {
+pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
     if !input.starts_with(&state.config.prefix) {
         return RVec::new();
     }

@@ -69,7 +69,7 @@ pub fn init(_config_dir: RString) -> State {
     }
 }
 
-pub fn get_matches(input: RString, state: &mut State) -> RVec<Match> {
+pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
     match &state.selection {
         Some(index_entry) => {
             let path = index_entry.path.to_string_lossy();

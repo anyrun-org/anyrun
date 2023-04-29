@@ -49,7 +49,7 @@ pub fn init(config_dir: RString) -> Vec<(DesktopEntry, u64)> {
     })
 }
 
-pub fn get_matches(input: RString, entries: &mut Vec<(DesktopEntry, u64)>) -> RVec<Match> {
+pub fn get_matches(input: RString, entries: &Vec<(DesktopEntry, u64)>) -> RVec<Match> {
     let matcher = fuzzy_matcher::skim::SkimMatcherV2::default().smart_case();
     let mut entries = entries
         .clone()

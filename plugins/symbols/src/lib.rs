@@ -53,7 +53,7 @@ fn info() -> PluginInfo {
     }
 }
 
-fn get_matches(input: RString, symbols: &mut Vec<Symbol>) -> RVec<Match> {
+fn get_matches(input: RString, symbols: &Vec<Symbol>) -> RVec<Match> {
     let matcher = fuzzy_matcher::skim::SkimMatcherV2::default().ignore_case();
     let mut symbols = symbols
         .clone()

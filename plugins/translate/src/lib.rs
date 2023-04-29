@@ -18,13 +18,13 @@ impl Default for Config {
     }
 }
 
-struct RuntimeData {
+struct State {
     config: Config,
     langs: Vec<(&'static str, &'static str)>,
 }
 
-fn init(config_dir: RString) -> RuntimeData {
-    RuntimeData {
+fn init(config_dir: RString) -> State {
+    State {
         config: match fs::read_to_string(format!("{}/translate.ron", config_dir)) {
             Ok(content) => ron::from_str(&content).unwrap_or_default(),
             Err(_) => Config::default(),
@@ -145,7 +145,7 @@ fn info() -> PluginInfo {
     }
 }
 
-fn get_matches(input: RString, data: &mut RuntimeData) -> RVec<Match> {
+fn get_matches(input: RString, data: &State) -> RVec<Match> {
     if !input.starts_with(&data.config.prefix) {
         return RVec::new();
     }
@@ -227,8 +227,8 @@ fn get_matches(input: RString, data: &mut RuntimeData) -> RVec<Match> {
     })
 }
 
-fn handler(selection: Match, _data: &mut RuntimeData) -> HandleResult {
+fn handler(selection: Match, _data: &mut State) -> HandleResult {
     HandleResult::Copy(selection.title.into_bytes())
 }
 
-plugin!(init, info, get_matches, handler, RuntimeData);
+plugin!(init, info, get_matches, handler, State);
