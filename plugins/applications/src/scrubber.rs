@@ -174,7 +174,10 @@ pub fn scrubber(config: Config) -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std:
         }
     };
 
-    paths.extend(fs::read_dir(user_path)?);
+    match fs::read_dir(&user_path) {
+        Ok(entries) => paths.extend(entries),
+        Err(why) => eprintln!("Error reading directory {}: {}", user_path, why),
+    }
 
     Ok(paths
         .iter()
