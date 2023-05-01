@@ -28,6 +28,27 @@ struct Config {
     layer: Layer,
 }
 
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            width: RelativeNum::Absolute(800),
+            vertical_offset: RelativeNum::Absolute(0),
+            position: Position::Top,
+            plugins: vec![
+                "libapplications.so".into(),
+                "libsymbols.so".into(),
+                "libshell.so".into(),
+                "libtranslate.so".into(),
+            ],
+            hide_icons: false,
+            hide_plugin_info: false,
+            ignore_exclusive_zones: false,
+            close_on_click: false,
+            layer: Layer::Overlay,
+        }
+    }
+}
+
 #[derive(Deserialize)]
 enum Layer {
     Background,
@@ -185,12 +206,24 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
         } else {
             DEFAULT_CONFIG_DIR.to_string()
         };
-    // Load config
-    let config: Config = ron::from_str(
-        &fs::read_to_string(format!("{}/config.ron", config_dir))
-            .expect("Unable to read config file"),
-    )
-    .expect("Config file malformed");
+
+    // Load config, if unable to then read default config
+    let config: Config = match fs::read_to_string(format!("{}/config.ron", config_dir)) {
+        Ok(content) => ron::from_str(&content).unwrap_or_else(|why| {
+            eprintln!(
+                "Failed to parse Anyrun config file, using default config: {}",
+                why
+            );
+            Config::default()
+        }),
+        Err(why) => {
+            eprintln!(
+                "Failed to read Anyrun config file, using default config: {}",
+                why
+            );
+            Config::default()
+        }
+    };
 
     // Create the main window
     let window = gtk::ApplicationWindow::builder()
