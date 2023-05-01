@@ -207,22 +207,26 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
             DEFAULT_CONFIG_DIR.to_string()
         };
 
-    // Load config, if unable to then read default config
-    let config: Config = match fs::read_to_string(format!("{}/config.ron", config_dir)) {
-        Ok(content) => ron::from_str(&content).unwrap_or_else(|why| {
-            eprintln!(
-                "Failed to parse Anyrun config file, using default config: {}",
-                why
-            );
-            Config::default()
-        }),
-        Err(why) => {
-            eprintln!(
+    // Load config, if unable to then read default config. If an error occurs the message will be displayed.
+    let (config, error_label) = match fs::read_to_string(format!("{}/config.ron", config_dir)) {
+        Ok(content) => ron::from_str(&content)
+            .map(|config| (config, None))
+            .unwrap_or_else(|why| {
+                (
+                    Config::default(),
+                    Some(format!(
+                        "Failed to parse Anyrun config file, using default config: {}",
+                        why
+                    )),
+                )
+            }),
+        Err(why) => (
+            Config::default(),
+            Some(format!(
                 "Failed to read Anyrun config file, using default config: {}",
                 why
-            );
-            Config::default()
-        }
+            )),
+        ),
     };
 
     // Create the main window
@@ -576,6 +580,16 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
             .name(style_names::MAIN)
             .build();
         main_vbox.add(&entry);
+
+        // Display the error message
+        if let Some(error_label) = &error_label {
+            main_vbox.add(
+                &gtk::Label::builder()
+                    .label(&format!(r#"<span foreground="red">{}</span>"#, error_label))
+                    .use_markup(true)
+                    .build(),
+            );
+        }
 
         let vertical_offset = match config.vertical_offset {
             RelativeNum::Absolute(offset) => offset,
