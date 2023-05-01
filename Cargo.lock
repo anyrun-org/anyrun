@@ -436,6 +436,7 @@ dependencies = [
  "abi_stable",
  "anyrun-plugin",
  "reqwest",
+ "ron",
  "serde",
 ]
 
@@ -1073,6 +1074,8 @@ dependencies = [
  "fuzzy-matcher",
  "kidex-common",
  "open",
+ "ron",
+ "serde",
 ]
 
 [[package]]

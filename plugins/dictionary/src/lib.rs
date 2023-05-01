@@ -1,6 +1,23 @@
+use std::fs;
+
 use abi_stable::std_types::{ROption, RString, RVec};
 use anyrun_plugin::*;
 use serde::Deserialize;
+
+#[derive(Deserialize)]
+pub struct Config {
+    prefix: String,
+    max_entries: usize,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            prefix: ":def".to_string(),
+            max_entries: 3,
+        }
+    }
+}
 
 #[allow(unused)]
 #[derive(Deserialize)]
@@ -36,7 +53,12 @@ struct Definition {
 }
 
 #[init]
-pub fn init(_config_dir: RString) {}
+pub fn init(config_dir: RString) -> Config {
+    match fs::read_to_string(format!("{}/dictionary.ron", config_dir)) {
+        Ok(content) => ron::from_str(&content).unwrap_or_default(),
+        Err(_) => Config::default(),
+    }
+}
 
 #[handler]
 pub fn handler(_match: Match) -> HandleResult {
@@ -44,12 +66,12 @@ pub fn handler(_match: Match) -> HandleResult {
 }
 
 #[get_matches]
-pub fn get_matches(input: RString) -> RVec<Match> {
-    if !input.starts_with(":def") {
+pub fn get_matches(input: RString, config: &Config) -> RVec<Match> {
+    let input = if let Some(input) = input.strip_prefix(&config.prefix) {
+        input.trim()
+    } else {
         return RVec::new();
-    }
-
-    let input = &input[4..].trim();
+    };
 
     let responses: Vec<ApiResponse> = match reqwest::blocking::get(format!(
         "https://api.dictionaryapi.dev/api/v2/entries/en/{}",
@@ -89,7 +111,7 @@ pub fn get_matches(input: RString) -> RVec<Match> {
                 })
                 .collect::<RVec<_>>()
         })
-        .take(3)
+        .take(config.max_entries)
         .collect()
 }
 

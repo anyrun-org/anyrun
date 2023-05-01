@@ -14,3 +14,5 @@ kidex-common = { git = "https://github.com/Kirottu/kidex", features = ["util"] }
 abi_stable = "0.11.1"
 fuzzy-matcher = "0.3.7"
 open = "3.2.0"
+serde = { version = "1.0.160", features = ["derive"] }
+ron = "0.8.0"

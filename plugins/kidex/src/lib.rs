@@ -2,9 +2,22 @@ use abi_stable::std_types::{ROption, RString, RVec};
 use anyrun_plugin::{anyrun_interface::HandleResult, *};
 use fuzzy_matcher::FuzzyMatcher;
 use kidex_common::IndexEntry;
-use std::{os::unix::prelude::OsStrExt, process::Command};
+use serde::Deserialize;
+use std::{fs, os::unix::prelude::OsStrExt, process::Command};
+
+#[derive(Deserialize)]
+struct Config {
+    max_entries: usize,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self { max_entries: 3 }
+    }
+}
 
 pub struct State {
+    config: Config,
     index: Vec<(usize, IndexEntry)>,
     selection: Option<IndexEntry>,
 }
@@ -58,15 +71,21 @@ pub fn handler(selection: Match, state: &mut State) -> HandleResult {
 }
 
 #[init]
-pub fn init(_config_dir: RString) -> State {
+pub fn init(config_dir: RString) -> State {
+    let config = match fs::read_to_string(format!("{}/kidex.ron", config_dir)) {
+        Ok(content) => ron::from_str(&content).unwrap_or_default(),
+        Err(_) => Config::default(),
+    };
+    let index = match kidex_common::util::get_index(None) {
+        Ok(index) => index.into_iter().enumerate().collect(),
+        Err(why) => {
+            println!("Failed to get kidex index: {}", why);
+            Vec::new()
+        }
+    };
     State {
-        index: match kidex_common::util::get_index(None) {
-            Ok(index) => index.into_iter().enumerate().collect(),
-            Err(why) => {
-                println!("Failed to get kidex index: {}", why);
-                Vec::new()
-            }
-        },
+        config,
+        index,
         selection: None,
     }
 }
@@ -116,7 +135,7 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
 
             index.sort_by(|a, b| b.2.cmp(&a.2));
 
-            index.truncate(3);
+            index.truncate(state.config.max_entries);
             index
                 .into_iter()
                 .map(|(entry_index, id, _)| Match {

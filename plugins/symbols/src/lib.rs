@@ -16,35 +16,40 @@ struct Symbol {
 #[derive(Deserialize, Debug)]
 struct Config {
     symbols: HashMap<String, String>,
+    max_entries: usize,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            symbols: HashMap::new(),
+            max_entries: 3,
+        }
+    }
+}
+
+struct State {
+    config: Config,
+    symbols: Vec<Symbol>,
 }
 
 #[init]
-fn init(config_dir: RString) -> Vec<Symbol> {
+fn init(config_dir: RString) -> State {
     // Try to load the config file, if it does not exist only use the static unicode characters
-    if let Ok(content) = fs::read_to_string(format!("{}/symbols.ron", config_dir)) {
-        match ron::from_str::<Config>(&content) {
-            Ok(config) => {
-                let symbols = UNICODE_CHARS
-                    .iter()
-                    .map(|(name, chr)| (name.to_string(), chr.to_string()))
-                    .chain(config.symbols.into_iter())
-                    .map(|(name, chr)| Symbol { chr, name })
-                    .collect();
-                return symbols;
-            }
-            Err(why) => {
-                println!("Error parsing symbols config file: {}", why);
-            }
-        }
-    }
+    let config = if let Ok(content) = fs::read_to_string(format!("{}/symbols.ron", config_dir)) {
+        ron::from_str(&content).unwrap_or_default()
+    } else {
+        Config::default()
+    };
 
-    UNICODE_CHARS
+    let symbols = UNICODE_CHARS
         .iter()
-        .map(|(name, chr)| Symbol {
-            chr: chr.to_string(),
-            name: name.to_string(),
-        })
-        .collect()
+        .map(|(name, chr)| (name.to_string(), chr.to_string()))
+        .chain(config.symbols.clone().into_iter())
+        .map(|(name, chr)| Symbol { chr, name })
+        .collect();
+
+    State { config, symbols }
 }
 
 #[info]
@@ -56,11 +61,11 @@ fn info() -> PluginInfo {
 }
 
 #[get_matches]
-fn get_matches(input: RString, symbols: &Vec<Symbol>) -> RVec<Match> {
+fn get_matches(input: RString, state: &State) -> RVec<Match> {
     let matcher = fuzzy_matcher::skim::SkimMatcherV2::default().ignore_case();
-    let mut symbols = symbols
-        .clone()
-        .into_iter()
+    let mut symbols = state
+        .symbols
+        .iter()
         .filter_map(|symbol| {
             matcher
                 .fuzzy_match(&symbol.name, &input)
@@ -71,13 +76,13 @@ fn get_matches(input: RString, symbols: &Vec<Symbol>) -> RVec<Match> {
     // Sort the symbol list according to the score
     symbols.sort_by(|a, b| b.1.cmp(&a.1));
 
-    symbols.truncate(3);
+    symbols.truncate(state.config.max_entries);
 
     symbols
         .into_iter()
         .map(|(symbol, _)| Match {
-            title: symbol.chr.into(),
-            description: ROption::RSome(symbol.name.into()),
+            title: symbol.chr.clone().into(),
+            description: ROption::RSome(symbol.name.clone().into()),
             use_pango: false,
             icon: ROption::RNone,
             id: ROption::RNone,
