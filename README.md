@@ -98,6 +98,9 @@ by managing it in Nix/home-manager, and using the full path, like this (in hm):_
       // Hide the plugin info panel
       hide_plugin_info: true,
 
+      // Close window when a click outside the main box is received
+      close_on_click: false,
+
       plugins: [
         "${pkgs.anyrun}/lib/libapplications.so",
       ],

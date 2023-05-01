@@ -24,6 +24,7 @@ struct Config {
     hide_icons: bool,
     hide_plugin_info: bool,
     ignore_exclusive_zones: bool,
+    close_on_click: bool,
     layer: Layer,
 }
 
@@ -513,8 +514,18 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
         }
     });
 
-    // Show the window initially, so it gets allocated and configured
-    window.show_all();
+    // If the option is enabled, close the window when any click is received
+    // that is outside the bounds of the main box
+    if config.close_on_click {
+        window.connect_button_press_event(move |window, event| {
+            if event.window() == window.window() {
+                window.close();
+                Inhibit(true)
+            } else {
+                Inhibit(false)
+            }
+        });
+    }
 
     // Create widgets here for proper positioning
     window.connect_configure_event(move |window, event| {
@@ -557,6 +568,9 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
         entry.grab_focus(); // Grab the focus so typing is immediately accepted by the entry box
         false
     });
+
+    // Show the window initially, so it gets allocated and configured
+    window.show_all();
 }
 
 fn handle_matches(

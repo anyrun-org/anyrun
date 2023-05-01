@@ -23,6 +23,9 @@ Config(
   
   // Hide the plugin info panel
   hide_plugin_info: false, 
+
+  // Close window when a click outside the main box is received
+  close_on_click: false,
   
   // List of plugins to be loaded by default, can be specified with a relative path to be loaded from the
   // `<anyrun config dir>/plugins` directory or with an absolute path to just load the file the path points to.
