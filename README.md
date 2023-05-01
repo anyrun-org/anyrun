@@ -143,6 +143,8 @@ Anyrun requires plugins to function, as they provide the results for input. The 
 - [Stdin](plugins/stdin)
   - Turn Anyrun into a dmenu like fuzzy selector.
   - Should generally be used exclusively with the `-o` argument.
+- [Dictionary](plugins/dictionary)
+  - Look up definitions for words
 
 ## Configuration
 
