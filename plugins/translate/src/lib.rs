@@ -56,6 +56,7 @@ fn init(config_dir: RString) -> State {
             ("nl", "Dutch"),
             ("en", "English"),
             ("eo", "Esperanto"),
+            ("ee", "Ewe"),
             ("et", "Estonian"),
             ("tl", "Filipino"),
             ("fi", "Finnish"),
@@ -216,10 +217,10 @@ fn get_matches(input: RString, data: &State) -> RVec<Match> {
                                     "{} -> {}",
                                     data.langs.iter()
                                     .find_map(|(code, name)| if *code == json[2].as_str().expect("Malformed JSON!") {
-                                            Some(name)
+                                            Some(*name)
                                         } else {
                                             None
-                                    }).expect("Google API returned unknown language code!"),
+                                    }).unwrap_or_else(|| json[2].as_str().expect("Malformed JSON!")),
                                     name)
                                 .into()),
                             use_pango: false,
