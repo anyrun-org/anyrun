@@ -1,17 +1,20 @@
 use std::io::stdin;
 
 use abi_stable::std_types::{ROption, RString, RVec};
-use anyrun_plugin::{anyrun_interface::HandleResult, plugin, Match, PluginInfo};
+use anyrun_plugin::*;
 use fuzzy_matcher::FuzzyMatcher;
 
+#[init]
 fn init(_config_dir: RString) -> Vec<String> {
     stdin().lines().filter_map(|line| line.ok()).collect()
 }
 
-fn handler(_match: Match, _lines: &mut Vec<String>) -> HandleResult {
+#[handler]
+fn handler(_match: Match) -> HandleResult {
     HandleResult::Stdout(_match.title.into_bytes())
 }
 
+#[get_matches]
 fn get_matches(input: RString, lines: &Vec<String>) -> RVec<Match> {
     let matcher = fuzzy_matcher::skim::SkimMatcherV2::default().smart_case();
 
@@ -42,11 +45,10 @@ fn get_matches(input: RString, lines: &Vec<String>) -> RVec<Match> {
         .into()
 }
 
+#[info]
 fn plugin_info() -> PluginInfo {
     PluginInfo {
         name: "Stdin".into(),
         icon: "format-indent-more".into(),
     }
 }
-
-plugin!(init, plugin_info, get_matches, handler, Vec<String>);

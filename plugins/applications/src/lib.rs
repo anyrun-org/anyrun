@@ -12,7 +12,8 @@ pub struct Config {
 
 mod scrubber;
 
-pub fn handler(selection: Match, entries: &mut Vec<(DesktopEntry, u64)>) -> HandleResult {
+#[handler]
+pub fn handler(selection: Match, entries: &Vec<(DesktopEntry, u64)>) -> HandleResult {
     let entry = entries
         .iter()
         .find_map(|(entry, id)| {
@@ -31,6 +32,7 @@ pub fn handler(selection: Match, entries: &mut Vec<(DesktopEntry, u64)>) -> Hand
     HandleResult::Close
 }
 
+#[init]
 pub fn init(config_dir: RString) -> Vec<(DesktopEntry, u64)> {
     let config: Config = match fs::read_to_string(format!("{}/applications.ron", config_dir)) {
         Ok(content) => ron::from_str(&content).unwrap_or_else(|why| {
@@ -49,6 +51,7 @@ pub fn init(config_dir: RString) -> Vec<(DesktopEntry, u64)> {
     })
 }
 
+#[get_matches]
 pub fn get_matches(input: RString, entries: &Vec<(DesktopEntry, u64)>) -> RVec<Match> {
     let matcher = fuzzy_matcher::skim::SkimMatcherV2::default().smart_case();
     let mut entries = entries
@@ -81,11 +84,10 @@ pub fn get_matches(input: RString, entries: &Vec<(DesktopEntry, u64)>) -> RVec<M
         .collect()
 }
 
+#[info]
 pub fn info() -> PluginInfo {
     PluginInfo {
         name: "Applications".into(),
         icon: "application-x-executable".into(),
     }
 }
-
-plugin!(init, info, get_matches, handler, Vec<(DesktopEntry, u64)>);

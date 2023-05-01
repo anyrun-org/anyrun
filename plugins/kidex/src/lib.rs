@@ -26,6 +26,7 @@ impl From<u64> for IndexAction {
     }
 }
 
+#[handler]
 pub fn handler(selection: Match, state: &mut State) -> HandleResult {
     match &state.selection {
         Some(index_entry) => match selection.id.unwrap().into() {
@@ -56,6 +57,7 @@ pub fn handler(selection: Match, state: &mut State) -> HandleResult {
     }
 }
 
+#[init]
 pub fn init(_config_dir: RString) -> State {
     State {
         index: match kidex_common::util::get_index(None) {
@@ -69,6 +71,7 @@ pub fn init(_config_dir: RString) -> State {
     }
 }
 
+#[get_matches]
 pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
     match &state.selection {
         Some(index_entry) => {
@@ -140,11 +143,10 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
     }
 }
 
+#[info]
 pub fn info() -> PluginInfo {
     PluginInfo {
         name: "Kidex".into(),
         icon: "folder".into(),
     }
 }
-
-plugin!(init, info, get_matches, handler, State);

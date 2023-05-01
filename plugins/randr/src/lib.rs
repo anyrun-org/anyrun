@@ -1,7 +1,7 @@
 use std::{env, fs};
 
 use abi_stable::std_types::{ROption, RString, RVec};
-use anyrun_plugin::{anyrun_interface::HandleResult, plugin, Match, PluginInfo};
+use anyrun_plugin::*;
 use fuzzy_matcher::FuzzyMatcher;
 use randr::{dummy::Dummy, hyprland::Hyprland, Configure, Monitor, Randr};
 use serde::Deserialize;
@@ -32,6 +32,7 @@ pub struct State {
     inner: InnerState,
 }
 
+#[init]
 pub fn init(config_dir: RString) -> State {
     // Determine which Randr implementation should be used
     let randr: Box<dyn Randr + Send + Sync> = if env::var("HYPRLAND_INSTANCE_SIGNATURE").is_ok() {
@@ -53,6 +54,7 @@ pub fn init(config_dir: RString) -> State {
     }
 }
 
+#[info]
 pub fn info() -> PluginInfo {
     PluginInfo {
         name: "Randr".into(),
@@ -60,6 +62,7 @@ pub fn info() -> PluginInfo {
     }
 }
 
+#[handler]
 pub fn handler(_match: Match, state: &mut State) -> HandleResult {
     match &state.inner {
         InnerState::None => {
@@ -98,6 +101,7 @@ pub fn handler(_match: Match, state: &mut State) -> HandleResult {
     }
 }
 
+#[get_matches]
 pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
     if !input.starts_with(&state.config.prefix) {
         return RVec::new();
@@ -187,5 +191,3 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
 
     vec.into_iter().map(|(_match, _)| _match).collect()
 }
-
-plugin!(init, info, get_matches, handler, State);

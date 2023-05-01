@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fs};
 
 use abi_stable::std_types::{ROption, RString, RVec};
-use anyrun_plugin::{anyrun_interface::HandleResult, plugin, Match, PluginInfo};
+use anyrun_plugin::*;
 use fuzzy_matcher::FuzzyMatcher;
 use serde::Deserialize;
 
@@ -18,6 +18,7 @@ struct Config {
     symbols: HashMap<String, String>,
 }
 
+#[init]
 fn init(config_dir: RString) -> Vec<Symbol> {
     // Try to load the config file, if it does not exist only use the static unicode characters
     if let Ok(content) = fs::read_to_string(format!("{}/symbols.ron", config_dir)) {
@@ -46,6 +47,7 @@ fn init(config_dir: RString) -> Vec<Symbol> {
         .collect()
 }
 
+#[info]
 fn info() -> PluginInfo {
     PluginInfo {
         name: "Symbols".into(),
@@ -53,6 +55,7 @@ fn info() -> PluginInfo {
     }
 }
 
+#[get_matches]
 fn get_matches(input: RString, symbols: &Vec<Symbol>) -> RVec<Match> {
     let matcher = fuzzy_matcher::skim::SkimMatcherV2::default().ignore_case();
     let mut symbols = symbols
@@ -82,8 +85,7 @@ fn get_matches(input: RString, symbols: &Vec<Symbol>) -> RVec<Match> {
         .collect()
 }
 
-fn handler(selection: Match, _symbols: &mut Vec<Symbol>) -> HandleResult {
+#[handler]
+fn handler(selection: Match) -> HandleResult {
     HandleResult::Copy(selection.title.into_bytes())
 }
-
-plugin!(init, info, get_matches, handler, Vec<Symbol>);

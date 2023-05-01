@@ -1,7 +1,8 @@
 use abi_stable::std_types::{ROption, RString, RVec};
-use anyrun_plugin::{anyrun_interface::HandleResult, plugin, Match, PluginInfo};
+use anyrun_plugin::*;
 use serde::Deserialize;
 
+#[allow(unused)]
 #[derive(Deserialize)]
 struct ApiResponse {
     word: String,
@@ -11,6 +12,7 @@ struct ApiResponse {
     meanings: Vec<Meaning>,
 }
 
+#[allow(unused)]
 #[derive(Deserialize)]
 struct Phonetic {
     text: String,
@@ -24,6 +26,7 @@ struct Meaning {
     definitions: Vec<Definition>,
 }
 
+#[allow(unused)]
 #[derive(Deserialize)]
 struct Definition {
     definition: String,
@@ -32,13 +35,16 @@ struct Definition {
     antonyms: Vec<String>,
 }
 
+#[init]
 pub fn init(_config_dir: RString) {}
 
-pub fn handler(_match: Match, _: &mut ()) -> HandleResult {
+#[handler]
+pub fn handler(_match: Match) -> HandleResult {
     HandleResult::Copy(_match.title.into_bytes())
 }
 
-pub fn get_matches(input: RString, _: &()) -> RVec<Match> {
+#[get_matches]
+pub fn get_matches(input: RString) -> RVec<Match> {
     if !input.starts_with(":def") {
         return RVec::new();
     }
@@ -87,11 +93,10 @@ pub fn get_matches(input: RString, _: &()) -> RVec<Match> {
         .collect()
 }
 
+#[info]
 fn info() -> PluginInfo {
     PluginInfo {
         name: "Dictionary".into(),
         icon: "accessories-dictionary".into(),
     }
 }
-
-plugin!(init, info, get_matches, handler, ());

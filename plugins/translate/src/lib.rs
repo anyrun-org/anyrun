@@ -1,7 +1,7 @@
 use std::fs;
 
 use abi_stable::std_types::{ROption, RString, RVec};
-use anyrun_plugin::{anyrun_interface::HandleResult, plugin, Match, PluginInfo};
+use anyrun_plugin::*;
 use fuzzy_matcher::FuzzyMatcher;
 use serde::Deserialize;
 
@@ -23,6 +23,7 @@ struct State {
     langs: Vec<(&'static str, &'static str)>,
 }
 
+#[init]
 fn init(config_dir: RString) -> State {
     State {
         config: match fs::read_to_string(format!("{}/translate.ron", config_dir)) {
@@ -138,6 +139,7 @@ fn init(config_dir: RString) -> State {
     }
 }
 
+#[info]
 fn info() -> PluginInfo {
     PluginInfo {
         name: "Translate".into(),
@@ -145,6 +147,7 @@ fn info() -> PluginInfo {
     }
 }
 
+#[get_matches]
 fn get_matches(input: RString, data: &State) -> RVec<Match> {
     if !input.starts_with(&data.config.prefix) {
         return RVec::new();
@@ -227,8 +230,7 @@ fn get_matches(input: RString, data: &State) -> RVec<Match> {
     })
 }
 
-fn handler(selection: Match, _data: &mut State) -> HandleResult {
+#[handler]
+fn handler(selection: Match) -> HandleResult {
     HandleResult::Copy(selection.title.into_bytes())
 }
-
-plugin!(init, info, get_matches, handler, State);

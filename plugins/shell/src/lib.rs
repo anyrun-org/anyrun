@@ -1,7 +1,7 @@
 use std::{env, fs, process::Command};
 
 use abi_stable::std_types::{ROption, RString, RVec};
-use anyrun_plugin::{anyrun_interface::HandleResult, plugin, Match, PluginInfo};
+use anyrun_plugin::*;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -19,6 +19,7 @@ impl Default for Config {
     }
 }
 
+#[init]
 fn init(config_dir: RString) -> Config {
     match fs::read_to_string(format!("{}/shell.ron", config_dir)) {
         Ok(content) => ron::from_str(&content).unwrap_or_default(),
@@ -26,6 +27,7 @@ fn init(config_dir: RString) -> Config {
     }
 }
 
+#[info]
 fn info() -> PluginInfo {
     PluginInfo {
         name: "Shell".into(),
@@ -33,6 +35,7 @@ fn info() -> PluginInfo {
     }
 }
 
+#[get_matches]
 fn get_matches(input: RString, config: &Config) -> RVec<Match> {
     if input.starts_with(&config.prefix) {
         let (_, command) = input.split_once(&config.prefix).unwrap();
@@ -63,7 +66,8 @@ fn get_matches(input: RString, config: &Config) -> RVec<Match> {
     }
 }
 
-fn handler(selection: Match, _config: &mut Config) -> HandleResult {
+#[handler]
+fn handler(selection: Match) -> HandleResult {
     if let Err(why) = Command::new(selection.description.unwrap().as_str())
         .arg("-c")
         .arg(selection.title.as_str())
@@ -74,5 +78,3 @@ fn handler(selection: Match, _config: &mut Config) -> HandleResult {
 
     HandleResult::Close
 }
-
-plugin!(init, info, get_matches, handler, Config);

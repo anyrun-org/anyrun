@@ -1,15 +1,10 @@
 use abi_stable::std_types::{ROption, RString, RVec};
-use anyrun_plugin::{anyrun_interface::HandleResult, plugin, Match, PluginInfo};
+use anyrun_plugin::*;
+use rink_core::{ast, date, gnu_units, CURRENCY_FILE};
 
-fn init(_config_dir: RString) {
-    // Currently broken due to limitations with the declarative macro anyrun_plugin crate.
-    // For any plugin that does something relatively time intensive like fetching something
-    // from the internet, the internal Mutex would block making requests way too long when typed rapidly.
-
-    // TODO: Redesign the anyrun_plugin crate to allow for both mutable and non mutable borrows of the
-    // shared data for functions
-
-    /*let mut ctx = rink_core::Context::new();
+#[init]
+fn init(_config_dir: RString) -> rink_core::Context {
+    let mut ctx = rink_core::Context::new();
 
     let units = gnu_units::parse_str(rink_core::DEFAULT_FILE.unwrap());
     let dates = date::parse_datefile(rink_core::DATES_FILE);
@@ -34,9 +29,10 @@ fn init(_config_dir: RString) {
     });
     ctx.load_dates(dates);
 
-    ctx*/
+    ctx
 }
 
+#[info]
 fn info() -> PluginInfo {
     PluginInfo {
         name: "Rink".into(),
@@ -44,11 +40,9 @@ fn info() -> PluginInfo {
     }
 }
 
-fn get_matches(input: RString, _: &()) -> RVec<Match> {
-    match rink_core::one_line(
-        &mut rink_core::simple_context().expect("Failed to create rink context"),
-        &input,
-    ) {
+#[get_matches]
+fn get_matches(input: RString, ctx: &mut rink_core::Context) -> RVec<Match> {
+    match rink_core::one_line(ctx, &input) {
         Ok(result) => vec![Match {
             title: result.into(),
             description: ROption::RNone,
@@ -61,8 +55,7 @@ fn get_matches(input: RString, _: &()) -> RVec<Match> {
     }
 }
 
-fn handler(selection: Match, _: &mut ()) -> HandleResult {
+#[handler]
+fn handler(selection: Match) -> HandleResult {
     HandleResult::Copy(selection.title.into_bytes())
 }
-
-plugin!(init, info, get_matches, handler, ());

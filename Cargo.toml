@@ -2,6 +2,7 @@
 members = [
   "anyrun",
   "anyrun-plugin",
+  "anyrun-plugin-macros",
   "anyrun-interface",
   "plugins/applications",
   "plugins/symbols",
