@@ -8,12 +8,14 @@ use serde::Deserialize;
 #[derive(Deserialize)]
 struct Config {
     prefix: String,
+    max_entries: usize,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             prefix: ":".to_string(),
+            max_entries: 3,
         }
     }
 }
@@ -182,7 +184,7 @@ fn get_matches(input: RString, data: &State) -> RVec<Match> {
     matches.sort_by(|a, b| b.2.cmp(&a.2));
 
     // We only want 3 matches
-    matches.truncate(3);
+    matches.truncate(data.config.max_entries);
 
     tokio::runtime::Runtime::new().expect("Failed to spawn tokio runtime!").block_on(async move {
         // Create the futures for fetching the translation results

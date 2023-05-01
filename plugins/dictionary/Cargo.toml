@@ -13,3 +13,4 @@ anyrun-plugin = { path = "../../anyrun-plugin" }
 abi_stable = "0.11.1"
 reqwest = { version = "0.11.16", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 serde = { version = "1.0.160", features = ["derive"] }
+ron = "0.8.0"

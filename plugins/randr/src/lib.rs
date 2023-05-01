@@ -11,12 +11,14 @@ mod randr;
 #[derive(Deserialize)]
 struct Config {
     prefix: String,
+    max_entries: usize,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Config {
             prefix: ":dp".to_string(),
+            max_entries: 5,
         }
     }
 }
@@ -103,11 +105,11 @@ pub fn handler(_match: Match, state: &mut State) -> HandleResult {
 
 #[get_matches]
 pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
-    if !input.starts_with(&state.config.prefix) {
+    let input = if let Some(input) = input.strip_prefix(&state.config.prefix) {
+        input.trim()
+    } else {
         return RVec::new();
-    }
-
-    let input = &input[state.config.prefix.len()..].trim();
+    };
 
     let matcher = fuzzy_matcher::skim::SkimMatcherV2::default().smart_case();
     let mut vec = match &state.inner {
@@ -187,7 +189,7 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
 
     vec.sort_by(|a, b| b.1.cmp(&a.1));
 
-    vec.truncate(5);
+    vec.truncate(state.config.max_entries);
 
     vec.into_iter().map(|(_match, _)| _match).collect()
 }

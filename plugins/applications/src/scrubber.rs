@@ -132,7 +132,7 @@ impl DesktopEntry {
     }
 }
 
-pub fn scrubber(config: Config) -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std::error::Error>> {
+pub fn scrubber(config: &Config) -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std::error::Error>> {
     // Create iterator over all the files in the XDG_DATA_DIRS
     // XDG compliancy is cool
     let mut paths: Vec<Result<fs::DirEntry, io::Error>> = match env::var("XDG_DATA_DIRS") {
@@ -186,7 +186,7 @@ pub fn scrubber(config: Config) -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std:
                 Ok(entry) => entry,
                 Err(_why) => return None,
             };
-            Some(DesktopEntry::from_dir_entry(entry, &config))
+            Some(DesktopEntry::from_dir_entry(entry, config))
         })
         .flatten()
         .enumerate()
