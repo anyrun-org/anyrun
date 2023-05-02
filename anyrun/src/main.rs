@@ -335,8 +335,6 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
                     .find(|path| path.exists())
                     .expect("Invalid plugin path");
 
-                println!("{}", path.display());
-
                 abi_stable::library::lib_header_from_path(&path)
             }
             .and_then(|plugin| plugin.init_root_module::<PluginRef>())
