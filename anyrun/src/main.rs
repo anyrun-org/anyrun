@@ -299,6 +299,17 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
         .name(style_names::MAIN)
         .build();
 
+    // Prioritise the ANYRUN_PLUGINS env var over other paths
+    let mut plugin_paths = match env::var("ANYRUN_PLUGINS") {
+        Ok(string) => string.split(':').map(PathBuf::from).collect::<Vec<_>>(),
+        Err(_) => Vec::new(),
+    };
+
+    plugin_paths.append(&mut vec![
+        format!("{}/plugins", config_dir).into(),
+        format!("{}/plugins", DEFAULT_CONFIG_DIR).into(),
+    ]);
+
     // Load plugins from the paths specified in the config file
     runtime_data.borrow_mut().as_mut().unwrap().plugins = plugins
         .iter()
@@ -310,12 +321,23 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
             global_path.extend(plugin_path.iter());
 
             // Load the plugin's dynamic library.
+
             let plugin = if plugin_path.is_absolute() {
                 abi_stable::library::lib_header_from_path(plugin_path)
-            } else if user_path.exists() {
-                abi_stable::library::lib_header_from_path(&user_path)
             } else {
-                abi_stable::library::lib_header_from_path(&global_path)
+                let path = plugin_paths
+                    .clone()
+                    .into_iter()
+                    .map(|mut path| {
+                        path.push(plugin_path);
+                        path
+                    })
+                    .find(|path| path.exists())
+                    .expect("Invalid plugin path");
+
+                println!("{}", path.display());
+
+                abi_stable::library::lib_header_from_path(&path)
             }
             .and_then(|plugin| plugin.init_root_module::<PluginRef>())
             .expect("Failed to load plugin");
