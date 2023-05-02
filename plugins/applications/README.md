@@ -1,13 +1,18 @@
 # Applications
 
-## Desktop Actions
+Launch applications.
 
-To enable desktop actions support, set `desktop_actions` in the applications plugin config
-file to `true` like so:
+## Usage
 
-`<anyrun config directory>/applications.ron`:
+Simply search for the application you wish to launch.
+
+## Configuration
+
 ```ron
+// <Anyrun config dir>/applications.ron
 Config(
+  // Also show the Desktop Actions defined in the desktop files, e.g. "New Window" from LibreWolf
   desktop_actions: true,
+  max_entries: 5, 
 )
 ```

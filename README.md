@@ -126,24 +126,24 @@ cp examples/config.ron ~/.config/anyrun/config.ron # Copy the default config fil
 
 Anyrun requires plugins to function, as they provide the results for input. The list of plugins in this repository is as follows:
 
-- [Applications](plugins/applications)
+- [Applications](plugins/applications/README.md)
   - Search and run system & user specific desktop entries.
-- [Symbols](plugins/symbols)
+- [Symbols](plugins/symbols/README.md)
   - Search unicode symbols.
   - [User defined symbols](plugins/symbols/README.md#User-defined-symbols)
-- [Rink](plugins/rink)
+- [Rink](plugins/rink/README.md)
   - Calculator & unit conversion.
-- [Shell](plugins/shell)
+- [Shell](plugins/shell/README.md)
   - Run shell commands.
-- [Kidex](plugins/kidex)
+- [Kidex](plugins/kidex/README.md)
   - File search provided by [Kidex](https://github.com/Kirottu/kidex).
-- [Randr](plugins/randr)
+- [Randr](plugins/randr/README.md)
   - Rotate and resize; quickly change monitor configurations on the fly.
   - TODO: Only supports Hyprland, needs support for other compositors.
-- [Stdin](plugins/stdin)
+- [Stdin](plugins/stdin/README.md)
   - Turn Anyrun into a dmenu like fuzzy selector.
   - Should generally be used exclusively with the `-o` argument.
-- [Dictionary](plugins/dictionary)
+- [Dictionary](plugins/dictionary/README.md)
   - Look up definitions for words
 
 ## Configuration

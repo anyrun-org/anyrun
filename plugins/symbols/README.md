@@ -1,13 +1,21 @@
 # Symbols
 
-## User defined symbols
+Look up unicode symbols and custom user defined symbols.
 
-User defined symbols are defined in the `symbols.ron` file inside the anyrun configuration directory. The structure of the file is as follows:
+## Usage
+
+Simply search for the symbol's name.
+
+## Configuration
+
 ```ron
+// <Anyrun config dir>/symbols.ron
 Config(
+  // Custom user defined symbols to be included along the unicode symbols
   symbols: {
-    // "search-term": "text to be copied"
+    // "name": "text to be copied"
     "shrug": "¯\_(ツ)_/¯",
-  }
+  },
+  max_entries: 3,
 )
 ```
