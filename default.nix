@@ -1,10 +1,9 @@
 # default.nix
 {
   lib,
-  naersk,
   glib,
-  targetPlatform,
   makeWrapper,
+  rustPlatform,
   atk,
   gtk3,
   gtk-layer-shell,
@@ -16,7 +15,7 @@
 }: let
   cargoToml = builtins.fromTOML (builtins.readFile ./anyrun/Cargo.toml);
 in
-  naersk.lib."${targetPlatform.system}".buildPackage {
+  rustPlatform.buildRustPackage {
     src = ./.;
 
     buildInputs = [
@@ -27,9 +26,18 @@ in
       librsvg
       gtk-layer-shell
     ];
+
+    cargoLock = {
+      lockFile = ./Cargo.lock;
+      outputHashes = {
+        "kidex-common-0.1.0" = "sha256-sPzCTK0gdIYkKWxrtoPJ/F2zrG2ZKHOSmANW2g00fSQ=";
+      };
+    };
+
     checkInputs = [cargo rustc];
 
     nativeBuildInputs = [
+      pkg-config
       makeWrapper
       rustfmt
       rustc
