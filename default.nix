@@ -54,7 +54,8 @@ in
 
     postInstall = ''
       wrapProgram $out/bin/anyrun \
-        --set GDK_PIXBUF_MODULE_FILE "$(echo ${librsvg.out}/lib/gdk-pixbuf-2.0/*/loaders.cache)"
+        --set GDK_PIXBUF_MODULE_FILE "$(echo ${librsvg.out}/lib/gdk-pixbuf-2.0/*/loaders.cache)" \
+        --prefix ANYRUN_PLUGINS : $out/lib
     '';
 
     meta = with lib; {
