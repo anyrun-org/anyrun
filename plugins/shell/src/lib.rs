@@ -41,7 +41,7 @@ fn get_matches(input: RString, config: &Config) -> RVec<Match> {
         let (_, command) = input.split_once(&config.prefix).unwrap();
         if !command.is_empty() {
             vec![Match {
-                title: command.into(),
+                title: command.trim().into(),
                 description: ROption::RSome(
                     config
                         .shell
