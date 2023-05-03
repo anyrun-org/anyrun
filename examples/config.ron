@@ -26,6 +26,9 @@ Config(
 
   // Close window when a click outside the main box is received
   close_on_click: false,
+
+  // Limit amount of entries shown in total
+  max_entries: None,
   
   // List of plugins to be loaded by default, can be specified with a relative path to be loaded from the
   // `<anyrun config dir>/plugins` directory or with an absolute path to just load the file the path points to.
