@@ -25,6 +25,7 @@ struct Config {
     hide_plugin_info: bool,
     ignore_exclusive_zones: bool,
     close_on_click: bool,
+    max_entries: Option<usize>,
     layer: Layer,
 }
 
@@ -44,6 +45,7 @@ impl Default for Config {
             hide_plugin_info: false,
             ignore_exclusive_zones: false,
             close_on_click: false,
+            max_entries: None,
             layer: Layer::Overlay,
         }
     }
@@ -74,7 +76,6 @@ struct PluginView {
 
 struct Args {
     override_plugins: Option<Vec<String>>,
-    config_dir: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -96,6 +97,10 @@ struct RuntimeData {
     exclusive: Option<PluginView>,
     plugins: Vec<PluginView>,
     post_run_action: PostRunAction,
+    config: Config,
+    /// Used for displaying errors later on
+    error_label: String,
+    config_dir: String,
 }
 
 /// The naming scheme for CSS styling
@@ -148,14 +153,49 @@ fn main() {
         let override_plugins = dict.lookup::<Vec<String>>("override-plugins").unwrap();
         let config_dir = dict.lookup::<String>("config-dir").unwrap();
 
+        // Figure out the config dir
+        let user_dir = format!(
+            "{}/.config/anyrun",
+            env::var("HOME").expect("Could not determine home directory! Is $HOME set?")
+        );
+        let config_dir = config_dir.unwrap_or_else(|| {
+            if PathBuf::from(&user_dir).exists() {
+                user_dir
+            } else {
+                DEFAULT_CONFIG_DIR.to_string()
+            }
+        });
+
+        // Load config, if unable to then read default config. If an error occurs the message will be displayed.
+        let (config, error_label) = match fs::read_to_string(format!("{}/config.ron", config_dir)) {
+            Ok(content) => ron::from_str(&content)
+                .map(|config| (config, String::new()))
+                .unwrap_or_else(|why| {
+                    (
+                        Config::default(),
+                        format!(
+                            "Failed to parse Anyrun config file, using default config: {}",
+                            why
+                        ),
+                    )
+                }),
+            Err(why) => (
+                Config::default(),
+                format!(
+                    "Failed to read Anyrun config file, using default config: {}",
+                    why
+                ),
+            ),
+        };
+
         *runtime_data_clone.borrow_mut() = Some(RuntimeData {
-            args: Args {
-                override_plugins,
-                config_dir,
-            },
+            args: Args { override_plugins },
             exclusive: None,
             plugins: Vec::new(),
             post_run_action: PostRunAction::None,
+            error_label,
+            config,
+            config_dir,
         });
         -1 // Magic GTK number to continue running
     });
@@ -193,42 +233,6 @@ fn main() {
 }
 
 fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>>>) {
-    // Figure out the config dir
-    let user_dir = format!(
-        "{}/.config/anyrun",
-        env::var("HOME").expect("Could not determine home directory! Is $HOME set?")
-    );
-    let config_dir =
-        if let Some(config_dir) = &runtime_data.borrow().as_ref().unwrap().args.config_dir {
-            config_dir.clone()
-        } else if PathBuf::from(&user_dir).exists() {
-            user_dir
-        } else {
-            DEFAULT_CONFIG_DIR.to_string()
-        };
-
-    // Load config, if unable to then read default config. If an error occurs the message will be displayed.
-    let (config, error_label) = match fs::read_to_string(format!("{}/config.ron", config_dir)) {
-        Ok(content) => ron::from_str(&content)
-            .map(|config| (config, None))
-            .unwrap_or_else(|why| {
-                (
-                    Config::default(),
-                    Some(format!(
-                        "Failed to parse Anyrun config file, using default config: {}",
-                        why
-                    )),
-                )
-            }),
-        Err(why) => (
-            Config::default(),
-            Some(format!(
-                "Failed to read Anyrun config file, using default config: {}",
-                why
-            )),
-        ),
-    };
-
     // Create the main window
     let window = gtk::ApplicationWindow::builder()
         .application(app)
@@ -246,13 +250,19 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
 
     gtk_layer_shell::set_namespace(&window, "anyrun");
 
-    if config.ignore_exclusive_zones {
+    if runtime_data
+        .borrow()
+        .as_ref()
+        .unwrap()
+        .config
+        .ignore_exclusive_zones
+    {
         gtk_layer_shell::set_exclusive_zone(&window, -1);
     }
 
     gtk_layer_shell::set_keyboard_mode(&window, gtk_layer_shell::KeyboardMode::Exclusive);
 
-    match config.layer {
+    match runtime_data.borrow().as_ref().unwrap().config.layer {
         Layer::Background => {
             gtk_layer_shell::set_layer(&window, gtk_layer_shell::Layer::Background)
         }
@@ -263,7 +273,10 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
 
     // Try to load custom CSS, if it fails load the default CSS
     let provider = gtk::CssProvider::new();
-    if let Err(why) = provider.load_from_path(&format!("{}/style.css", config_dir)) {
+    if let Err(why) = provider.load_from_path(&format!(
+        "{}/style.css",
+        runtime_data.borrow().as_ref().unwrap().config_dir
+    )) {
         eprintln!("Failed to load custom CSS: {}", why);
         provider
             .load_from_data(include_bytes!("../res/style.css"))
@@ -284,7 +297,13 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
         .override_plugins
     {
         Some(plugins) => plugins.iter().map(PathBuf::from).collect(),
-        None => config.plugins,
+        None => runtime_data
+            .borrow()
+            .as_ref()
+            .unwrap()
+            .config
+            .plugins
+            .clone(),
     };
 
     // Make sure at least one plugin is specified
@@ -306,7 +325,11 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
     };
 
     plugin_paths.append(&mut vec![
-        format!("{}/plugins", config_dir).into(),
+        format!(
+            "{}/plugins",
+            runtime_data.borrow().as_ref().unwrap().config_dir
+        )
+        .into(),
         format!("{}/plugins", DEFAULT_CONFIG_DIR).into(),
     ]);
 
@@ -315,7 +338,10 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
         .iter()
         .map(|plugin_path| {
             // Load the plugin's dynamic library.
-            let mut user_path = PathBuf::from(&format!("{}/plugins", config_dir));
+            let mut user_path = PathBuf::from(&format!(
+                "{}/plugins",
+                runtime_data.borrow().as_ref().unwrap().config_dir
+            ));
             let mut global_path = PathBuf::from("/etc/anyrun/plugins");
             user_path.extend(plugin_path.iter());
             global_path.extend(plugin_path.iter());
@@ -341,15 +367,32 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
             .expect("Failed to load plugin");
 
             // Run the plugin's init code to init static resources etc.
-            plugin.init()(config_dir.clone().into());
+            plugin.init()(
+                runtime_data
+                    .borrow()
+                    .as_ref()
+                    .unwrap()
+                    .config_dir
+                    .clone()
+                    .into(),
+            );
 
             let plugin_box = gtk::Box::builder()
                 .orientation(gtk::Orientation::Horizontal)
                 .spacing(10)
                 .name(style_names::PLUGIN)
                 .build();
-            if !config.hide_plugin_info {
-                plugin_box.add(&create_info_box(&plugin.info()(), config.hide_icons));
+            if !runtime_data
+                .borrow()
+                .as_ref()
+                .unwrap()
+                .config
+                .hide_plugin_info
+            {
+                plugin_box.add(&create_info_box(
+                    &plugin.info()(),
+                    runtime_data.borrow().as_ref().unwrap().config.hide_icons,
+                ));
                 plugin_box.add(
                     &gtk::Separator::builder()
                         .orientation(gtk::Orientation::Horizontal)
@@ -409,15 +452,13 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
     // Refresh the matches when text input changes
     let runtime_data_clone = runtime_data.clone();
     entry.connect_changed(move |entry| {
-        refresh_matches(
-            entry.text().to_string(),
-            runtime_data_clone.clone(),
-            config.hide_icons,
-        )
+        refresh_matches(entry.text().to_string(), runtime_data_clone.clone())
     });
 
     // Handle other key presses for selection control and all other things that may be needed
     let entry_clone = entry.clone();
+    let runtime_data_clone = runtime_data.clone();
+
     window.connect_key_press_event(move |window, event| {
         use gdk::keys::constants;
         match event.keyval() {
@@ -429,7 +470,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
             // Handle selections
             constants::Down | constants::Tab | constants::Up => {
                 // Combine all of the matches into a `Vec` to allow for easier handling of the selection
-                let combined_matches = runtime_data
+                let combined_matches = runtime_data_clone
                     .borrow()
                     .as_ref()
                     .unwrap()
@@ -447,7 +488,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
                     .collect::<Vec<(gtk::ListBoxRow, gtk::ListBox)>>();
 
                 // Get the selected match
-                let (selected_match, selected_list) = match runtime_data
+                let (selected_match, selected_list) = match runtime_data_clone
                     .borrow()
                     .as_ref()
                     .unwrap()
@@ -515,9 +556,9 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
             }
             // Handle when the selected match is "activated"
             constants::Return => {
-                let mut _runtime_data = runtime_data.borrow_mut();
+                let mut _runtime_data_clone = runtime_data_clone.borrow_mut();
 
-                let (selected_match, plugin_view) = match _runtime_data
+                let (selected_match, plugin_view) = match _runtime_data_clone
                     .as_ref()
                     .unwrap()
                     .plugins
@@ -540,20 +581,17 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
                     }
                     HandleResult::Refresh(exclusive) => {
                         if exclusive {
-                            _runtime_data.as_mut().unwrap().exclusive = Some(plugin_view.clone());
+                            _runtime_data_clone.as_mut().unwrap().exclusive =
+                                Some(plugin_view.clone());
                         } else {
-                            _runtime_data.as_mut().unwrap().exclusive = None;
+                            _runtime_data_clone.as_mut().unwrap().exclusive = None;
                         }
-                        mem::drop(_runtime_data); // Drop the mutable borrow
-                        refresh_matches(
-                            entry_clone.text().into(),
-                            runtime_data.clone(),
-                            config.hide_icons,
-                        );
+                        mem::drop(_runtime_data_clone); // Drop the mutable borrow
+                        refresh_matches(entry_clone.text().into(), runtime_data_clone.clone());
                         Inhibit(false)
                     }
                     HandleResult::Copy(bytes) => {
-                        _runtime_data.as_mut().unwrap().post_run_action =
+                        _runtime_data_clone.as_mut().unwrap().post_run_action =
                             PostRunAction::Copy(bytes.into());
                         window.close();
                         Inhibit(true)
@@ -573,7 +611,13 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
 
     // If the option is enabled, close the window when any click is received
     // that is outside the bounds of the main box
-    if config.close_on_click {
+    if runtime_data
+        .borrow()
+        .as_ref()
+        .unwrap()
+        .config
+        .close_on_click
+    {
         window.connect_button_press_event(move |window, event| {
             if event.window() == window.window() {
                 window.close();
@@ -586,7 +630,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
 
     // Create widgets here for proper positioning
     window.connect_configure_event(move |window, event| {
-        let width = match config.width {
+        let width = match runtime_data.borrow().as_ref().unwrap().config.width {
             RelativeNum::Absolute(width) => width,
             RelativeNum::Fraction(fraction) => (event.size().0 as f32 * fraction) as i32,
         };
@@ -602,16 +646,31 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
         main_vbox.add(&entry);
 
         // Display the error message
-        if let Some(error_label) = &error_label {
+        if !runtime_data
+            .borrow()
+            .as_ref()
+            .unwrap()
+            .error_label
+            .is_empty()
+        {
             main_vbox.add(
                 &gtk::Label::builder()
-                    .label(&format!(r#"<span foreground="red">{}</span>"#, error_label))
+                    .label(&format!(
+                        r#"<span foreground="red">{}</span>"#,
+                        runtime_data.borrow().as_ref().unwrap().error_label
+                    ))
                     .use_markup(true)
                     .build(),
             );
         }
 
-        let vertical_offset = match config.vertical_offset {
+        let vertical_offset = match runtime_data
+            .borrow()
+            .as_ref()
+            .unwrap()
+            .config
+            .vertical_offset
+        {
             RelativeNum::Absolute(offset) => offset,
             RelativeNum::Fraction(fraction) => (event.size().1 as f32 * fraction) as i32,
         };
@@ -619,7 +678,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
         fixed.put(
             &main_vbox,
             (event.size().0 as i32 - width) / 2,
-            match config.position {
+            match runtime_data.borrow().as_ref().unwrap().config.position {
                 Position::Top => vertical_offset,
                 Position::Center => {
                     (event.size().1 as i32 - entry.allocated_height()) / 2 + vertical_offset
@@ -640,12 +699,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<Option<RuntimeData>
     window.show_all();
 }
 
-fn handle_matches(
-    plugin_view: PluginView,
-    runtime_data: Rc<RefCell<Option<RuntimeData>>>,
-    matches: RVec<Match>,
-    hide_icons: bool,
-) {
+fn handle_matches(plugin_view: PluginView, runtime_data: &RuntimeData, matches: RVec<Match>) {
     // Clear out the old matches from the list
     for widget in plugin_view.list.children() {
         plugin_view.list.remove(&widget);
@@ -664,7 +718,7 @@ fn handle_matches(
             .name(style_names::MATCH)
             .hexpand(true)
             .build();
-        if !hide_icons {
+        if !runtime_data.config.hide_icons {
             if let ROption::RSome(icon) = &_match.icon {
                 let mut builder = gtk::Image::builder()
                     .name(style_names::MATCH)
@@ -742,23 +796,32 @@ fn handle_matches(
     plugin_view.row.show_all();
 
     let combined_matches = runtime_data
-        .borrow()
-        .as_ref()
-        .unwrap()
         .plugins
         .iter()
         .flat_map(|view| {
-            view.list.children().into_iter().map(|child| {
-                (
-                    child.dynamic_cast::<gtk::ListBoxRow>().unwrap(),
-                    view.list.clone(),
-                )
-            })
+            view.list
+                .children()
+                .into_iter()
+                .map(move |child| (child.dynamic_cast::<gtk::ListBoxRow>().unwrap(), view))
         })
-        .collect::<Vec<(gtk::ListBoxRow, gtk::ListBox)>>();
+        .collect::<Vec<(gtk::ListBoxRow, &PluginView)>>();
 
-    if let Some((row, list)) = combined_matches.get(0) {
-        list.select_row(Some(row));
+    // If `max_entries` is set, truncate the amount of entries
+    if let Some(max_matches) = runtime_data.config.max_entries {
+        for (row, view) in combined_matches.iter().skip(max_matches) {
+            view.list.remove(row);
+        }
+    }
+
+    // Hide the plugins that no longer have any entries
+    for (_, view) in &combined_matches {
+        if view.list.children().is_empty() {
+            view.row.hide();
+        }
+    }
+
+    if let Some((row, view)) = combined_matches.get(0) {
+        view.list.select_row(Some(row));
     }
 }
 
@@ -808,45 +871,34 @@ fn create_info_box(info: &PluginInfo, hide_icons: bool) -> gtk::Box {
 }
 
 /// Refresh the matches from the plugins
-fn refresh_matches(
-    input: String,
-    runtime_data: Rc<RefCell<Option<RuntimeData>>>,
-    hide_icons: bool,
-) {
+fn refresh_matches(input: String, runtime_data: Rc<RefCell<Option<RuntimeData>>>) {
     for plugin_view in runtime_data.borrow().as_ref().unwrap().plugins.iter() {
         let id = plugin_view.plugin.get_matches()(input.clone().into());
         let plugin_view = plugin_view.clone();
         let runtime_data_clone = runtime_data.clone();
         // If the input is empty, skip getting matches and just clear everything out.
         if input.is_empty() {
-            handle_matches(plugin_view, runtime_data_clone, RVec::new(), hide_icons);
+            handle_matches(
+                plugin_view,
+                runtime_data.borrow().as_ref().unwrap(),
+                RVec::new(),
+            );
         // If a plugin has requested exclusivity, respect it
         } else if let Some(exclusive) = &runtime_data.borrow().as_ref().unwrap().exclusive {
             if plugin_view.plugin.info() == exclusive.plugin.info() {
                 glib::timeout_add_local(Duration::from_micros(1000), move || {
-                    async_match(
-                        plugin_view.clone(),
-                        runtime_data_clone.clone(),
-                        id,
-                        hide_icons,
-                    )
+                    async_match(plugin_view.clone(), runtime_data_clone.clone(), id)
                 });
             } else {
                 handle_matches(
                     plugin_view.clone(),
-                    runtime_data_clone,
+                    runtime_data.borrow().as_ref().unwrap(),
                     RVec::new(),
-                    hide_icons,
                 );
             }
         } else {
             glib::timeout_add_local(Duration::from_micros(1000), move || {
-                async_match(
-                    plugin_view.clone(),
-                    runtime_data_clone.clone(),
-                    id,
-                    hide_icons,
-                )
+                async_match(plugin_view.clone(), runtime_data_clone.clone(), id)
             });
         }
     }
@@ -857,11 +909,14 @@ fn async_match(
     plugin_view: PluginView,
     runtime_data: Rc<RefCell<Option<RuntimeData>>>,
     id: u64,
-    hide_icons: bool,
 ) -> glib::Continue {
     match plugin_view.plugin.poll_matches()(id) {
         PollResult::Ready(matches) => {
-            handle_matches(plugin_view, runtime_data, matches, hide_icons);
+            handle_matches(
+                plugin_view,
+                runtime_data.borrow().as_ref().unwrap(),
+                matches,
+            );
             glib::Continue(false)
         }
         PollResult::Pending => glib::Continue(true),
