@@ -1,4 +1,4 @@
-use std::{collections::HashMap, env, ffi::OsStr, fs, io};
+use std::{collections::HashMap, env, ffi::OsStr, fs};
 
 use crate::Config;
 
@@ -135,7 +135,19 @@ impl DesktopEntry {
 pub fn scrubber(config: &Config) -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std::error::Error>> {
     // Create iterator over all the files in the XDG_DATA_DIRS
     // XDG compliancy is cool
-    let mut paths: Vec<Result<fs::DirEntry, io::Error>> = match env::var("XDG_DATA_DIRS") {
+    let user_path = match env::var("XDG_DATA_HOME") {
+        Ok(data_home) => {
+            format!("{}/applications/", data_home)
+        }
+        Err(_) => {
+            format!(
+                "{}/.local/share/applications/",
+                env::var("HOME").expect("Unable to determine home directory!")
+            )
+        }
+    };
+
+    let mut entries: HashMap<String, DesktopEntry> = match env::var("XDG_DATA_DIRS") {
         Ok(data_dirs) => {
             // The vec for all the DirEntry objects
             let mut paths = Vec::new();
@@ -159,37 +171,40 @@ pub fn scrubber(config: &Config) -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std
             paths
         }
         Err(_) => fs::read_dir("/usr/share/applications")?.collect(),
-    };
+    }
+    .into_iter()
+    .filter_map(|entry| {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(_why) => return None,
+        };
+        let entries = DesktopEntry::from_dir_entry(&entry, config);
+        Some(entries.into_iter().map(|entry| (entry.name.clone(), entry)))
+    })
+    .flatten()
+    .collect();
 
     // Go through user directory desktop files for overrides
-    let user_path = match env::var("XDG_DATA_HOME") {
-        Ok(data_home) => {
-            format!("{}/applications/", data_home)
-        }
-        Err(_) => {
-            format!(
-                "{}/.local/share/applications/",
-                env::var("HOME").expect("Unable to determine home directory!")
-            )
-        }
-    };
-
     match fs::read_dir(&user_path) {
-        Ok(entries) => paths.extend(entries),
+        Ok(dir_entries) => entries.extend(
+            dir_entries
+                .into_iter()
+                .filter_map(|entry| {
+                    let entry = match entry {
+                        Ok(entry) => entry,
+                        Err(_why) => return None,
+                    };
+                    let entries = DesktopEntry::from_dir_entry(&entry, config);
+                    Some(entries.into_iter().map(|entry| (entry.name.clone(), entry)))
+                })
+                .flatten(),
+        ),
         Err(why) => eprintln!("Error reading directory {}: {}", user_path, why),
     }
 
-    Ok(paths
-        .iter()
-        .filter_map(|entry| {
-            let entry = match entry {
-                Ok(entry) => entry,
-                Err(_why) => return None,
-            };
-            Some(DesktopEntry::from_dir_entry(entry, config))
-        })
-        .flatten()
+    Ok(entries
+        .into_iter()
         .enumerate()
-        .map(|(i, val)| (val, i as u64))
+        .map(|(i, (_, entry))| (entry, i as u64))
         .collect())
 }
