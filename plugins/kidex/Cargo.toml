@@ -10,7 +10,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 anyrun-plugin = { path = "../../anyrun-plugin" }
-kidex-common = { git = "https://github.com/Kirottu/kidex", features = ["util"] }
+kidex-common = { version = "0.1.0", features = ["util"] }
 abi_stable = "0.11.1"
 fuzzy-matcher = "0.3.7"
 open = "3.2.0"

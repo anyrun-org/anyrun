@@ -1081,7 +1081,8 @@ dependencies = [
 [[package]]
 name = "kidex-common"
 version = "0.1.0"
-source = "git+https://github.com/Kirottu/kidex#afcbf54b37dc47b914e0c8f873cb1f11c69674a7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9d161d39ea0b3247a56831cc370e0187f7ab587d43a1efa843ccc314a97e539"
 dependencies = [
  "serde",
  "serde_json",
