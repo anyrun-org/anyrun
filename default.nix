@@ -29,9 +29,6 @@ in
 
     cargoLock = {
       lockFile = ./Cargo.lock;
-      outputHashes = {
-        "kidex-common-0.1.0" = "sha256-sPzCTK0gdIYkKWxrtoPJ/F2zrG2ZKHOSmANW2g00fSQ=";
-      };
     };
 
     checkInputs = [cargo rustc];
