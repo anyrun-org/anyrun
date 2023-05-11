@@ -201,7 +201,8 @@ pub fn init(_attr: TokenStream, item: TokenStream) -> TokenStream {
             #function
 
             ::std::thread::spawn(|| {
-                *ANYRUN_INTERNAL_DATA.write().unwrap() = Some(#fn_name(config_dir));
+                let mut lock = ANYRUN_INTERNAL_DATA.write().unwrap();
+                *lock = Some(#fn_name(config_dir));
             });
         }
     }

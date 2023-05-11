@@ -14,3 +14,4 @@ serde = { version = "1.0.151", features = ["derive"] }
 anyrun-interface = { path = "../anyrun-interface" }
 wl-clipboard-rs = "0.7.0"
 nix = { version = "0.26.1", default-features = false, features = ["process"] }
+clap = { version = "4.2.7", features = ["derive"] }
