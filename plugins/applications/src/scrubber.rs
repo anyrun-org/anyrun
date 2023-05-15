@@ -179,7 +179,11 @@ pub fn scrubber(config: &Config) -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std
             Err(_why) => return None,
         };
         let entries = DesktopEntry::from_dir_entry(&entry, config);
-        Some(entries.into_iter().map(|entry| (entry.name.clone(), entry)))
+        Some(
+            entries
+                .into_iter()
+                .map(|entry| (format!("{}{}", entry.name, entry.icon), entry)),
+        )
     })
     .flatten()
     .collect();
@@ -195,7 +199,11 @@ pub fn scrubber(config: &Config) -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std
                         Err(_why) => return None,
                     };
                     let entries = DesktopEntry::from_dir_entry(&entry, config);
-                    Some(entries.into_iter().map(|entry| (entry.name.clone(), entry)))
+                    Some(
+                        entries
+                            .into_iter()
+                            .map(|entry| (format!("{}{}", entry.name, entry.icon), entry)),
+                    )
                 })
                 .flatten(),
         ),
