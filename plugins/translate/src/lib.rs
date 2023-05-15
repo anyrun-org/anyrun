@@ -10,6 +10,7 @@ use tokio::runtime::Runtime;
 #[derive(Deserialize)]
 struct Config {
     prefix: String,
+    language_delimiter: String,
     max_entries: usize,
 }
 
@@ -17,6 +18,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             prefix: ":".to_string(),
+            language_delimiter: ">".to_string(),
             max_entries: 3,
         }
     }
@@ -169,7 +171,7 @@ fn get_matches(input: RString, state: &State) -> RVec<Match> {
         None => return RVec::new(),
     };
 
-    let (src, dest) = match lang_split.split_once('>') {
+    let (src, dest) = match lang_split.split_once(&state.config.language_delimiter) {
         Some(split) => (Some(split.0), split.1),
         None => (None, lang_split),
     };
