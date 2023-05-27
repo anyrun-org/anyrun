@@ -5,6 +5,7 @@ use std::{
     mem,
     path::PathBuf,
     rc::Rc,
+    sync::Once,
     time::Duration,
 };
 
@@ -555,63 +556,72 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
         });
     }
 
+    // Only create the widgets once to avoid issues
+    let configure_once = Once::new();
+
     // Create widgets here for proper positioning
     window.connect_configure_event(move |window, event| {
-        let width = match runtime_data.borrow().config.width {
-            RelativeNum::Absolute(width) => width,
-            RelativeNum::Fraction(fraction) => (event.size().0 as f32 * fraction) as i32,
-        };
-        // The GtkFixed widget is used for absolute positioning of the main box
-        let fixed = gtk::Fixed::builder().build();
-        let main_vbox = gtk::Box::builder()
-            .orientation(gtk::Orientation::Vertical)
-            .halign(gtk::Align::Center)
-            .vexpand(false)
-            .width_request(width)
-            .name(style_names::MAIN)
-            .build();
-        main_vbox.add(&entry);
+        let runtime_data = runtime_data.clone();
+        let entry = entry.clone();
+        let main_list = main_list.clone();
 
-        // Display the error message
-        if !runtime_data.borrow().error_label.is_empty() {
-            main_vbox.add(
-                &gtk::Label::builder()
-                    .label(&format!(
-                        r#"<span foreground="red">{}</span>"#,
-                        runtime_data.borrow().error_label
-                    ))
-                    .use_markup(true)
-                    .build(),
+        configure_once.call_once(move || {
+            let width = match runtime_data.borrow().config.width {
+                RelativeNum::Absolute(width) => width,
+                RelativeNum::Fraction(fraction) => (event.size().0 as f32 * fraction) as i32,
+            };
+            // The GtkFixed widget is used for absolute positioning of the main box
+            let fixed = gtk::Fixed::builder().build();
+            let main_vbox = gtk::Box::builder()
+                .orientation(gtk::Orientation::Vertical)
+                .halign(gtk::Align::Center)
+                .vexpand(false)
+                .width_request(width)
+                .name(style_names::MAIN)
+                .build();
+            main_vbox.add(&entry);
+
+            // Display the error message
+            if !runtime_data.borrow().error_label.is_empty() {
+                main_vbox.add(
+                    &gtk::Label::builder()
+                        .label(&format!(
+                            r#"<span foreground="red">{}</span>"#,
+                            runtime_data.borrow().error_label
+                        ))
+                        .use_markup(true)
+                        .build(),
+                );
+            }
+
+            let vertical_offset = match runtime_data.borrow().config.vertical_offset {
+                RelativeNum::Absolute(offset) => offset,
+                RelativeNum::Fraction(fraction) => (event.size().1 as f32 * fraction) as i32,
+            };
+
+            fixed.put(
+                &main_vbox,
+                (event.size().0 as i32 - width) / 2,
+                match runtime_data.borrow().config.position {
+                    Position::Top => vertical_offset,
+                    Position::Center => {
+                        (event.size().1 as i32 - entry.allocated_height()) / 2 + vertical_offset
+                    }
+                },
             );
-        }
+            window.add(&fixed);
+            window.show_all();
 
-        let vertical_offset = match runtime_data.borrow().config.vertical_offset {
-            RelativeNum::Absolute(offset) => offset,
-            RelativeNum::Fraction(fraction) => (event.size().1 as f32 * fraction) as i32,
-        };
+            // Add and show the list later, to avoid showing empty plugin categories on launch
+            main_vbox.add(&main_list);
+            main_list.show();
+            entry.grab_focus(); // Grab the focus so typing is immediately accepted by the entry box
 
-        fixed.put(
-            &main_vbox,
-            (event.size().0 as i32 - width) / 2,
-            match runtime_data.borrow().config.position {
-                Position::Top => vertical_offset,
-                Position::Center => {
-                    (event.size().1 as i32 - entry.allocated_height()) / 2 + vertical_offset
-                }
-            },
-        );
-        window.add(&fixed);
-        window.show_all();
-
-        // Add and show the list later, to avoid showing empty plugin categories on launch
-        main_vbox.add(&main_list);
-        main_list.show();
-        entry.grab_focus(); // Grab the focus so typing is immediately accepted by the entry box
-
-        if runtime_data.borrow().config.show_results_immediately {
-            // Get initial matches
-            refresh_matches(String::new(), runtime_data.clone());
-        }
+            if runtime_data.borrow().config.show_results_immediately {
+                // Get initial matches
+                refresh_matches(String::new(), runtime_data);
+            }
+        });
 
         false
     });
