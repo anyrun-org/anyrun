@@ -94,6 +94,8 @@ Anyrun requires plugins to function, as they provide the results for input. The 
   - Calculator & unit conversion.
 - [Shell](plugins/shell/README.md)
   - Run shell commands.
+- [Translate](plugins/translate/README.md)
+  - Quickly translate text.
 - [Kidex](plugins/kidex/README.md)
   - File search provided by [Kidex](https://github.com/Kirottu/kidex).
 - [Randr](plugins/randr/README.md)

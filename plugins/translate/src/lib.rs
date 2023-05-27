@@ -3,11 +3,14 @@ use std::fs;
 use abi_stable::std_types::{ROption, RString, RVec};
 use anyrun_plugin::*;
 use fuzzy_matcher::FuzzyMatcher;
+use reqwest::Client;
 use serde::Deserialize;
+use tokio::runtime::Runtime;
 
 #[derive(Deserialize)]
 struct Config {
     prefix: String,
+    language_delimiter: String,
     max_entries: usize,
 }
 
@@ -15,6 +18,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             prefix: ":".to_string(),
+            language_delimiter: ">".to_string(),
             max_entries: 3,
         }
     }
@@ -22,6 +26,8 @@ impl Default for Config {
 
 struct State {
     config: Config,
+    client: Client,
+    runtime: Runtime,
     langs: Vec<(&'static str, &'static str)>,
 }
 
@@ -32,6 +38,8 @@ fn init(config_dir: RString) -> State {
             Ok(content) => ron::from_str(&content).unwrap_or_default(),
             Err(_) => Config::default(),
         },
+        client: Client::new(),
+        runtime: Runtime::new().expect("Failed to create tokio runtime"),
         langs: vec![
             ("af", "Afrikaans"),
             ("sq", "Albanian"),
@@ -151,16 +159,21 @@ fn info() -> PluginInfo {
 }
 
 #[get_matches]
-fn get_matches(input: RString, data: &State) -> RVec<Match> {
-    if !input.starts_with(&data.config.prefix) {
+fn get_matches(input: RString, state: &State) -> RVec<Match> {
+    if !input.starts_with(&state.config.prefix) {
         return RVec::new();
     }
 
     // Ignore the prefix
-    let input = &input[data.config.prefix.len()..];
-    let (lang, text) = match input.split_once(' ') {
+    let input = &input[state.config.prefix.len()..];
+    let (lang_split, text) = match input.split_once(' ') {
         Some(split) => split,
         None => return RVec::new(),
+    };
+
+    let (src, dest) = match lang_split.split_once(&state.config.language_delimiter) {
+        Some(split) => (Some(split.0), split.1),
+        None => (None, lang_split),
     };
 
     if text.is_empty() {
@@ -169,33 +182,71 @@ fn get_matches(input: RString, data: &State) -> RVec<Match> {
 
     let matcher = fuzzy_matcher::skim::SkimMatcherV2::default().ignore_case();
 
-    // Fuzzy match the input language with the languages in the Vec
-    let mut matches = data
+    let dest_matches = state
         .langs
         .clone()
         .into_iter()
         .filter_map(|(code, name)| {
             matcher
-                .fuzzy_match(code, lang)
-                .max(matcher.fuzzy_match(name, lang))
+                .fuzzy_match(code, dest)
+                .max(matcher.fuzzy_match(name, dest))
                 .map(|score| (code, name, score))
         })
         .collect::<Vec<_>>();
 
-    matches.sort_by(|a, b| b.2.cmp(&a.2));
+    // Fuzzy match the input language with the languages in the Vec
+    let mut matches = match src {
+        Some(src) => {
+            let src_matches = state
+                .langs
+                .clone()
+                .into_iter()
+                .filter_map(|(code, name)| {
+                    matcher
+                        .fuzzy_match(code, src)
+                        .max(matcher.fuzzy_match(name, src))
+                        .map(|score| (code, name, score))
+                })
+                .collect::<Vec<_>>();
+
+            let mut matches = src_matches
+                .into_iter()
+                .flat_map(|src| dest_matches.clone().into_iter().map(move |dest| (Some(src), dest)))
+                .collect::<Vec<_>>();
+
+            matches.sort_by(|a, b| (b.1 .2 + b.0.unwrap().2).cmp(&(a.1 .2 + a.0.unwrap().2)));
+            matches
+        }
+        None => {
+            let mut matches = dest_matches
+                .into_iter()
+                .map(|dest| (None, dest))
+                .collect::<Vec<_>>();
+
+            matches.sort_by(|a, b| b.1 .2.cmp(&a.1 .2));
+            matches
+        }
+    };
 
     // We only want 3 matches
-    matches.truncate(data.config.max_entries);
+    matches.truncate(state.config.max_entries);
 
-    tokio::runtime::Runtime::new().expect("Failed to spawn tokio runtime!").block_on(async move {
+    state.runtime.block_on(async move {
         // Create the futures for fetching the translation results
         let futures = matches
             .into_iter()
-            .map(|(code, name, _)| async move {
-                (name, reqwest::get(format!("https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={}&dt=t&q={}", code, text)).await)
+            .map(|(src, dest)| async move {
+                match src {
+                    Some(src) => 
+                (dest.1, state.client.get(format!("https://translate.googleapis.com/translate_a/single?client=gtx&sl={}&tl={}&dt=t&q={}", src.0, dest.0, text)).send().await),
+                    None => (dest.1, state.client.get(format!("https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={}&dt=t&q={}", dest.0, text)).send().await)
+                }
             });
-        futures::future::join_all(futures) // Wait for all futures to complete
-            .await
+       
+        let res = futures::future::join_all(futures) // Wait for all futures to complete
+            .await;
+
+        res
             .into_iter()
             .filter_map(|(name, res)| res
                 .ok()
@@ -215,7 +266,7 @@ fn get_matches(input: RString, data: &State) -> RVec<Match> {
                             description: ROption::RSome(
                                 format!(
                                     "{} -> {}",
-                                    data.langs.iter()
+                                    state.langs.iter()
                                     .find_map(|(code, name)| if *code == json[2].as_str().expect("Malformed JSON!") {
                                             Some(*name)
                                         } else {

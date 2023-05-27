@@ -6,6 +6,8 @@ Launch applications.
 
 Simply search for the application you wish to launch.
 
+*NOTE: The applications plugin does not look for executables in your $PATH, it looks for [desktop entries](https://specifications.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html) in standard locations (`XDG_DATA_DIRS`).*
+
 ## Configuration
 
 ```ron
