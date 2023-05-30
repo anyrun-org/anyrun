@@ -43,14 +43,17 @@ fn info() -> PluginInfo {
 #[get_matches]
 fn get_matches(input: RString, ctx: &mut rink_core::Context) -> RVec<Match> {
     match rink_core::one_line(ctx, &input) {
-        Ok(result) => vec![Match {
-            title: result.into(),
-            description: ROption::RNone,
-            use_pango: false,
-            icon: ROption::RNone,
-            id: ROption::RNone,
-        }]
-        .into(),
+        Ok(result) => {
+            let (title, desc) = parse_result(result);
+            vec![Match {
+                title: title.into(),
+                description: desc.map(RString::from).into(),
+                use_pango: false,
+                icon: ROption::RNone,
+                id: ROption::RNone,
+            }]
+            .into()
+        }
         Err(_) => RVec::new(),
     }
 }
@@ -58,4 +61,18 @@ fn get_matches(input: RString, ctx: &mut rink_core::Context) -> RVec<Match> {
 #[handler]
 fn handler(selection: Match) -> HandleResult {
     HandleResult::Copy(selection.title.into_bytes())
+}
+
+/// Extracts the title and description from `rink` result.
+/// The description is anything inside brackets from `rink`, if present.
+fn parse_result(result: String) -> (String, Option<String>) {
+    result
+        .split_once(" (")
+        .map(|(title, desc)| {
+            (
+                title.to_string(),
+                Some(desc.trim_end_matches(')').to_string()),
+            )
+        })
+        .unwrap_or((result, None))
 }
