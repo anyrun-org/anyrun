@@ -74,7 +74,7 @@ nix.settings = {
     builders-use-substitutes = true;
     # substituters to use
     substituters = [
-        https://anyrun.cachix.org
+        "https://anyrun.cachix.org"
     ];
 
     trusted-public-keys = [
