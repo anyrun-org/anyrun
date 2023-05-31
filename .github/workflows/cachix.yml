@@ -7,8 +7,8 @@ on:
       - master
     paths-ignore:
       - .github/**
-      - assets/**
       - .gitignore
+      - README.md
 
 jobs:
   cahix:
@@ -16,7 +16,8 @@ jobs:
     strategy:
       matrix:
         package:
-          - default
+          - anyrun
+          - defaultPackage
     steps:
       - uses: easimon/maximize-build-space@v6
         with:
@@ -41,5 +42,5 @@ jobs:
         run: git config --global init.defaultBranch main
       - name: Validate Flakes
         run: nix flake check
-      - name: Build anyrun with default settings
+      - name: Build anyrun from the defined matrix
         run: nix build .#${{ matrix.package }} --print-build-logs
