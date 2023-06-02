@@ -2,71 +2,80 @@
   description = "A wayland native, highly customizable runner.";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-  };
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-  outputs = {
-    self,
-    nixpkgs,
-  }: let
-    cargoToml = builtins.fromTOML (builtins.readFile ./anyrun/Cargo.toml);
-    supportedSystems = ["x86_64-linux" "aarch64-linux"];
-    forAllSystems = f: nixpkgs.lib.genAttrs supportedSystems (system: f system);
-  in {
-    overlay = final: prev: {
-      "${cargoToml.package.name}" = final.callPackage ./. {};
+    # project shells
+    devshell = {
+      url = "github:numtide/devshell";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
-
-    packages = forAllSystems (system: let
-      pkgs = import nixpkgs {
-        inherit system;
-        overlays = [self.overlay];
-      };
-    in {
-      "${cargoToml.package.name}" = pkgs."${cargoToml.package.name}";
-    });
-
-    defaultPackage = forAllSystems (system:
-      (import nixpkgs {
-        inherit system;
-        overlays = [self.overlay];
-      })
-      ."${cargoToml.package.name}");
-
-    checks = forAllSystems (system: let
-      pkgs = import nixpkgs {
-        inherit system;
-        overlays = [
-          self.overlay
-        ];
-      };
-    in {
-      format =
-        pkgs.runCommand "check-format"
-        {
-          buildInputs = with pkgs; [rustfmt cargo];
-        } ''
-          ${pkgs.rustfmt}/bin/cargo-fmt fmt --manifest-path ${./anyrun}/Cargo.toml -- --check
-          ${pkgs.nixpkgs-fmt}/bin/nixpkgs-fmt --check ${./anyrun}
-          touch $out # it worked!
-        '';
-      "${cargoToml.package.name}" = pkgs."${cargoToml.package.name}";
-    });
-    devShell = forAllSystems (system: let
-      pkgs = import nixpkgs {
-        inherit system;
-        overlays = [self.overlay];
-      };
-    in
-      pkgs.mkShell {
-        inputsFrom = [
-          pkgs."${cargoToml.package.name}"
-        ];
-        buildInputs = with pkgs; [
-          rustfmt
-          nixpkgs-fmt
-        ];
-        LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
-      });
   };
+
+  outputs = inputs @ {flake-parts, ...}:
+    flake-parts.lib.mkFlake {inherit inputs;} {
+      systems = ["x86_64-linux" "aarch64-linux"];
+
+      perSystem = {
+        config,
+        self',
+        inputs',
+        pkgs,
+        system,
+        ...
+      }: let
+        inherit (inputs.nixpkgs) lib;
+        inherit (lib) getExe;
+      in {
+        # provide the formatter for nix fmt
+        formatter = pkgs.alejandra;
+
+        devShells.default = inputs'.devshell.legacyPackages.mkShell {
+          name = "anyrun-shell";
+          packages = with pkgs; [
+            alejandra # nix formatter
+            rustfmt # rust formatter
+            statix # lints and suggestions
+            deadnix # clean up unused nix code
+          ];
+        };
+
+        packages = rec {
+          anyrun = pkgs.callPackage ./nix/default.nix {inherit inputs;};
+          default = anyrun;
+        };
+
+        checks = {
+          format =
+            pkgs.runCommand "check-format" {
+              buildInputs = with pkgs; [
+                rustfmt
+                cargo
+              ];
+            } ''
+              ${pkgs.rustfmt}/bin/cargo-fmt fmt --manifest-path ./anyrun/Cargo.toml -- --check
+              ${getExe pkgs.alejandra} --check ./
+              touch $out # it worked!
+            '';
+          "anyrun-format-check" = self'.packages.anyrun;
+        };
+      };
+
+      flake = {
+        inputs,
+        pkgs,
+        self,
+        ...
+      }: {
+        # TODO
+        nixosModules = {
+          default = {};
+          homeManager = {};
+        };
+
+        # simply an alias
+        homeManagerModules = {
+          default = self.nixosModules.homeManager;
+        };
+      };
+    };
 }

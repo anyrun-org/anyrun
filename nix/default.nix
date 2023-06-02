@@ -1,4 +1,3 @@
-# default.nix
 {
   lib,
   glib,
@@ -12,11 +11,18 @@
   rustfmt,
   cargo,
   rustc,
+  #version ? "git",
+  #commit,
+  ...
 }: let
-  cargoToml = builtins.fromTOML (builtins.readFile ./anyrun/Cargo.toml);
+  cargoToml = builtins.fromTOML (builtins.readFile ../anyrun/Cargo.toml);
 in
-  rustPlatform.buildRustPackage {
-    src = ./.;
+  rustPlatform.buildRustPackage rec {
+    name = cargoToml.package.name;
+    pname = "anyrun";
+    #inherit version;
+
+    src = ../.;
 
     buildInputs = [
       pkg-config
@@ -28,7 +34,7 @@ in
     ];
 
     cargoLock = {
-      lockFile = ./Cargo.lock;
+      lockFile = ../Cargo.lock;
     };
 
     checkInputs = [cargo rustc];
@@ -46,9 +52,6 @@ in
     RUST_BACKTRACE = "full";
     copyLibs = true;
 
-    name = cargoToml.package.name;
-    version = cargoToml.package.version;
-
     postInstall = ''
       wrapProgram $out/bin/anyrun \
         --set GDK_PIXBUF_MODULE_FILE "$(echo ${librsvg.out}/lib/gdk-pixbuf-2.0/*/loaders.cache)" \
@@ -65,6 +68,10 @@ in
           github = "n3oney";
           githubId = 30625554;
           name = "Michał Minarowski";
+        }
+        {
+          email = "raf@notashelf.dev";
+          github = "NotAShelf";
         }
       ];
     };
