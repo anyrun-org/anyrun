@@ -212,9 +212,9 @@ fn get_matches(input: RString) -> RVec<Match> {
   // The `data` is a mutable reference to the shared data type later specified.
   vec![Match {
     title: "Test match".into(),
-    icon: ROption::RSome("help-about"),
+    icon: ROption::RSome("help-about".into()),
     use_pango: false,
-    description: ROption::RSome("Test match for the plugin API demo"),
+    description: ROption::RSome("Test match for the plugin API demo".into()),
     id: ROption::RNone, // The ID can be used for identifying the match later, is not required
   }].into()
 }
