@@ -9,6 +9,7 @@ use std::{fs, process::Command};
 pub struct Config {
     desktop_actions: bool,
     max_entries: usize,
+    terminal: Option<String>,
 }
 
 impl Default for Config {
@@ -16,6 +17,7 @@ impl Default for Config {
         Self {
             desktop_actions: false,
             max_entries: 5,
+            terminal: None,
         }
     }
 }
@@ -26,6 +28,8 @@ pub struct State {
 }
 
 mod scrubber;
+
+const SENSIBLE_TERMINALS: &[&str] = &["alacritty", "foot", "kitty", "wezterm", "wterm"];
 
 #[handler]
 pub fn handler(selection: Match, state: &State) -> HandleResult {
@@ -41,8 +45,28 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
         })
         .unwrap();
 
-    if let Err(why) = Command::new("sh").arg("-c").arg(&entry.exec).spawn() {
-        println!("Error running desktop entry: {}", why);
+    if entry.term {
+        match &state.config.terminal {
+            Some(term) => {
+                if let Err(why) = Command::new(term).arg("-e").arg(&entry.exec).spawn() {
+                    eprintln!("Error running desktop entry: {}", why);
+                }
+            }
+            None => {
+                for term in SENSIBLE_TERMINALS {
+                    if Command::new(term)
+                        .arg("-e")
+                        .arg(&entry.exec)
+                        .spawn()
+                        .is_ok()
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+    } else if let Err(why) = Command::new("sh").arg("-c").arg(&entry.exec).spawn() {
+        eprintln!("Error running desktop entry: {}", why);
     }
 
     HandleResult::Close
