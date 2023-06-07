@@ -8,6 +8,7 @@ pub struct DesktopEntry {
     pub name: String,
     pub desc: Option<String>,
     pub icon: String,
+    pub term: bool,
 }
 
 const FIELD_CODE_LIST: &[&str] = &[
@@ -78,6 +79,10 @@ impl DesktopEntry {
                                 .get("Icon")
                                 .unwrap_or(&"application-x-executable")
                                 .to_string(),
+                            term: map
+                                .get("Terminal")
+                                .map(|val| val.to_lowercase() == "true")
+                                .unwrap_or(false),
                         })
                     } else {
                         None
@@ -119,6 +124,10 @@ impl DesktopEntry {
                             },
                             desc: Some(entry.name.clone()),
                             icon: entry.icon.clone(),
+                            term: map
+                                .get("Terminal")
+                                .map(|val| val.to_lowercase() == "true")
+                                .unwrap_or(false),
                         })
                     }
                 }
