@@ -39,6 +39,7 @@
           ];
         };
 
+        # TODO: Make each of the builtin plugins available as a package.
         packages = rec {
           anyrun = pkgs.callPackage ./nix/default.nix {inherit inputs;};
           default = anyrun;
@@ -60,22 +61,11 @@
         };
       };
 
-      flake = {
-        inputs,
-        pkgs,
-        self,
-        ...
-      }: {
-        # TODO
-        nixosModules = {
-          default = {};
-          homeManager = {};
-        };
+      flake = _: {
+        # TODO: Make a NixOS module
+        nixosModules.default = null;
 
-        # simply an alias
-        homeManagerModules = {
-          default = self.nixosModules.homeManager;
-        };
+        homeManagerModules.default = import ./nix/hm-module.nix inputs.self;
       };
     };
 }
