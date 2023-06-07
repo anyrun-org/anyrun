@@ -173,11 +173,15 @@ in {
     capitalize = string:
       lib.toUpper (builtins.substring 0 1 string) + lib.toLower (builtins.substring 1 ((builtins.stringLength string) - 1) string);
 
-    parsedPlugins = builtins.map (entry:
-      if lib.types.package.check entry
-      then "${entry}/lib/lib${lib.replaceStrings ["-"] ["_"] entry.pname}.so"
-      else entry)
-    cfg.config.plugins;
+    parsedPlugins =
+      if cfg.config.plugins == null
+      then []
+      else
+        builtins.map (entry:
+          if lib.types.package.check entry
+          then "${entry}/lib/lib${lib.replaceStrings ["-"] ["_"] entry.pname}.so"
+          else entry)
+        cfg.config.plugins;
   in {
     assertions = [(assertNumeric cfg.config.width) (assertNumeric cfg.config.verticalOffset)];
 
@@ -185,7 +189,7 @@ in {
       if cfg.config.plugins == null
       then [
         ''
-          You haven't enabled any plugins. Anyrun will not start, unless you specify plugins with the --override-plugins flag.
+          You haven't enabled any plugins. Anyrun will not show any results, unless you specify plugins with the --override-plugins flag.
           Add plugins to programs.anyrun.config.plugins, or set it to [] to silence the warning.
         ''
       ]
