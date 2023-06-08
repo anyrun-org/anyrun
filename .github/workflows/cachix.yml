@@ -17,7 +17,7 @@ jobs:
       matrix:
         package:
           - anyrun
-          - defaultPackage
+          - ""
     steps:
       - uses: easimon/maximize-build-space@v6
         with:
