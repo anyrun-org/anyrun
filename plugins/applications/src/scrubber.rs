@@ -74,7 +74,7 @@ impl DesktopEntry {
                                 }
                                 exec
                             },
-                            path: map.get("Path").map(|val| PathBuf::from(val)),
+                            path: map.get("Path").map(PathBuf::from),
                             name: map.get("Name")?.to_string(),
                             desc: None,
                             icon: map
