@@ -11,8 +11,7 @@
   rustfmt,
   cargo,
   rustc,
-  #version ? "git",
-  #commit,
+  lockFile,
   ...
 }: let
   cargoToml = builtins.fromTOML (builtins.readFile ../anyrun/Cargo.toml);
@@ -34,7 +33,7 @@ in
     ];
 
     cargoLock = {
-      lockFile = ../Cargo.lock;
+      lockFile = lockFile;
     };
 
     checkInputs = [cargo rustc];

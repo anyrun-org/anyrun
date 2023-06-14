@@ -40,9 +40,16 @@
         };
 
         # TODO: Make each of the builtin plugins available as a package.
-        packages = rec {
-          anyrun = pkgs.callPackage ./nix/default.nix {inherit inputs;};
+        packages = let
+          lockFile = ./Cargo.lock;
+        in rec {
+          anyrun = pkgs.callPackage ./nix/default.nix {inherit inputs lockFile;};
           default = anyrun;
+
+          applications = pkgs.callPackage ./nix/plugins/default.nix {
+            inherit inputs lockFile;
+            name = "applications";
+          };
         };
 
         checks = {
