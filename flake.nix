@@ -39,16 +39,57 @@
           ];
         };
 
-        # TODO: Make each of the builtin plugins available as a package.
         packages = let
           lockFile = ./Cargo.lock;
         in rec {
           anyrun = pkgs.callPackage ./nix/default.nix {inherit inputs lockFile;};
+          # alias nix build .# to anyrun
           default = anyrun;
 
+          # expose each plugin as a package
           applications = pkgs.callPackage ./nix/plugins/default.nix {
             inherit inputs lockFile;
             name = "applications";
+          };
+
+          dictionary = pkgs.callPackage ./nix/plugins/default.nix {
+            inherit inputs lockFile;
+            name = "dictionary";
+          };
+
+          kidex = pkgs.callPackage ./nix/plugins/default.nix {
+            inherit inputs lockFile;
+            name = "kidex";
+          };
+
+          randr = pkgs.callPackage ./nix/plugins/default.nix {
+            inherit inputs lockFile;
+            name = "randr";
+          };
+
+          rink = pkgs.callPackage ./nix/plugins/default.nix {
+            inherit inputs lockFile;
+            name = "rink";
+          };
+
+          shell = pkgs.callPackage ./nix/plugins/default.nix {
+            inherit inputs lockFile;
+            name = "shell";
+          };
+
+          stdin = pkgs.callPackage ./nix/plugins/default.nix {
+            inherit inputs lockFile;
+            name = "stdin";
+          };
+
+          symbols = pkgs.callPackage ./nix/plugins/default.nix {
+            inherit inputs lockFile;
+            name = "symbols";
+          };
+
+          translate = pkgs.callPackage ./nix/plugins/default.nix {
+            inherit inputs lockFile;
+            name = "translate";
           };
         };
 
