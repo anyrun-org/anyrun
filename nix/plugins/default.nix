@@ -14,15 +14,13 @@
   lockFile,
   ...
 }:
-rustPlatform.buildRustPackage rec {
+rustPlatform.buildRustPackage {
   inherit name;
-  pname = name;
 
-  src = "${inputs.self}/plugins/applications";
+  src = "${inputs.self}";
   cargoLock.lockFile = lockFile;
 
   buildInputs = [
-    pkg-config
     glib
     atk
     gtk3
@@ -33,20 +31,16 @@ rustPlatform.buildRustPackage rec {
   nativeBuildInputs = [
     pkg-config
     makeWrapper
-    rustfmt
   ];
-
-  postPatch = ''
-    cp ${lockFile} Cargo.lock
-  '';
 
   doCheck = true;
   CARGO_BUILD_INCREMENTAL = "false";
   RUST_BACKTRACE = "full";
   copyLibs = true;
+  cargoBuildFlags = ["-p ${name}"];
 
   meta = with lib; {
-    description = "The applications plugin for Anyrun";
+    description = "The ${name} plugin for Anyrun";
     homepage = "https://github.com/Kirottu/anyrun";
     license = with licenses; [gpl3];
   };
