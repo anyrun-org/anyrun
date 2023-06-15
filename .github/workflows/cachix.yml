@@ -17,7 +17,14 @@ jobs:
       matrix:
         package:
           - anyrun
-          - defaultPackage
+          - applications
+          - dictionary
+          - kidex
+          - randr
+          - rink
+          - shell
+          - stdin
+          - symbols
     steps:
       - uses: easimon/maximize-build-space@v6
         with:
