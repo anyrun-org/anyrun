@@ -1,10 +1,11 @@
-use std::{collections::HashMap, env, ffi::OsStr, fs};
+use std::{collections::HashMap, env, ffi::OsStr, fs, path::PathBuf};
 
 use crate::Config;
 
 #[derive(Clone, Debug)]
 pub struct DesktopEntry {
     pub exec: String,
+    pub path: Option<PathBuf>,
     pub name: String,
     pub desc: Option<String>,
     pub icon: String,
@@ -73,6 +74,7 @@ impl DesktopEntry {
                                 }
                                 exec
                             },
+                            path: map.get("Path").map(PathBuf::from),
                             name: map.get("Name")?.to_string(),
                             desc: None,
                             icon: map
@@ -118,6 +120,7 @@ impl DesktopEntry {
                                 }
                                 None => continue,
                             },
+                            path: entry.path.clone(),
                             name: match map.get("Name") {
                                 Some(name) => name.to_string(),
                                 None => continue,

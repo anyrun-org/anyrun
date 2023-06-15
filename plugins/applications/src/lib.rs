@@ -3,7 +3,7 @@ use anyrun_plugin::{anyrun_interface::HandleResult, *};
 use fuzzy_matcher::FuzzyMatcher;
 use scrubber::DesktopEntry;
 use serde::Deserialize;
-use std::{fs, process::Command};
+use std::{env, fs, process::Command};
 
 #[derive(Deserialize)]
 pub struct Config {
@@ -65,7 +65,12 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
                 }
             }
         }
-    } else if let Err(why) = Command::new("sh").arg("-c").arg(&entry.exec).spawn() {
+    } else if let Err(why) = Command::new("sh")
+        .arg("-c")
+        .arg(&entry.exec)
+        .current_dir(entry.path.as_ref().unwrap_or(&env::current_dir().unwrap()))
+        .spawn()
+    {
         eprintln!("Error running desktop entry: {}", why);
     }
 
