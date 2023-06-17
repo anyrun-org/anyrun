@@ -12,7 +12,7 @@ use std::{
 use abi_stable::std_types::{ROption, RVec};
 use anyrun_interface::{HandleResult, Match, PluginInfo, PluginRef, PollResult};
 use clap::Parser;
-use gtk::{gdk, gdk_pixbuf, glib, prelude::*};
+use gtk::{gdk, gdk_pixbuf, gio, glib, prelude::*};
 use nix::unistd;
 use serde::Deserialize;
 use wl_clipboard_rs::copy;
@@ -137,6 +137,14 @@ pub const DEFAULT_CONFIG_DIR: &str = "/etc/anyrun";
 
 fn main() {
     let app = gtk::Application::new(Some("com.kirottu.anyrun"), Default::default());
+
+    // Register here so we know if the instance is the primary or a remote
+    app.register(None::<&gio::Cancellable>).unwrap();
+
+    // If another instance is running, quit
+    if app.is_remote() {
+        return;
+    }
 
     let args = Args::parse();
 
