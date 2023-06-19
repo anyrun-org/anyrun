@@ -167,7 +167,10 @@ Anyrun supports [GTK+ CSS](https://docs.gtk.org/gtk3/css-overview.html) styling.
 The custom arguments for anyrun are as follows:
 
 - `--config-dir`, `-c`: Override the configuration directory
-- `--override-plugins`, `-o`: Override the plugins to be used, provided in the same way as in the config file.
+
+The rest of the arguments are automatically generated based on the config, and can be used to override
+configuration parameters. For example if you want to temporarily only run the Applications and Symbols plugins on
+the top side of the screen, you would run `anyrun --plugins libapplications.so --plugins libsymbols.so --position top`.
 
 # Plugin development
 

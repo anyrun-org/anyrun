@@ -11,12 +11,13 @@ use std::{
 
 use abi_stable::std_types::{ROption, RVec};
 use anyrun_interface::{HandleResult, Match, PluginInfo, PluginRef, PollResult};
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use gtk::{gdk, gdk_pixbuf, gio, glib, prelude::*};
 use nix::unistd;
 use serde::Deserialize;
 use wl_clipboard_rs::copy;
 
+#[anyrun_macros::config_args]
 #[derive(Deserialize)]
 struct Config {
     width: RelativeNum,
@@ -55,7 +56,7 @@ impl Default for Config {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone, ValueEnum)]
 enum Layer {
     Background,
     Bottom,
@@ -64,10 +65,22 @@ enum Layer {
 }
 
 // Could have a better name
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 enum RelativeNum {
     Absolute(i32),
     Fraction(f32),
+}
+
+impl From<&str> for RelativeNum {
+    fn from(value: &str) -> Self {
+        let (ty, val) = value.split_once(':').expect("Invalid RelativeNum value");
+
+        match ty {
+            "absolute" => Self::Absolute(val.parse().unwrap()),
+            "fraction" => Self::Fraction(val.parse().unwrap()),
+            _ => panic!("Invalid type of value"),
+        }
+    }
 }
 
 /// A "view" of plugin's info and matches
@@ -83,12 +96,11 @@ struct Args {
     /// Override the path to the config directory
     #[arg(short, long)]
     config_dir: Option<String>,
-    /// Override plugin selection
-    #[arg(short, long, value_delimiter = ' ', num_args = 1..)]
-    override_plugins: Option<Vec<PathBuf>>,
+    #[command(flatten)]
+    config: ConfigArgs,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone, ValueEnum)]
 enum Position {
     Top,
     Center,
@@ -183,9 +195,7 @@ fn main() {
         ),
     };
 
-    if let Some(override_plugins) = args.override_plugins {
-        config.plugins = override_plugins;
-    }
+    config.merge_opt(args.config);
 
     let runtime_data: Rc<RefCell<RuntimeData>> = Rc::new(RefCell::new(RuntimeData {
         exclusive: None,

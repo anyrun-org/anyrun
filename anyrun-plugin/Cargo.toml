@@ -8,4 +8,4 @@ edition = "2021"
 [dependencies]
 abi_stable = "0.11.1"
 anyrun-interface = { path = "../anyrun-interface" }
-anyrun-plugin-macros = { path = "../anyrun-plugin-macros" }
+anyrun-macros = { path = "../anyrun-macros" }

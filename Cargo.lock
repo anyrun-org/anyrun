@@ -129,6 +129,7 @@ version = "0.1.0"
 dependencies = [
  "abi_stable",
  "anyrun-interface",
+ "anyrun-macros",
  "clap",
  "gtk",
  "gtk-layer-shell",
@@ -146,20 +147,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyrun-macros"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn 2.0.15",
+]
+
+[[package]]
 name = "anyrun-plugin"
 version = "0.1.0"
 dependencies = [
  "abi_stable",
  "anyrun-interface",
- "anyrun-plugin-macros",
-]
-
-[[package]]
-name = "anyrun-plugin-macros"
-version = "0.1.0"
-dependencies = [
- "quote",
- "syn 2.0.15",
+ "anyrun-macros",
 ]
 
 [[package]]

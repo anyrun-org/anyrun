@@ -1,6 +1,6 @@
-use proc_macro::TokenStream;
+use proc_macro::{Span, TokenStream};
 use quote::quote;
-use syn::{parse_macro_input, ReturnType, Type};
+use syn::{parse_macro_input, parse_quote, Attribute, Ident, ReturnType, Type};
 
 /// The function to handle the selection of an item. Takes a `Match` as its first argument, and the second argument can be one of:
 /// - &T
@@ -204,6 +204,48 @@ pub fn init(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 let mut lock = ANYRUN_INTERNAL_DATA.write().unwrap();
                 *lock = Some(#fn_name(config_dir));
             });
+        }
+    }
+    .into()
+}
+
+#[proc_macro_attribute]
+pub fn config_args(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let item = parse_macro_input!(item as syn::ItemStruct);
+    let ident = &item.ident;
+
+    let mut opt_item = item.clone();
+
+    opt_item.attrs = vec![parse_quote!(#[derive(::clap::Args)])];
+    opt_item.ident = Ident::new(&format!("{}Args", opt_item.ident), Span::call_site().into());
+
+    let opt_ident = &opt_item.ident;
+
+    let mut operations = quote!();
+
+    for field in opt_item.fields.iter_mut() {
+        let ty = &field.ty;
+        let ident = &field.ident;
+        field.ty = Type::Verbatim(quote!(Option<#ty>));
+        field.attrs = vec![parse_quote!(#[arg(long)])];
+
+        operations = quote! {
+            #operations
+            if let Some(val) = opt.#ident {
+                self.#ident = val;
+            }
+        }
+    }
+
+    quote! {
+        #item
+
+        #opt_item
+
+        impl #ident {
+            fn merge_opt(&mut self, opt: #opt_ident) {
+                #operations
+            }
         }
     }
     .into()
