@@ -50,19 +50,69 @@ You can use the flake:
   };
 
   outputs = { self, nixpkgs, anyrun }: let
-    pkgs = import nixpkgs {
-      system = system;
-      overlays = [anyrun.overlay];
-      allowUnfree = true;
-    };
   in {
     nixosConfigurations.HOSTNAME = nixpkgs.lib.nixosSystem {
       # ...
 
-      system.packages = [ pkgs.anyrun ];
+      system.packages = [ anyrun.packages.${system}.anyrun ];
 
       # ...
     };
+  };
+}
+```
+
+The flake provides multiple packages:
+ - anyrun (default) - just the anyrun binary
+ - anyrun-with-all-plugins - anyrun and all builtin plugins
+ - applications - the applications plugin
+ - dictionary - the dictionary plugin
+ - kidex - the kidex plugin
+ - randr - the randr plugin
+ - rink - the rink plugin
+ - shell - the shell plugin
+ - stdin - the stdin plugin
+ - symbols - the symbols plugin
+ - translate - the translate plugin
+
+#### home-manager module
+We have a home-manager module available at `homeManagerModules.default`. You use it like this:
+
+```nix
+{
+  programs.anyrun = {
+    enable = true;
+    config = {
+      plugins = [
+        # An array of all the plugins you want, which either can be paths to the .so files, or their packages
+        inputs.anyrun.packages.${pkgs.system}.applications
+        ./some_plugin.so
+        "${inputs.anyrun.packages.${pkgs.system}.anyrun-with-all-plugins}/lib/kidex"
+      ];
+      width = { fraction = 0.3; };
+      position = "top";
+      verticalOffset = { absolute = 0; };
+      hideIcons = false;
+      ignoreExclusiveZones = false;
+      layer = "overlay";
+      hidePluginInfo = false;
+      closeOnClick = false;
+      showResultsImmediately = false;
+      maxEntries = null;
+    };
+    extraCss = ''
+      .some_class {
+        background: red;
+      }
+    '';
+
+    extraConfigFiles."some-plugin.ron".text = ''
+      Config(
+        // for any other plugin
+        // this file will be put in ~/.config/anyrun/some-plugin.ron
+        // refer to docs of xdg.configFile for available options
+      )
+    '';
   };
 }
 ```
