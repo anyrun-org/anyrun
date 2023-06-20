@@ -47,7 +47,10 @@ in
       cargo
     ];
 
-    cargoBuildFlags = if dontBuildPlugins then [ "-p ${name}" ] else [];
+    cargoBuildFlags =
+      if dontBuildPlugins
+      then ["-p ${name}"]
+      else [];
 
     doCheck = true;
     CARGO_BUILD_INCREMENTAL = "false";
