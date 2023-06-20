@@ -3,7 +3,10 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    flake-parts.url = "github:hercules-ci/flake-parts";
+    flake-parts = {
+      url = "github:hercules-ci/flake-parts";
+      inputs.nixpkgs-lib.follows = "nixpkgs";
+    };
   };
 
   outputs = inputs @ {flake-parts, ...}:
@@ -46,7 +49,10 @@
           # alias nix build .# to anyrun
           default = anyrun;
 
-          anyrun-with-all-plugins = pkgs.callPackage ./nix/default.nix { inherit inputs lockFile; dontBuildPlugins = false; };
+          anyrun-with-all-plugins = pkgs.callPackage ./nix/default.nix {
+            inherit inputs lockFile;
+            dontBuildPlugins = false;
+          };
 
           # expose each plugin as a package
           applications = pkgs.callPackage ./nix/plugins/default.nix {
