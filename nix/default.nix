@@ -12,6 +12,7 @@
   cargo,
   rustc,
   lockFile,
+  dontBuildPlugins ? true,
   ...
 }: let
   cargoToml = builtins.fromTOML (builtins.readFile ../anyrun/Cargo.toml);
@@ -45,6 +46,8 @@ in
       rustc
       cargo
     ];
+
+    cargoBuildFlags = if dontBuildPlugins then [ "-p ${name}" ] else [];
 
     doCheck = true;
     CARGO_BUILD_INCREMENTAL = "false";

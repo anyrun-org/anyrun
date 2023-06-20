@@ -8,7 +8,6 @@
   gtk-layer-shell,
   pkg-config,
   librsvg,
-  rustfmt,
   inputs,
   name,
   lockFile,

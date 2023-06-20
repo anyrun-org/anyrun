@@ -46,6 +46,8 @@
           # alias nix build .# to anyrun
           default = anyrun;
 
+          anyrun-with-all-plugins = pkgs.callPackage ./nix/default.nix { inherit inputs lockFile; dontBuildPlugins = false; };
+
           # expose each plugin as a package
           applications = pkgs.callPackage ./nix/plugins/default.nix {
             inherit inputs lockFile;
