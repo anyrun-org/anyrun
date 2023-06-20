@@ -3,12 +3,6 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-
-    # project shells
-    devshell = {
-      url = "github:numtide/devshell";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
   outputs = inputs @ {flake-parts, ...}:
@@ -29,13 +23,18 @@
         # provide the formatter for nix fmt
         formatter = pkgs.alejandra;
 
-        devShells.default = inputs'.devshell.legacyPackages.mkShell {
-          name = "anyrun-shell";
+        devShells.default = pkgs.mkShell {
+          inputsFrom = builtins.attrValues self'.packages;
+
           packages = with pkgs; [
             alejandra # nix formatter
             rustfmt # rust formatter
             statix # lints and suggestions
             deadnix # clean up unused nix code
+            rustc # rust compiler
+            gcc
+            cargo # rust package manager
+            clippy # opinionated rust formatter
           ];
         };
 
