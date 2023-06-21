@@ -1,4 +1,3 @@
-# default.nix
 {
   lib,
   glib,
@@ -12,11 +11,18 @@
   rustfmt,
   cargo,
   rustc,
+  lockFile,
+  dontBuildPlugins ? true,
+  ...
 }: let
-  cargoToml = builtins.fromTOML (builtins.readFile ./anyrun/Cargo.toml);
+  cargoToml = builtins.fromTOML (builtins.readFile ../anyrun/Cargo.toml);
 in
-  rustPlatform.buildRustPackage {
-    src = ./.;
+  rustPlatform.buildRustPackage rec {
+    name = cargoToml.package.name;
+    pname = "anyrun";
+    #inherit version;
+
+    src = ../.;
 
     buildInputs = [
       pkg-config
@@ -28,7 +34,7 @@ in
     ];
 
     cargoLock = {
-      lockFile = ./Cargo.lock;
+      lockFile = lockFile;
     };
 
     checkInputs = [cargo rustc];
@@ -41,13 +47,15 @@ in
       cargo
     ];
 
+    cargoBuildFlags =
+      if dontBuildPlugins
+      then ["-p ${name}"]
+      else [];
+
     doCheck = true;
     CARGO_BUILD_INCREMENTAL = "false";
     RUST_BACKTRACE = "full";
     copyLibs = true;
-
-    name = cargoToml.package.name;
-    version = cargoToml.package.version;
 
     postInstall = ''
       wrapProgram $out/bin/anyrun \
@@ -65,6 +73,10 @@ in
           github = "n3oney";
           githubId = 30625554;
           name = "Michał Minarowski";
+        }
+        {
+          email = "raf@notashelf.dev";
+          github = "NotAShelf";
         }
       ];
     };
