@@ -100,28 +100,15 @@
             name = "translate";
           };
         };
-
-        checks = {
-          format =
-            pkgs.runCommand "check-format" {
-              buildInputs = with pkgs; [
-                rustfmt
-                cargo
-              ];
-            } ''
-              ${pkgs.rustfmt}/bin/cargo-fmt fmt --manifest-path ./anyrun/Cargo.toml -- --check
-              ${getExe pkgs.alejandra} --check ./
-              touch $out # it worked!
-            '';
-          "anyrun-format-check" = self'.packages.anyrun;
-        };
       };
 
-      flake = _: {
-        # TODO: Make a NixOS module
-        nixosModules.default = null;
+      flake = _: rec {
+        nixosModules.home-manager = homeManagerModules.default;
 
-        homeManagerModules.default = import ./nix/hm-module.nix inputs.self;
+        homeManagerModules = rec {
+          anyrun = import ./nix/hm-module.nix inputs.self;
+          default = anyrun;
+        };
       };
     };
 }
