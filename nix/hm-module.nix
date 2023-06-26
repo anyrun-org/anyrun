@@ -217,7 +217,7 @@ in {
             max_entries: ${
             if cfg.config.maxEntries == null
             then "None"
-            else builtins.toString cfg.config.maxEntries
+            else "Some(${builtins.toString cfg.config.maxEntries})"
           },
             plugins: ${builtins.toJSON parsedPlugins},
           )
