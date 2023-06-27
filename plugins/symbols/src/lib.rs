@@ -15,6 +15,7 @@ struct Symbol {
 
 #[derive(Deserialize, Debug)]
 struct Config {
+    prefix: String,
     symbols: HashMap<String, String>,
     max_entries: usize,
 }
@@ -22,6 +23,7 @@ struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            prefix: "".to_string(),
             symbols: HashMap::new(),
             max_entries: 3,
         }
@@ -62,13 +64,18 @@ fn info() -> PluginInfo {
 
 #[get_matches]
 fn get_matches(input: RString, state: &State) -> RVec<Match> {
+    let input = if let Some(input) = input.strip_prefix(&state.config.prefix) {
+        input.trim()
+    } else {
+        return RVec::new();
+    };
     let matcher = fuzzy_matcher::skim::SkimMatcherV2::default().ignore_case();
     let mut symbols = state
         .symbols
         .iter()
         .filter_map(|symbol| {
             matcher
-                .fuzzy_match(&symbol.name, &input)
+                .fuzzy_match(&symbol.name, input)
                 .map(|score| (symbol, score))
         })
         .collect::<Vec<_>>();
