@@ -1,5 +1,5 @@
 Config(
-  // `width` and `vertical_offset` use an enum for the value it can be either:
+  // Position/size fields use an enum for the value, it can be either:
   // Absolute(n): The absolute value in pixels
   // Fraction(n): A fraction of the width or height of the full screen (depends on exclusive zones and the settings related to them) window respectively
   
