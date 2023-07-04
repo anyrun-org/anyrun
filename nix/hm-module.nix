@@ -67,7 +67,7 @@ in {
       };
 
       x = mkNumericOption {
-        default.relative = 0.5;
+        default.fraction = 0.5;
         description = mdDoc ''
           The horizontal position, adjusted so that { relative = 0.5; } always centers the runner.
 
@@ -76,7 +76,7 @@ in {
       };
 
       y = mkNumericOption {
-        default.absolute = 0;
+        default.fraction = 0;
         description = mdDoc ''
           The vertical position, works the same as x.
 
@@ -97,15 +97,6 @@ in {
         default.absolute = 0;
         description = mdDoc ''
           The minimum height of the runner, the runner will expand to fit all the entries.
-
-          ${numericInfo}
-        '';
-      };
-
-      verticalOffset = mkNumericOption {
-        default.absolute = 0;
-        description = ''
-          How much the runner is shifted vertically.
 
           ${numericInfo}
         '';
