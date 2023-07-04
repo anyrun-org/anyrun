@@ -4,7 +4,7 @@ Config(
   // Fraction(n): A fraction of the width or height of the full screen (depends on exclusive zones and the settings related to them) window respectively
   
   // The horizontal position, adjusted so that Relative(0.5) always centers the runner
-  x: Relative(0.5),
+  x: Fraction(0.5),
 
   // The vertical position, works the same as `x`
   y: Absolute(0),
