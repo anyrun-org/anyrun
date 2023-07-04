@@ -1,6 +1,6 @@
 use proc_macro::{Span, TokenStream};
 use quote::quote;
-use syn::{parse_macro_input, parse_quote, Attribute, Ident, ReturnType, Type};
+use syn::{parse_macro_input, parse_quote, Ident, ReturnType, Type};
 
 /// The function to handle the selection of an item. Takes a `Match` as its first argument, and the second argument can be one of:
 /// - &T

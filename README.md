@@ -155,7 +155,6 @@ Anyrun requires plugins to function, as they provide the results for input. The 
   - Search and run system & user specific desktop entries.
 - [Symbols](plugins/symbols/README.md)
   - Search unicode symbols.
-  - [User defined symbols](plugins/symbols/README.md#User-defined-symbols)
 - [Rink](plugins/rink/README.md)
   - Calculator & unit conversion.
 - [Shell](plugins/shell/README.md)
