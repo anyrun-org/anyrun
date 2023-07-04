@@ -66,19 +66,40 @@ in {
         '';
       };
 
-      width = mkNumericOption {
-        default.absolute = 800;
+      x = mkNumericOption {
+        default.relative = 0.5;
         description = mdDoc ''
-          How wide the input box and results are.
+          The horizontal position, adjusted so that { relative = 0.5; } always centers the runner.
 
           ${numericInfo}
         '';
       };
 
-      position = mkOption {
-        type = with types; enum ["top" "center"];
-        default = "top";
-        description = "Where Anyrun is located on the screen (top or center)";
+      y = mkNumericOption {
+        default.absolute = 0;
+        description = mdDoc ''
+          The vertical position, works the same as x.
+
+          ${numericInfo}
+        '';
+      };
+
+      width = mkNumericOption {
+        default.absolute = 800;
+        description = mdDoc ''
+          The width of the runner.
+
+          ${numericInfo}
+        '';
+      };
+
+      height = mkNumericOption {
+        default.absolute = 0;
+        description = mdDoc ''
+          The minimum height of the runner, the runner will expand to fit all the entries.
+
+          ${numericInfo}
+        '';
       };
 
       verticalOffset = mkNumericOption {
@@ -183,7 +204,7 @@ in {
           else entry)
         cfg.config.plugins;
   in {
-    assertions = [(assertNumeric cfg.config.width) (assertNumeric cfg.config.verticalOffset)];
+    assertions = [(assertNumeric cfg.config.width) (assertNumeric cfg.config.height) (assertNumeric cfg.config.x) (assertNumeric cfg.config.y)];
 
     warnings =
       if cfg.config.plugins == null
@@ -205,9 +226,10 @@ in {
       {
         "anyrun/config.ron".text = ''
           Config(
+            x: ${stringifyNumeric cfg.config.x},
+            y: ${stringifyNumeric cfg.config.y},
             width: ${stringifyNumeric cfg.config.width},
-            position: ${capitalize cfg.config.position},
-            vertical_offset: ${stringifyNumeric cfg.config.verticalOffset},
+            height: ${stringifyNumeric cfg.config.height},
             hide_icons: ${lib.boolToString cfg.config.hideIcons},
             ignore_exclusive_zones: ${lib.boolToString cfg.config.ignoreExclusiveZones},
             layer: ${capitalize cfg.config.layer},
