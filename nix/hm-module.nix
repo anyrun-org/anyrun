@@ -76,7 +76,7 @@ in {
       };
 
       y = mkNumericOption {
-        default.fraction = 0;
+        default.fraction = 0.0;
         description = mdDoc ''
           The vertical position, works the same as x.
 
