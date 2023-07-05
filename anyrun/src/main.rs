@@ -719,6 +719,7 @@ fn handle_matches(plugin_view: PluginView, runtime_data: &RuntimeData, matches: 
                     &gtk::Label::builder()
                         .name(style_names::MATCH_DESC)
                         .wrap(true)
+                        .xalign(0.0)
                         .use_markup(_match.use_pango)
                         .halign(gtk::Align::Start)
                         .valign(gtk::Align::Center)
