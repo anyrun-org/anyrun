@@ -11,6 +11,8 @@ Simply search for the symbol's name.
 ```ron
 // <Anyrun config dir>/symbols.ron
 Config(
+  // The prefix that the search needs to begin with to yield symbol results
+  prefix: "",
   // Custom user defined symbols to be included along the unicode symbols
   symbols: {
     // "name": "text to be copied"
