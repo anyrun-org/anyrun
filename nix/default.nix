@@ -56,6 +56,7 @@ in
     CARGO_BUILD_INCREMENTAL = "false";
     RUST_BACKTRACE = "full";
     copyLibs = true;
+    buildAndTestSubdir = if dontBuildPlugins then name else null;
 
     postInstall = ''
       wrapProgram $out/bin/anyrun \
