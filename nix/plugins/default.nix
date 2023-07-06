@@ -40,6 +40,7 @@ in
     RUST_BACKTRACE = "full";
     copyLibs = true;
     cargoBuildFlags = ["-p ${name}"];
+    buildAndTestSubdir = "plugins/${name}";
 
     meta = with lib; {
       description = "The ${name} plugin for Anyrun";
