@@ -16,7 +16,7 @@ Config(
   // Custom user defined symbols to be included along the unicode symbols
   symbols: {
     // "name": "text to be copied"
-    "shrug": "¯\_(ツ)_/¯",
+    "shrug": "¯\\_(ツ)_/¯",
   },
   max_entries: 3,
 )
