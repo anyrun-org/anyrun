@@ -7,7 +7,7 @@ Config(
   x: Fraction(0.5),
 
   // The vertical position, works the same as `x`
-  y: Absolute(0),
+  y: Fraction(0.38196601125010515),
 
   // The width of the runner
   width: Absolute(800),
