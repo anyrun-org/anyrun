@@ -2022,6 +2022,8 @@ dependencies = [
  "abi_stable",
  "anyrun-plugin",
  "fuzzy-matcher",
+ "ron",
+ "serde",
 ]
 
 [[package]]

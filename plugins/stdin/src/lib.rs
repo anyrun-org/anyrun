@@ -1,12 +1,42 @@
-use std::io::stdin;
+use std::{fs, io::stdin};
 
 use abi_stable::std_types::{ROption, RString, RVec};
 use anyrun_plugin::*;
 use fuzzy_matcher::FuzzyMatcher;
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+struct Config {
+    allow_invalid: bool,
+    max_entries: usize,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            allow_invalid: false,
+            max_entries: 5,
+        }
+    }
+}
+
+struct State {
+    config: Config,
+    lines: Vec<String>,
+}
 
 #[init]
-fn init(_config_dir: RString) -> Vec<String> {
-    stdin().lines().filter_map(|line| line.ok()).collect()
+fn init(config_dir: RString) -> State {
+    let config = if let Ok(content) = fs::read_to_string(format!("{}/stdin.ron", config_dir)) {
+        ron::from_str(&content).unwrap_or_default()
+    } else {
+        Config::default()
+    };
+
+    State {
+        config,
+        lines: stdin().lines().filter_map(|line| line.ok()).collect(),
+    }
 }
 
 #[handler]
@@ -15,10 +45,11 @@ fn handler(_match: Match) -> HandleResult {
 }
 
 #[get_matches]
-fn get_matches(input: RString, lines: &Vec<String>) -> RVec<Match> {
+fn get_matches(input: RString, state: &State) -> RVec<Match> {
     let matcher = fuzzy_matcher::skim::SkimMatcherV2::default().smart_case();
 
-    let mut lines = lines
+    let mut lines = state
+        .lines
         .clone()
         .into_iter()
         .filter_map(|line| {
@@ -28,9 +59,12 @@ fn get_matches(input: RString, lines: &Vec<String>) -> RVec<Match> {
         })
         .collect::<Vec<_>>();
 
-    lines.sort_by(|a, b| b.1.cmp(&a.1));
-
-    lines.truncate(5);
+    if !lines.is_empty() {
+        lines.sort_by(|a, b| b.1.cmp(&a.1));
+        lines.truncate(state.config.max_entries);
+    } else if state.config.allow_invalid {
+        lines.push((input.into(), 0));
+    }
 
     lines
         .into_iter()
