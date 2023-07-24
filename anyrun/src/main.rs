@@ -20,19 +20,19 @@ use wl_clipboard_rs::copy;
 #[anyrun_macros::config_args]
 #[derive(Deserialize)]
 struct Config {
-    #[serde(default = "default_x")]
+    #[serde(default = "Config::default_x")]
     x: RelativeNum,
 
-    #[serde(default = "default_y")]
+    #[serde(default = "Config::default_y")]
     y: RelativeNum,
 
-    #[serde(default = "default_width")]
+    #[serde(default = "Config::default_width")]
     width: RelativeNum,
 
-    #[serde(default = "default_height")]
+    #[serde(default = "Config::default_height")]
     height: RelativeNum,
 
-    #[serde(default = "default_plugins")]
+    #[serde(default = "Config::default_plugins")]
     plugins: Vec<PathBuf>,
 
     #[serde(default)]
@@ -47,51 +47,58 @@ struct Config {
     show_results_immediately: bool,
     #[serde(default)]
     max_entries: Option<usize>,
-    #[serde(default = "default_layer")]
+    #[serde(default = "Config::default_layer")]
     layer: Layer,
+}
+
+impl Config {
+    fn default_x() -> RelativeNum {
+        RelativeNum::Fraction(0.5)
+    }
+
+    fn default_y() -> RelativeNum {
+        RelativeNum::Absolute(0)
+    }
+
+    fn default_width() -> RelativeNum {
+        RelativeNum::Fraction(0.5)
+    }
+
+    fn default_height() -> RelativeNum {
+        RelativeNum::Absolute(0)
+    }
+
+    fn default_plugins() -> Vec<PathBuf> {
+        vec![
+            "libapplications.so".into(),
+            "libsymbols.so".into(),
+            "libshell.so".into(),
+            "libtranslate.so".into(),
+        ]
+    }
+
+    fn default_layer() -> Layer {
+        Layer::Overlay
+    }
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
-            x: default_x(),
-            y: default_y(),
-            width: default_width(),
-            height: default_height(),
-            plugins: default_plugins(),
+            x: Self::default_x(),
+            y: Self::default_y(),
+            width: Self::default_width(),
+            height: Self::default_height(),
+            plugins: Self::default_plugins(),
             hide_icons: false,
             hide_plugin_info: false,
             ignore_exclusive_zones: false,
             close_on_click: false,
             show_results_immediately: false,
             max_entries: None,
-            layer: default_layer(),
+            layer: Self::default_layer(),
         }
     }
-}
-
-fn default_x() -> RelativeNum {
-    RelativeNum::Fraction(0.5)
-}
-fn default_y() -> RelativeNum {
-    RelativeNum::Absolute(0)
-}
-fn default_width() -> RelativeNum {
-    RelativeNum::Fraction(0.5)
-}
-fn default_height() -> RelativeNum {
-    RelativeNum::Absolute(0)
-}
-fn default_plugins() -> Vec<PathBuf> {
-    vec![
-        "libapplications.so".into(),
-        "libsymbols.so".into(),
-        "libshell.so".into(),
-        "libtranslate.so".into(),
-    ]
-}
-fn default_layer() -> Layer {
-    Layer::Overlay
 }
 
 #[derive(Deserialize, Clone, ValueEnum)]
