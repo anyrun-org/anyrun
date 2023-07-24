@@ -19,21 +19,9 @@ impl Default for Config {
     }
 }
 
-#[allow(unused)]
 #[derive(Deserialize)]
 struct ApiResponse {
-    word: String,
-    phonetic: Option<String>,
-    phonetics: Vec<Phonetic>,
-    origin: Option<String>,
     meanings: Vec<Meaning>,
-}
-
-#[allow(unused)]
-#[derive(Deserialize)]
-struct Phonetic {
-    text: String,
-    audio: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -43,13 +31,9 @@ struct Meaning {
     definitions: Vec<Definition>,
 }
 
-#[allow(unused)]
 #[derive(Deserialize)]
 struct Definition {
     definition: String,
-    example: Option<String>,
-    synonyms: Vec<String>,
-    antonyms: Vec<String>,
 }
 
 #[init]
