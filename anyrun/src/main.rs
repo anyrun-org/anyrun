@@ -20,40 +20,83 @@ use wl_clipboard_rs::copy;
 #[anyrun_macros::config_args]
 #[derive(Deserialize)]
 struct Config {
+    #[serde(default = "Config::default_x")]
     x: RelativeNum,
+
+    #[serde(default = "Config::default_y")]
     y: RelativeNum,
+
+    #[serde(default = "Config::default_width")]
     width: RelativeNum,
+
+    #[serde(default = "Config::default_height")]
     height: RelativeNum,
+
+    #[serde(default = "Config::default_plugins")]
     plugins: Vec<PathBuf>,
+
+    #[serde(default)]
     hide_icons: bool,
+    #[serde(default)]
     hide_plugin_info: bool,
+    #[serde(default)]
     ignore_exclusive_zones: bool,
+    #[serde(default)]
     close_on_click: bool,
+    #[serde(default)]
     show_results_immediately: bool,
+    #[serde(default)]
     max_entries: Option<usize>,
+    #[serde(default = "Config::default_layer")]
     layer: Layer,
+}
+
+impl Config {
+    fn default_x() -> RelativeNum {
+        RelativeNum::Fraction(0.5)
+    }
+
+    fn default_y() -> RelativeNum {
+        RelativeNum::Absolute(0)
+    }
+
+    fn default_width() -> RelativeNum {
+        RelativeNum::Fraction(0.5)
+    }
+
+    fn default_height() -> RelativeNum {
+        RelativeNum::Absolute(0)
+    }
+
+    fn default_plugins() -> Vec<PathBuf> {
+        vec![
+            "libapplications.so".into(),
+            "libsymbols.so".into(),
+            "libshell.so".into(),
+            "libtranslate.so".into(),
+        ]
+    }
+
+    fn default_layer() -> Layer {
+        Layer::Overlay
+    }
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
-            x: RelativeNum::Fraction(0.5),
-            y: RelativeNum::Absolute(0),
-            width: RelativeNum::Fraction(0.4),
-            height: RelativeNum::Absolute(0),
-            plugins: vec![
-                "libapplications.so".into(),
-                "libsymbols.so".into(),
-                "libshell.so".into(),
-                "libtranslate.so".into(),
-            ],
+            x: Self::default_x(),
+            y: Self::default_y(),
+            width: Self::default_width(),
+            height: Self::default_height(),
+            plugins: Self::default_plugins(),
             hide_icons: false,
             hide_plugin_info: false,
             ignore_exclusive_zones: false,
             close_on_click: false,
             show_results_immediately: false,
             max_entries: None,
-            layer: Layer::Overlay,
+            layer: Self::default_layer(),
         }
     }
 }
