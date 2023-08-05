@@ -13,4 +13,5 @@ members = [
   "plugins/randr",
   "plugins/stdin",
   "plugins/dictionary",
+  "plugins/userdirs",
 ]
