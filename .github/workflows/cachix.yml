@@ -11,7 +11,7 @@ on:
       - README.md
 
 jobs:
-  cahix:
+  cachix:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -25,6 +25,7 @@ jobs:
           - shell
           - stdin
           - symbols
+          - websearch
     steps:
       - uses: easimon/maximize-build-space@v6
         with:
