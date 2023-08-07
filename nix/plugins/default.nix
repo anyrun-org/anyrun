@@ -16,11 +16,13 @@
   cargoToml = builtins.fromTOML (builtins.readFile ../../plugins/${name}/Cargo.toml);
 in
   rustPlatform.buildRustPackage {
-    pname = name;
-    name = cargoToml.package.name;
+    pname = cargoToml.package.name;
+    version = cargoToml.package.version;
 
     src = "${inputs.self}";
-    cargoLock.lockFile = lockFile;
+    cargoLock = {
+      inherit lockFile;
+    };
 
     buildInputs = [
       glib
