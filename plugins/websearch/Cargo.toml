@@ -7,7 +7,7 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-anyrun-plugin = { git = "https://github.com/Kirottu/anyrun" }
+anyrun-plugin = { path = "../../anyrun-plugin" }
 abi_stable = "0.11.1"
 urlencoding = "2.1.3"
 ron = "0.8.0"

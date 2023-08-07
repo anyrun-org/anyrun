@@ -128,8 +128,8 @@ name = "anyrun"
 version = "0.1.0"
 dependencies = [
  "abi_stable",
- "anyrun-interface 0.1.0",
- "anyrun-macros 0.1.0",
+ "anyrun-interface",
+ "anyrun-macros",
  "clap",
  "gtk",
  "gtk-layer-shell",
@@ -147,25 +147,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "anyrun-interface"
-version = "0.1.0"
-source = "git+https://github.com/Kirottu/anyrun#da97c9287f01f7d85ecf5e4ab8819bde3ae0e79a"
-dependencies = [
- "abi_stable",
-]
-
-[[package]]
 name = "anyrun-macros"
 version = "0.1.0"
-dependencies = [
- "quote",
- "syn 2.0.15",
-]
-
-[[package]]
-name = "anyrun-macros"
-version = "0.1.0"
-source = "git+https://github.com/Kirottu/anyrun#da97c9287f01f7d85ecf5e4ab8819bde3ae0e79a"
 dependencies = [
  "quote",
  "syn 2.0.15",
@@ -176,18 +159,8 @@ name = "anyrun-plugin"
 version = "0.1.0"
 dependencies = [
  "abi_stable",
- "anyrun-interface 0.1.0",
- "anyrun-macros 0.1.0",
-]
-
-[[package]]
-name = "anyrun-plugin"
-version = "0.1.0"
-source = "git+https://github.com/Kirottu/anyrun#da97c9287f01f7d85ecf5e4ab8819bde3ae0e79a"
-dependencies = [
- "abi_stable",
- "anyrun-interface 0.1.0 (git+https://github.com/Kirottu/anyrun)",
- "anyrun-macros 0.1.0 (git+https://github.com/Kirottu/anyrun)",
+ "anyrun-interface",
+ "anyrun-macros",
 ]
 
 [[package]]
@@ -195,7 +168,7 @@ name = "applications"
 version = "0.1.0"
 dependencies = [
  "abi_stable",
- "anyrun-plugin 0.1.0",
+ "anyrun-plugin",
  "fuzzy-matcher",
  "ron",
  "serde",
@@ -560,7 +533,7 @@ name = "dictionary"
 version = "0.1.0"
 dependencies = [
  "abi_stable",
- "anyrun-plugin 0.1.0",
+ "anyrun-plugin",
  "reqwest",
  "ron",
  "serde",
@@ -1246,7 +1219,7 @@ name = "kidex"
 version = "0.1.0"
 dependencies = [
  "abi_stable",
- "anyrun-plugin 0.1.0",
+ "anyrun-plugin",
  "fuzzy-matcher",
  "kidex-common",
  "open",
@@ -1680,7 +1653,7 @@ name = "randr"
 version = "0.1.0"
 dependencies = [
  "abi_stable",
- "anyrun-plugin 0.1.0",
+ "anyrun-plugin",
  "fuzzy-matcher",
  "hyprland",
  "ron",
@@ -1790,7 +1763,7 @@ name = "rink"
 version = "0.1.0"
 dependencies = [
  "abi_stable",
- "anyrun-plugin 0.1.0",
+ "anyrun-plugin",
  "reqwest",
  "rink-core",
 ]
@@ -1991,7 +1964,7 @@ name = "shell"
 version = "0.1.0"
 dependencies = [
  "abi_stable",
- "anyrun-plugin 0.1.0",
+ "anyrun-plugin",
  "ron",
  "serde",
 ]
@@ -2047,7 +2020,7 @@ name = "stdin"
 version = "0.1.0"
 dependencies = [
  "abi_stable",
- "anyrun-plugin 0.1.0",
+ "anyrun-plugin",
  "fuzzy-matcher",
  "ron",
  "serde",
@@ -2111,7 +2084,7 @@ name = "symbols"
 version = "0.1.0"
 dependencies = [
  "abi_stable",
- "anyrun-plugin 0.1.0",
+ "anyrun-plugin",
  "fuzzy-matcher",
  "ron",
  "serde",
@@ -2326,7 +2299,7 @@ name = "translate"
 version = "0.1.0"
 dependencies = [
  "abi_stable",
- "anyrun-plugin 0.1.0",
+ "anyrun-plugin",
  "futures",
  "fuzzy-matcher",
  "reqwest",
@@ -2632,7 +2605,7 @@ name = "websearch"
 version = "0.1.0"
 dependencies = [
  "abi_stable",
- "anyrun-plugin 0.1.0 (git+https://github.com/Kirottu/anyrun)",
+ "anyrun-plugin",
  "ron",
  "serde",
  "strum 0.25.0",
