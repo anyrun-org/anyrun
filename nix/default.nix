@@ -18,9 +18,8 @@
   cargoToml = builtins.fromTOML (builtins.readFile ../anyrun/Cargo.toml);
 in
   rustPlatform.buildRustPackage rec {
-    name = cargoToml.package.name;
-    pname = "anyrun";
-    #inherit version;
+    pname = cargoToml.package.name;
+    version = cargoToml.package.version;
 
     src = ../.;
 
@@ -34,7 +33,7 @@ in
     ];
 
     cargoLock = {
-      lockFile = lockFile;
+      inherit lockFile;
     };
 
     checkInputs = [cargo rustc];
@@ -49,14 +48,17 @@ in
 
     cargoBuildFlags =
       if dontBuildPlugins
-      then ["-p ${name}"]
+      then ["-p ${pname}"]
       else [];
 
     doCheck = true;
     CARGO_BUILD_INCREMENTAL = "false";
     RUST_BACKTRACE = "full";
     copyLibs = true;
-    buildAndTestSubdir = if dontBuildPlugins then name else null;
+    buildAndTestSubdir =
+      if dontBuildPlugins
+      then pname
+      else null;
 
     postInstall = ''
       wrapProgram $out/bin/anyrun \
