@@ -6,21 +6,23 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 use urlencoding::encode;
 
-#[derive(Debug, Clone, Copy, Deserialize, EnumIter)]
+#[derive(Debug, Clone, Deserialize, EnumIter)]
 enum Engine {
     Google,
     Ecosia,
     Bing,
     DuckDuckGo,
+    Custom { name: String, url: String },
 }
 
 impl Engine {
     fn value(&self) -> &str {
-        match *self {
-            Engine::Google => "google.com/search?q=",
-            Engine::Ecosia => "www.ecosia.org/search?q=",
-            Engine::Bing => "www.bing.com/search?q=",
-            Engine::DuckDuckGo => "duckduckgo.com/?q=",
+        match self {
+            Self::Google => "google.com/search?q=",
+            Self::Ecosia => "www.ecosia.org/search?q=",
+            Self::Bing => "www.bing.com/search?q=",
+            Self::DuckDuckGo => "duckduckgo.com/?q=",
+            Self::Custom { url, .. } => url,
         }
     }
 }
@@ -28,10 +30,11 @@ impl Engine {
 impl fmt::Display for Engine {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Engine::Google => write!(f, "Google"),
-            Engine::Ecosia => write!(f, "Ecosia"),
-            Engine::Bing => write!(f, "Bing"),
-            Engine::DuckDuckGo => write!(f, "DuckDuckGo"),
+            Self::Google => write!(f, "Google"),
+            Self::Ecosia => write!(f, "Ecosia"),
+            Self::Bing => write!(f, "Bing"),
+            Self::DuckDuckGo => write!(f, "DuckDuckGo"),
+            Self::Custom { name, .. } => write!(f, "{}", name),
         }
     }
 }
@@ -78,7 +81,7 @@ fn get_matches(input: RString, config: &Config) -> RVec<Match> {
             .into_iter()
             .map(|engine| Match {
                 title: input.trim_start_matches(&config.prefix).into(),
-                description: ROption::RSome(format!("Search with {}", engine.to_string()).into()),
+                description: ROption::RSome(format!("Search with {}", engine).into()),
                 use_pango: false,
                 icon: ROption::RNone,
                 id: ROption::RNone,

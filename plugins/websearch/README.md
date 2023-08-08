@@ -10,9 +10,18 @@ Enter your search-term and select the resulting search action you want to perfor
 
 Default config
 
-```
+```ron
 Config(
   prefix: "?",
-  engines: [Google] // options: Google, Ecosia, Bing, DuckDuckGo
+  // Options: Google, Ecosia, Bing, DuckDuckGo, Custom
+  //
+  // Custom engines can be defined as such:
+  // Custom {
+  //   name: "Searx"
+  //   url: "searx.be/?q="
+  // }
+  //
+  // NOTE: The search query is appended after the URL, and `https://` is automatically added in front.
+  engines: [Google] 
 )
 ```
