@@ -63,19 +63,22 @@ You can use the flake:
 ```
 
 The flake provides multiple packages:
- - anyrun (default) - just the anyrun binary
- - anyrun-with-all-plugins - anyrun and all builtin plugins
- - applications - the applications plugin
- - dictionary - the dictionary plugin
- - kidex - the kidex plugin
- - randr - the randr plugin
- - rink - the rink plugin
- - shell - the shell plugin
- - stdin - the stdin plugin
- - symbols - the symbols plugin
- - translate - the translate plugin
+
+- anyrun (default) - just the anyrun binary
+- anyrun-with-all-plugins - anyrun and all builtin plugins
+- applications - the applications plugin
+- dictionary - the dictionary plugin
+- kidex - the kidex plugin
+- randr - the randr plugin
+- rink - the rink plugin
+- shell - the shell plugin
+- stdin - the stdin plugin
+- symbols - the symbols plugin
+- translate - the translate plugin
+- websearch - the websearch plugin
 
 #### home-manager module
+
 We have a home-manager module available at `homeManagerModules.default`. You use it like this:
 
 ```nix
@@ -171,6 +174,8 @@ Anyrun requires plugins to function, as they provide the results for input. The 
   - Should generally be used exclusively with the `-o` argument.
 - [Dictionary](plugins/dictionary/README.md)
   - Look up definitions for words
+- [Websearch](plugins/websearch/README.md)
+  - Search the web with configurable engines: Google, Ecosia, Bing, DuckDuckGo.
 
 ## Configuration
 

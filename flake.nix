@@ -99,6 +99,11 @@
             inherit inputs lockFile;
             name = "translate";
           };
+
+          websearch = pkgs.callPackage ./nix/plugins/default.nix {
+            inherit inputs lockFile;
+            name = "websearch";
+          };
         };
       };
 
