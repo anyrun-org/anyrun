@@ -105,8 +105,13 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
         .entries
         .iter()
         .filter_map(|(entry, id)| {
-            let score = matcher.fuzzy_match(&entry.name, &input).unwrap_or(0)
-                + matcher.fuzzy_match(&entry.exec, &input).unwrap_or(0);
+            let score: i64 = matcher.fuzzy_match(&entry.name, &input).unwrap_or(0)
+                + matcher.fuzzy_match(&entry.exec, &input).unwrap_or(0)
+                + entry
+                    .keywords
+                    .iter()
+                    .map(|keyword| matcher.fuzzy_match(keyword, &input).unwrap_or(0))
+                    .sum::<i64>();
 
             if score > 0 {
                 Some((entry, *id, score))

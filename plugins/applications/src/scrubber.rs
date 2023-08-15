@@ -7,6 +7,7 @@ pub struct DesktopEntry {
     pub exec: String,
     pub path: Option<PathBuf>,
     pub name: String,
+    pub keywords: Vec<String>,
     pub desc: Option<String>,
     pub icon: String,
     pub term: bool,
@@ -76,6 +77,15 @@ impl DesktopEntry {
                             },
                             path: map.get("Path").map(PathBuf::from),
                             name: map.get("Name")?.to_string(),
+                            keywords: map
+                                .get("Keywords")
+                                .map(|keywords| {
+                                    keywords
+                                        .split(';')
+                                        .map(|s| s.to_owned())
+                                        .collect::<Vec<_>>()
+                                })
+                                .unwrap_or_default(),
                             desc: None,
                             icon: map
                                 .get("Icon")
@@ -125,6 +135,15 @@ impl DesktopEntry {
                                 Some(name) => name.to_string(),
                                 None => continue,
                             },
+                            keywords: map
+                                .get("Keywords")
+                                .map(|keywords| {
+                                    keywords
+                                        .split(';')
+                                        .map(|s| s.to_owned())
+                                        .collect::<Vec<_>>()
+                                })
+                                .unwrap_or_default(),
                             desc: Some(entry.name.clone()),
                             icon: entry.icon.clone(),
                             term: map
