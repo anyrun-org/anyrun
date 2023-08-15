@@ -16,12 +16,12 @@ Config(
   // Options: Google, Ecosia, Bing, DuckDuckGo, Custom
   //
   // Custom engines can be defined as such:
-  // Custom {
-  //   name: "Searx"
-  //   url: "searx.be/?q="
-  // }
+  // Custom(
+  //   name: "Searx",
+  //   url: "searx.be/?q={}",
+  // )
   //
-  // NOTE: The search query is appended after the URL, and `https://` is automatically added in front.
+  // NOTE: `{}` is replaced by the search query and `https://` is automatically added in front.
   engines: [Google] 
 )
 ```
