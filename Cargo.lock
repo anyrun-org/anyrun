@@ -1319,19 +1319,6 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.1.0"
-dependencies = [
- "abi_stable",
- "anyrun-plugin",
- "fuzzy-matcher",
- "regex",
- "ron",
- "serde",
- "sublime_fuzzy",
-]
-
-[[package]]
-name = "nix"
 version = "0.24.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fa52e972a9a719cecb6864fb88568781eb706bac2cd1d4f04a648542dbf78069"
@@ -1352,6 +1339,19 @@ dependencies = [
  "cfg-if",
  "libc",
  "static_assertions",
+]
+
+[[package]]
+name = "nix-run"
+version = "0.1.0"
+dependencies = [
+ "abi_stable",
+ "anyrun-plugin",
+ "fuzzy-matcher",
+ "regex",
+ "ron",
+ "serde",
+ "sublime_fuzzy",
 ]
 
 [[package]]

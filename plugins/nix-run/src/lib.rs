@@ -65,7 +65,7 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
 
 #[init]
 pub fn init(config_dir: RString) -> State {
-    let config: Config = match fs::read_to_string(format!("{}/nix.ron", config_dir)) {
+    let config: Config = match fs::read_to_string(format!("{}/nix-run.ron", config_dir)) {
         Ok(content) => ron::from_str(&content).unwrap_or_else(|why| {
             eprintln!("Error parsing applications plugin config: {}", why);
             Config::default()
@@ -168,7 +168,7 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
 #[info]
 pub fn info() -> PluginInfo {
     PluginInfo {
-        name: "Nix".into(),
+        name: "Nix-Run".into(),
         icon: "application-x-executable".into(),
     }
 }

@@ -76,7 +76,7 @@ The flake provides multiple packages:
 - symbols - the symbols plugin
 - translate - the translate plugin
 - websearch - the websearch plugin
-- nix - the nix plugin
+- nix-run - the nix-run plugin
 
 #### home-manager module
 
@@ -177,7 +177,7 @@ Anyrun requires plugins to function, as they provide the results for input. The 
   - Look up definitions for words
 - [Websearch](plugins/websearch/README.md)
   - Search the web with configurable engines: Google, Ecosia, Bing, DuckDuckGo.
-- [Nix](plugins/nix/README.md)
+- [Nix-Run](plugins/nix/README.md)
   - Run applications ephemerally from nixpkgs.
 
 ## Configuration

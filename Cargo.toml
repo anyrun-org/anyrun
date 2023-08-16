@@ -14,5 +14,5 @@ members = [
   "plugins/stdin",
   "plugins/dictionary",
   "plugins/websearch",
-  "plugins/nix",
+  "plugins/nix-run",
 ]

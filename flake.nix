@@ -105,9 +105,9 @@
             name = "websearch";
           };
 
-          nix = pkgs.callPackage ./nix/plugins/default.nix {
+          nix-run = pkgs.callPackage ./nix/plugins/default.nix {
             inherit inputs lockFile;
-            name = "nix";
+            name = "nix-run";
           };
 
         };
