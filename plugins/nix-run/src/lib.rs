@@ -7,12 +7,14 @@ use std::{fs, process::Command};
 
 #[derive(Deserialize)]
 pub struct Config {
+    prefix: String,
     max_entries: usize,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
+            prefix: String::from("nixpkgs#"),
             max_entries: 5,
         }
     }
@@ -134,6 +136,12 @@ fn get_entries() -> RVec<NixEntry> {
 
 #[get_matches]
 pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
+    let input = if let Some(input) = input.strip_prefix(&state.config.prefix) {
+        input.trim()
+    } else {
+        return RVec::new();
+    };
+
     let matcher = fuzzy_matcher::skim::SkimMatcherV2::default().smart_case();
     let mut entries = state
         .entries

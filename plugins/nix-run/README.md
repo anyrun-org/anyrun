@@ -11,6 +11,8 @@ Simply search for the application you wish to launch.
 ```ron
 // <Anyrun config dir>/nix-run.ron
 Config(
+  // The prefix that the search needs to begin with to yield results
+  prefix: "nixpkgs#"
   max_entries: 5,
 )
 ```
