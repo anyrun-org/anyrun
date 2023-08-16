@@ -28,6 +28,13 @@ pub struct NixEntry {
     name: RString,
     desc: RString,
 }
+impl NixEntry {
+    fn get_command(&self) -> RString {
+        let mut cmd = RString::from("nixpkgs#");
+        cmd.push_str(&self.name);
+        cmd
+    }
+}
 
 #[handler]
 pub fn handler(selection: Match, state: &State) -> HandleResult {
@@ -43,11 +50,11 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
         })
         .unwrap();
 
-    if let Err(why) = Command::new("nix-shell")
-        .arg("-p")
-        .arg(&*entry.name)
-        .arg("--run")
-        .arg(&*entry.name)
+    if let Err(why) = Command::new("nix")
+        .arg("--experimental-features")
+        .arg("nix-command flakes")
+        .arg("run")
+        .arg(&*entry.get_command())
         .spawn()
     {
         eprintln!("Error running desktop entry: {}", why);
