@@ -92,8 +92,6 @@ fn get_matches(input: RString, config: &Config) -> RVec<Match> {
 fn handler(selection: Match, config: &Config) -> HandleResult {
     let engine = &config.engines[selection.id.unwrap() as usize];
 
-    println!("{}", engine.value());
-
     if let Err(why) = Command::new("sh")
         .arg("-c")
         .arg(format!(
