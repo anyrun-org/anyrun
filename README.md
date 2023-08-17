@@ -76,6 +76,7 @@ The flake provides multiple packages:
 - symbols - the symbols plugin
 - translate - the translate plugin
 - websearch - the websearch plugin
+- hyprlandwindows - the hyprlandwindows plugin
 
 #### home-manager module
 
@@ -176,6 +177,8 @@ Anyrun requires plugins to function, as they provide the results for input. The 
   - Look up definitions for words
 - [Websearch](plugins/websearch/README.md)
   - Search the web with configurable engines: Google, Ecosia, Bing, DuckDuckGo.
+- [Hyprland Windows](plugins/hyprlandwindows/README.md)
+  - Search your current open windows in Hyprland to focus them.
 
 ## Configuration
 

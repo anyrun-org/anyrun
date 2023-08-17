@@ -1118,6 +1118,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "hyprlandwindows"
+version = "0.1.0"
+dependencies = [
+ "abi_stable",
+ "anyrun-plugin",
+ "fuzzy-matcher",
+ "ron",
+ "serde",
+]
+
+[[package]]
 name = "iana-time-zone"
 version = "0.1.53"
 source = "registry+https://github.com/rust-lang/crates.io-index"

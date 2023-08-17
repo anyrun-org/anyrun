@@ -104,6 +104,11 @@
             inherit inputs lockFile;
             name = "websearch";
           };
+
+          hyprlandwindows = pkgs.callPackage ./nix/plugins/default.nix {
+            inherit inputs lockFile;
+            name = "hyprlandwindows";
+          };
         };
       };
 
