@@ -11,6 +11,7 @@ pub struct DesktopEntry {
     pub desc: Option<String>,
     pub icon: String,
     pub term: bool,
+    pub offset: i64,
 }
 
 const FIELD_CODE_LIST: &[&str] = &[
@@ -95,6 +96,7 @@ impl DesktopEntry {
                                 .get("Terminal")
                                 .map(|val| val.to_lowercase() == "true")
                                 .unwrap_or(false),
+                            offset: 0,
                         })
                     } else {
                         None
@@ -108,7 +110,7 @@ impl DesktopEntry {
             };
 
             if config.desktop_actions {
-                for section in new_sections {
+                for (i, section) in new_sections.iter().enumerate() {
                     let mut map = HashMap::new();
 
                     for line in section.iter().skip(1) {
@@ -150,6 +152,7 @@ impl DesktopEntry {
                                 .get("Terminal")
                                 .map(|val| val.to_lowercase() == "true")
                                 .unwrap_or(false),
+                            offset: i as i64,
                         })
                     }
                 }
