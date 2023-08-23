@@ -9,9 +9,6 @@ A wayland native krunner-like runner, made with customizability in mind.
 - Can do basically anything
   - As long as it can work with input and selection
   - Hence the name anyrun
-- Easy to make plugins
-  - You only need 4 functions!
-  - See [Rink](plugins/rink) for a simple example. More info in the documentation of the [anyrun-plugin](anyrun-plugin) crate.
 - Responsive
   - Asynchronous running of plugin functions
 - Wayland native
@@ -154,28 +151,40 @@ cp examples/config.ron ~/.config/anyrun/config.ron # Copy the default config fil
 
 Anyrun requires plugins to function, as they provide the results for input. The list of plugins in this repository is as follows:
 
-- [Applications](plugins/applications/README.md)
+### Official plugins
+
+Plugins that are a part of the project, and actively maintained alongside the project.
+
+- [Applications](https://github.com/anyrun-org/plugin-applications)
   - Search and run system & user specific desktop entries.
-- [Symbols](plugins/symbols/README.md)
+- [Symbols](https://github.com/anyrun-org/plugin-symbols)
   - Search unicode symbols.
-- [Rink](plugins/rink/README.md)
+- [Rink](https://github.com/anyrun-org/plugin-rink)
   - Calculator & unit conversion.
-- [Shell](plugins/shell/README.md)
+- [Shell](https://github.com/anyrun-org/plugin-shell)
   - Run shell commands.
-- [Translate](plugins/translate/README.md)
+- [Translate](https://github.com/anyrun-org/plugin-translate)
   - Quickly translate text.
-- [Kidex](plugins/kidex/README.md)
+- [Kidex](https://github.com/anyrun-org/plugin-kidex)
   - File search provided by [Kidex](https://github.com/Kirottu/kidex).
-- [Randr](plugins/randr/README.md)
+- [Randr](https://github.com/anyrun-org/plugin-randr)
   - Rotate and resize; quickly change monitor configurations on the fly.
   - TODO: Only supports Hyprland, needs support for other compositors.
-- [Stdin](plugins/stdin/README.md)
+- [Stdin](https://github.com/anyrun-org/plugin-stdin)
   - Turn Anyrun into a dmenu like fuzzy selector.
   - Should generally be used exclusively with the `-o` argument.
-- [Dictionary](plugins/dictionary/README.md)
+- [Dictionary](https://github.com/anyrun-org/plugin-dictionary)
   - Look up definitions for words
-- [Websearch](plugins/websearch/README.md)
+- [Websearch](https://github.com/anyrun-org/plugin-websearch)
   - Search the web with configurable engines: Google, Ecosia, Bing, DuckDuckGo.
+
+### Community plugins
+
+Plugins that are community contributed and/or more niche that are not officially a part of this project.
+
+- [Randr](https://github.com/Kirottu/anyrun-plugin-randr)
+  - Rotate and resize; quickly change monitor configurations on the fly.
+  - TODO: Only supports Hyprland, needs support for other compositors.
 
 ## Configuration
 
@@ -228,59 +237,4 @@ the top side of the screen, you would run `anyrun --plugins libapplications.so -
 
 # Plugin development
 
-The plugin API is intentionally very simple to use. This is all you need for a plugin:
-
-`Cargo.toml`:
-
-```toml
-#[package] omitted
-[lib]
-crate-type = ["cdylib"] # Required to build a dynamic library that can be loaded by anyrun
-
-[dependencies]
-anyrun-plugin = { git = "https://github.com/Kirottu/anyrun" }
-abi_stable = "0.11.1"
-# Any other dependencies you may have
-```
-
-`lib.rs`:
-
-```rs
-use abi_stable::std_types::{RString, RVec, ROption};
-use anyrun_plugin::*;
-
-#[init]
-fn init(config_dir: RString) {
-  // Your initialization code. This is run in another thread.
-  // The return type is the data you want to share between functions
-}
-
-#[info]
-fn info() -> PluginInfo {
-  PluginInfo {
-    name: "Demo".into(),
-    icon: "help-about".into(), // Icon from the icon theme
-  }
-}
-
-#[get_matches]
-fn get_matches(input: RString) -> RVec<Match> {
-  // The logic to get matches from the input text in the `input` argument.
-  // The `data` is a mutable reference to the shared data type later specified.
-  vec![Match {
-    title: "Test match".into(),
-    icon: ROption::RSome("help-about".into()),
-    use_pango: false,
-    description: ROption::RSome("Test match for the plugin API demo".into()),
-    id: ROption::RNone, // The ID can be used for identifying the match later, is not required
-  }].into()
-}
-
-#[handler]
-fn handler(selection: Match) -> HandleResult {
-  // Handle the selected match and return how anyrun should proceed
-  HandleResult::Close
-}
-```
-
-And that's it! That's all of the API needed to make runners. Refer to the plugins in the [plugins](plugins) folder for more examples.
+To develop plugins, refer to the [plugin crate](https://github.com/anyrun-org/plugin) for instructions on how to do that.
