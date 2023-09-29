@@ -7,12 +7,14 @@ use std::fs;
 #[derive(Deserialize, Debug)]
 struct Config {
     prefix: String,
+    pull_currencies: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Config {
             prefix: "".to_string(),
+            pull_currencies: true,
         }
     }
 }
@@ -24,31 +26,6 @@ struct State {
 
 #[init]
 fn init(config_dir: RString) -> State {
-    let mut ctx = rink_core::Context::new();
-
-    let units = gnu_units::parse_str(rink_core::DEFAULT_FILE.unwrap());
-    let dates = date::parse_datefile(rink_core::DATES_FILE);
-
-    let mut currency_defs = Vec::new();
-
-    match reqwest::blocking::get("https://rinkcalc.app/data/currency.json") {
-        Ok(response) => match response.json::<ast::Defs>() {
-            Ok(mut live_defs) => {
-                currency_defs.append(&mut live_defs.defs);
-            }
-            Err(why) => eprintln!("[rink] Error parsing currency json: {why}"),
-        },
-        Err(why) => eprintln!("[rink] Error fetching up-to-date currency conversions: {why}",),
-    }
-
-    currency_defs.append(&mut gnu_units::parse_str(CURRENCY_FILE).defs);
-
-    ctx.load(units);
-    ctx.load(ast::Defs {
-        defs: currency_defs,
-    });
-    ctx.load_dates(dates);
-
     let config = match fs::read_to_string(format!("{config_dir}/rink.ron")) {
         Ok(content) => ron::from_str(&content).unwrap_or_else(|why| {
             eprintln!("[rink] Failed to parse config: {why}");
@@ -59,6 +36,34 @@ fn init(config_dir: RString) -> State {
             Config::default()
         }
     };
+
+    let mut ctx = rink_core::Context::new();
+
+    let units = gnu_units::parse_str(rink_core::DEFAULT_FILE.unwrap());
+    let dates = date::parse_datefile(rink_core::DATES_FILE);
+
+    if config.pull_currencies {
+        let mut currency_defs = Vec::new();
+
+        match reqwest::blocking::get("https://rinkcalc.app/data/currency.json") {
+            Ok(response) => match response.json::<ast::Defs>() {
+                Ok(mut live_defs) => {
+                    currency_defs.append(&mut live_defs.defs);
+                }
+                Err(why) => eprintln!("[rink] Error parsing currency json: {why}"),
+            },
+            Err(why) => eprintln!("[rink] Error fetching up-to-date currency conversions: {why}",),
+        }
+
+        currency_defs.append(&mut gnu_units::parse_str(CURRENCY_FILE).defs);
+
+        ctx.load(ast::Defs {
+            defs: currency_defs,
+        });
+    }
+
+    ctx.load(units);
+    ctx.load_dates(dates);
 
     State { ctx, config }
 }
