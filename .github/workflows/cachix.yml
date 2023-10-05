@@ -2,16 +2,22 @@ name: "Set up binary cache & push binaries"
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - master
+    paths-ignore:
+      - .gitignore
+      - README.md
   push:
     branches:
       - master
     paths-ignore:
-      - .github/**
       - .gitignore
       - README.md
 
 jobs:
   cachix:
+    name: "Build Exposed Packages"
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -27,28 +33,29 @@ jobs:
           - symbols
           - websearch
     steps:
-      - uses: easimon/maximize-build-space@v6
+      - uses: easimon/maximize-build-space@v8
         with:
           overprovision-lvm: true
           remove-android: true
           remove-dotnet: true
           remove-haskell: true
-      - uses: actions/checkout@v3
-      - uses: cachix/install-nix-action@v22
-        with:
-          extra_nix_config: |
-            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
-            auto-optimise-store = true
-            experimental-features = nix-command flakes
-          nix_path: nixpkgs=channel:nixos-unstable
+          remove-docker-images: true
+          remove-codeql: true
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+
       - uses: cachix/cachix-action@v12
         with:
           authToken: ${{ secrets.CACHIX_TOKEN }}
           extraPullNames: nix-community
           name: anyrun
+
       - name: Set default git branch (to reduce log spam)
         run: git config --global init.defaultBranch main
-      - name: Validate Flakes
-        run: nix flake check
+
       - name: Build anyrun from the defined matrix
         run: nix build .#${{ matrix.package }} --print-build-logs
