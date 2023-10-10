@@ -1,0 +1,19 @@
+name: Flake Check
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  check-flake:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+        with:
+          logger: pretty
+
+      - name: Check Flake
+        run: nix flake check --accept-flake-config
