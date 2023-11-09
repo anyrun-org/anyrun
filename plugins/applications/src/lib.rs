@@ -109,19 +109,6 @@ pub fn init(config_dir: RString) -> State {
     State { config, entries, history }
 }
 
-fn format_entries(entries: Vec<(&DesktopEntry, u64)>) -> RVec<Match> {
-    entries
-    .into_iter()
-    .map(|(entry, id)| Match {
-        title: entry.name.clone().into(),
-        description: entry.desc.clone().map(|desc| desc.into()).into(),
-        use_pango: false,
-        icon: ROption::RSome(entry.icon.clone().into()),
-        id: ROption::RSome(id),
-    })
-    .collect()
-}
-
 #[get_matches]
 pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
 
