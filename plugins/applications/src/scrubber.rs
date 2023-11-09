@@ -18,6 +18,7 @@ const FIELD_CODE_LIST: &[&str] = &[
     "%f", "%F", "%u", "%U", "%d", "%D", "%n", "%N", "%i", "%c", "%k", "%v", "%m",
 ];
 
+
 impl DesktopEntry {
     fn from_dir_entry(entry: &fs::DirEntry, config: &Config) -> Vec<Self> {
         if entry.path().extension() == Some(OsStr::new("desktop")) {
@@ -166,6 +167,52 @@ impl DesktopEntry {
     }
 }
 
+fn generate_desktop_entry_id(entry: &fs::DirEntry, folder: &PathBuf) -> String {
+    let mut id = entry.path()
+        .strip_prefix(folder).unwrap()        
+        .to_string_lossy().to_string();
+
+    id = id.replace("/", "-");
+    id = id.replace(".desktop", "");        
+    id
+}
+
+fn get_desktop_files(path: &str, entries: &mut Vec<Result<fs::DirEntry,std::io::Error>>) {    
+    match fs::read_dir(path) {
+        Ok(dir_entries) => {
+            for entry in dir_entries {
+                match entry {
+                    Ok(entry) => {
+                        if entry.path().is_dir() {
+                            get_desktop_files(entry.path().to_str().unwrap(), entries);
+                        } else {
+                            entries.push(Ok(entry));
+                        }
+                    }
+                    Err(why) => {
+                        entries.push(Err(why));
+                    }
+                }
+            }
+        }
+        Err(why) => eprintln!("Error reading directory {}: {}", path, why),
+    }    
+}
+fn get_desktop_files_and_ids(path: &str, entries: &mut HashMap<String, fs::DirEntry>) {    
+    let mut files = Vec::new();
+    get_desktop_files(path, &mut files);
+    entries.extend(
+        files.into_iter().filter_map(|entry| {
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(_why) => return None,
+            };
+            let id = generate_desktop_entry_id(&entry, &PathBuf::from(path));
+            Some((id, entry))
+        })
+    )
+}
+
 pub fn scrubber(config: &Config) -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std::error::Error>> {
     // Create iterator over all the files in the XDG_DATA_DIRS
     // XDG compliancy is cool
@@ -180,73 +227,45 @@ pub fn scrubber(config: &Config) -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std
             )
         }
     };
-
-    let mut entries: HashMap<String, DesktopEntry> = match env::var("XDG_DATA_DIRS") {
+    
+    let entries: Vec<DesktopEntry> = match env::var("XDG_DATA_DIRS") {
         Ok(data_dirs) => {
+            let mut paths = HashMap::new();
             // The vec for all the DirEntry objects
-            let mut paths = Vec::new();
-            // Parse the XDG_DATA_DIRS variable and list files of all the paths
-            for dir in data_dirs.split(':') {
-                match fs::read_dir(format!("{}/applications/", dir)) {
-                    Ok(dir) => {
-                        paths.extend(dir);
-                    }
-                    Err(why) => {
-                        eprintln!("Error reading directory {}: {}", dir, why);
-                    }
-                }
-            }
+            
+            // Parse the XDG_DATA_DIRS variable and list files of all the paths.
+            // Precedence is from first to last in the list, so reverse execution order 
+            // so that entries in the first directory are the last to be assigned.            
+            data_dirs.split(':').rev()
+                .map(|dir| format!("{}/applications/", dir))
+                .for_each(|dir| get_desktop_files_and_ids(&dir, &mut paths));
+            
+            // Finally, the user directory takes precedence over all, so assign it after
+            // all the other directories.
+            get_desktop_files_and_ids(&user_path, &mut paths);
+
             // Make sure the list of paths isn't empty
             if paths.is_empty() {
                 return Err("No valid desktop file dirs found!".into());
             }
-
-            // Return it
             paths
         }
-        Err(_) => fs::read_dir("/usr/share/applications")?.collect(),
+        Err(_) => {
+            let mut paths = HashMap::new();
+            get_desktop_files_and_ids("/usr/share/applications", &mut paths);
+            paths
+        }
     }
     .into_iter()
-    .filter_map(|entry| {
-        let entry = match entry {
-            Ok(entry) => entry,
-            Err(_why) => return None,
-        };
-        let entries = DesktopEntry::from_dir_entry(&entry, config);
-        Some(
-            entries
-                .into_iter()
-                .map(|entry| (format!("{}{}", entry.name, entry.icon), entry)),
-        )
-    })
+    .map(|(_, entry)| DesktopEntry::from_dir_entry(&entry, config))
     .flatten()
     .collect();
 
-    // Go through user directory desktop files for overrides
-    match fs::read_dir(&user_path) {
-        Ok(dir_entries) => entries.extend(
-            dir_entries
-                .into_iter()
-                .filter_map(|entry| {
-                    let entry = match entry {
-                        Ok(entry) => entry,
-                        Err(_why) => return None,
-                    };
-                    let entries = DesktopEntry::from_dir_entry(&entry, config);
-                    Some(
-                        entries
-                            .into_iter()
-                            .map(|entry| (format!("{}{}", entry.name, entry.icon), entry)),
-                    )
-                })
-                .flatten(),
-        ),
-        Err(why) => eprintln!("Error reading directory {}: {}", user_path, why),
-    }
+    
 
     Ok(entries
         .into_iter()
         .enumerate()
-        .map(|(i, (_, entry))| (entry, i as u64))
+        .map(|(i, entry)| (entry, i as u64))
         .collect())
 }
