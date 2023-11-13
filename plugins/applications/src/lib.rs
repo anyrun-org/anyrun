@@ -132,8 +132,8 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
                 .sum::<i64>();   
 
             let history_score = state.history.get_entry_info(entry).map(|(index, count)| {                
-                let recency = 10-index;
-                ((count + recency) * 20) as i64               
+                let recency = 10-index as i64;
+                (count as i64 + recency) * 20
             }).unwrap_or(0);
 
             if app_score + keyword_score == 0 {
