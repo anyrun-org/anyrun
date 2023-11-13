@@ -105,6 +105,7 @@ pub fn init(config_dir: RString) -> State {
     });
 
     let history = history::History::load();
+    println!("Loaded {} history entries", history.count());
 
     State { config, entries, history }
 }
@@ -128,7 +129,8 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
                 .keywords
                 .iter()
                 .map(|keyword| matcher.fuzzy_match(keyword, &input).unwrap_or(0))
-                .sum::<i64>();            
+                .sum::<i64>();   
+
             let history_score = state.history.get_entry_info(entry).map(|(index, count)| {                
                 let recency = 10-index;
                 ((count + recency) * 20) as i64               

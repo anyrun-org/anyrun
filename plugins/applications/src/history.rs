@@ -20,7 +20,8 @@ impl History {
         );
 
         if let Ok(content) = fs::read_to_string(&path) {
-            let mut history: VecDeque<DesktopEntry> = ron::from_str(&content).unwrap_or_else(|why| {
+            let mut history: VecDeque<DesktopEntry> = ron::from_str(&content)
+            .unwrap_or_else(|why| {
                 eprintln!("Error parsing history: {}", why);
                 VecDeque::new()
             });            
@@ -45,9 +46,9 @@ impl History {
             eprintln!("Error writing history: {}", why);
         }
     }
-    pub fn add_entry(&mut self, entry: DesktopEntry) {
-        
-        self.0.push_back(entry);
+
+    pub fn add_entry(&mut self, entry: DesktopEntry) {        
+        self.0.push_front(entry);
     }
 
     pub fn truncate(&mut self, max_entries: usize) {
@@ -59,6 +60,8 @@ impl History {
         let count = self.0.iter().filter(|x| *x == entry).count();
         Some((index, count))
     }
-
+    pub fn count(&self) -> usize {
+        self.0.len()
+    }
 }
 
