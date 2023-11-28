@@ -12,5 +12,6 @@ Type in `<prefix><word to define>`, where prefix is the configured prefix (defau
 // <Anyrun config dir>/dictionary.ron
 Config(
   prefix: ":def",
+  max_entries: 5,
 )
 ```
