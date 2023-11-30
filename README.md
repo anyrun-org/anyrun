@@ -171,7 +171,7 @@ Anyrun requires plugins to function, as they provide the results for input. The 
   - TODO: Only supports Hyprland, needs support for other compositors.
 - [Stdin](plugins/stdin/README.md)
   - Turn Anyrun into a dmenu like fuzzy selector.
-  - Should generally be used exclusively with the `-o` argument.
+  - Should generally be used exclusively with the `--plugins` argument.
 - [Dictionary](plugins/dictionary/README.md)
   - Look up definitions for words
 - [Websearch](plugins/websearch/README.md)
