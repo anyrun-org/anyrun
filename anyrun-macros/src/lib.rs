@@ -16,14 +16,14 @@ pub fn handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let data = if function.sig.inputs.len() == 2 {
         if match function.sig.inputs.last() {
-            Some(syn::FnArg::Typed(pat)) => match &*pat.ty {
+            ::core::option::Option::Some(syn::FnArg::Typed(pat)) => match &*pat.ty {
                 Type::Reference(reference) => {
                     reference.mutability.is_some()
                 }
                 _ => return quote! { compile_error!("Last argument must be either a reference to the shared data or should not be present at all.") }.into(),
             },
-            Some(_) => return quote! { compile_error!("`self` argument, really?") }.into(),
-            None => unreachable!(),
+            ::core::option::Option::Some(_) => return quote! { compile_error!("`self` argument, really?") }.into(),
+            ::core::option::Option::None => unreachable!(),
         } {
             quote! {
                 ANYRUN_INTERNAL_DATA.write().unwrap().as_mut().unwrap(),
@@ -67,14 +67,14 @@ pub fn get_matches(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let fn_call = if function.sig.inputs.len() == 2 {
         let data = if match function.sig.inputs.last() {
-            Some(syn::FnArg::Typed(pat)) => match &*pat.ty {
+            ::core::option::Option::Some(syn::FnArg::Typed(pat)) => match &*pat.ty {
                 Type::Reference(reference) => {
                     reference.mutability.is_some()
                 }
                 _ => return quote! { compile_error!("Last argument must be either a reference to the shared data or should not be present at all.") }.into(),
             },
-            Some(_) => return quote! { compile_error!("`self` argument, really?") }.into(),
-            None => unreachable!(),
+            ::core::option::Option::Some(_) => return quote! { compile_error!("`self` argument, really?") }.into(),
+            ::core::option::Option::None => unreachable!(),
         } {
             quote! {
                 ANYRUN_INTERNAL_DATA.write().unwrap().as_mut()
@@ -85,7 +85,7 @@ pub fn get_matches(_attr: TokenStream, item: TokenStream) -> TokenStream {
             }
         };
         quote! {
-            if let Some(data) = #data {
+            if let ::core::option::Option::Some(data) = #data {
                 #fn_name(input, data)
             } else {
                 ::abi_stable::std_types::RVec::new()
@@ -111,7 +111,7 @@ pub fn get_matches(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 #fn_call
             });
 
-            *ANYRUN_INTERNAL_THREAD.lock().unwrap() = Some((handle, current_id));
+            *ANYRUN_INTERNAL_THREAD.lock().unwrap() = ::core::option::Option::Some((handle, current_id));
 
             current_id
         }
@@ -177,8 +177,8 @@ pub fn init(_attr: TokenStream, item: TokenStream) -> TokenStream {
         #[::abi_stable::sabi_extern_fn]
         fn anyrun_internal_poll_matches(id: u64) -> ::anyrun_plugin::anyrun_interface::PollResult {
             match ANYRUN_INTERNAL_THREAD.try_lock() {
-                Ok(thread) => match thread.as_ref() {
-                    Some((thread, task_id)) => {
+                ::core::result::Result::Ok(thread) => match thread.as_ref() {
+                    ::core::option::Option::Some((thread, task_id)) => {
                         if *task_id == id {
                             if !thread.is_finished() {
                                 return ::anyrun_plugin::anyrun_interface::PollResult::Pending;
@@ -187,9 +187,9 @@ pub fn init(_attr: TokenStream, item: TokenStream) -> TokenStream {
                             return ::anyrun_plugin::anyrun_interface::PollResult::Cancelled;
                         }
                     }
-                    None => return ::anyrun_plugin::anyrun_interface::PollResult::Cancelled,
+                    ::core::option::Option::None => return ::anyrun_plugin::anyrun_interface::PollResult::Cancelled,
                 },
-                Err(_) => return ::anyrun_plugin::anyrun_interface::PollResult::Pending,
+                ::core::result::Result::Err(_) => return ::anyrun_plugin::anyrun_interface::PollResult::Pending,
             }
 
             let (thread, _) = ANYRUN_INTERNAL_THREAD.lock().unwrap().take().unwrap();
@@ -202,7 +202,7 @@ pub fn init(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
             ::std::thread::spawn(|| {
                 let mut lock = ANYRUN_INTERNAL_DATA.write().unwrap();
-                *lock = Some(#fn_name(config_dir));
+                *lock = ::core::option::Option::Some(#fn_name(config_dir));
             });
         }
     }
@@ -231,7 +231,7 @@ pub fn config_args(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
         operations = quote! {
             #operations
-            if let Some(val) = opt.#ident {
+            if let ::core::option::Option::Some(val) = opt.#ident {
                 self.#ident = val;
             }
         }
