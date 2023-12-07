@@ -1,5 +1,3 @@
-#![feature()]
-
 use abi_stable::std_types::{ROption, RString, RVec};
 use anyrun_plugin::{anyrun_interface::HandleResult, *};
 use fuzzy_matcher::FuzzyMatcher;
