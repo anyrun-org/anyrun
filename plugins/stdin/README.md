@@ -5,5 +5,5 @@ Allows for easy integration into scripts that have been made with something like
 
 ## Usage
 
-This plugin should generally be used alone, if a dmenu replacement is needed. This can be done with `anyrun -o libstdin.so`.
+This plugin should generally be used alone, if a dmenu replacement is needed. This can be done with `anyrun --plugins libstdin.so`.
 The content to fuzzy match on needs to be piped into Anyrun.
