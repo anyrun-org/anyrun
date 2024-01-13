@@ -71,13 +71,24 @@ fn get_matches(input: RString, state: &State) -> RVec<Match> {
         .map(|(line, _)| {
             let mut line = line.split('\t');
             let title = line.next().unwrap_or("").into();
-            let (icon, image) = line.next().map_or((ROption::RNone, ROption::RNone), |second| {
-                if second.starts_with("image:") {
-                    (ROption::RNone, ROption::RSome(second.chars().skip("image:".len()).collect().into()))
-                } else {
-                    (ROption::RSome(second.into()), ROption::RNone)
-                }
-            });
+            let (icon, image) = line
+                .next()
+                .map_or((ROption::RNone, ROption::RNone), |second| {
+                    if second.starts_with("image:") {
+                        (
+                            ROption::RNone,
+                            ROption::RSome(
+                                second
+                                    .chars()
+                                    .skip("image:".len())
+                                    .collect::<String>()
+                                    .into(),
+                            ),
+                        )
+                    } else {
+                        (ROption::RSome(second.into()), ROption::RNone)
+                    }
+                });
 
             Match {
                 title,
