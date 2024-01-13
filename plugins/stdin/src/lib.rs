@@ -35,7 +35,7 @@ fn init(config_dir: RString) -> State {
 
     State {
         config,
-        lines: stdin().lines().filter_map(|line| line.ok()).collect(),
+        lines: stdin().lines().map_while(Result::ok).collect(),
     }
 }
 
@@ -69,9 +69,9 @@ fn get_matches(input: RString, state: &State) -> RVec<Match> {
     lines
         .into_iter()
         .map(|(line, _)| {
-            let mut line = line.split("\t");
+            let mut line = line.split('\t');
             Match {
-                title: line.next().unwrap_or("".into()).into(),
+                title: line.next().unwrap_or("").into(),
                 description: ROption::RNone,
                 use_pango: false,
                 icon: ROption::RNone,

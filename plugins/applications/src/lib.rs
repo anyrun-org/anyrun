@@ -122,7 +122,7 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
 
             // prioritize actions
             if entry.desc.is_some() {
-                score = score * 2;
+                score *= 2;
             }
 
             if score > 0 {
