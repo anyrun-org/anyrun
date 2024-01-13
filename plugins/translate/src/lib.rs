@@ -276,6 +276,7 @@ fn get_matches(input: RString, state: &State) -> RVec<Match> {
                                 .into()),
                             use_pango: false,
                             icon: ROption::RNone,
+                            image: ROption::RNone,
                             id: ROption::RNone
                         }
                     )

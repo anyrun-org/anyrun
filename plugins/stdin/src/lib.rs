@@ -68,12 +68,16 @@ fn get_matches(input: RString, state: &State) -> RVec<Match> {
 
     lines
         .into_iter()
-        .map(|(line, _)| Match {
-            title: line.into(),
-            description: ROption::RNone,
-            use_pango: false,
-            icon: ROption::RNone,
-            id: ROption::RNone,
+        .map(|(line, _)| {
+            let mut line = line.split("\t");
+            Match {
+                title: line.next().unwrap_or("".into()).into(),
+                description: ROption::RNone,
+                use_pango: false,
+                icon: ROption::RNone,
+                image: line.next().map_or(ROption::RNone, |p| ROption::RSome(p.into())),
+                id: ROption::RNone,
+            }
         })
         .collect::<Vec<_>>()
         .into()

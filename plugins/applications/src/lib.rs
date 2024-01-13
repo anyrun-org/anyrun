@@ -143,6 +143,7 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
             description: entry.desc.clone().map(|desc| desc.into()).into(),
             use_pango: false,
             icon: ROption::RSome(entry.icon.clone().into()),
+            image: ROption::RNone,
             id: ROption::RSome(id),
         })
         .collect()
