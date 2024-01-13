@@ -210,8 +210,6 @@ mod style_names {
 
     pub const MATCH_TITLE: &str = "match-title";
     pub const MATCH_DESC: &str = "match-desc";
-    pub const MATCH_ICON: &str = "match-icon";
-    pub const MATCH_IMAGE: &str = "match-image";
 }
 
 /// Default config directory
@@ -732,7 +730,7 @@ fn handle_matches(plugin_view: PluginView, runtime_data: &RuntimeData, matches: 
         if !runtime_data.config.hide_icons {
             if let ROption::RSome(image) = &_match.image {
                 let mut builder = gtk::Image::builder()
-                    .name(style_names::MATCH_IMAGE);
+                    .name(style_names::MATCH);
 
                 match gdk_pixbuf::Pixbuf::from_file_at_size(image.as_str(), runtime_data.config.max_image_width, runtime_data.config.max_image_height) {
                     Ok(pixbuf) => {
@@ -743,7 +741,7 @@ fn handle_matches(plugin_view: PluginView, runtime_data: &RuntimeData, matches: 
                 }
             } else if let ROption::RSome(icon) = &_match.icon {
                 let mut builder = gtk::Image::builder()
-                    .name(style_names::MATCH_ICON)
+                    .name(style_names::MATCH)
                     .pixel_size(32);
 
                 let path = PathBuf::from(icon.as_str());
