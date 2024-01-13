@@ -70,14 +70,21 @@ fn get_matches(input: RString, state: &State) -> RVec<Match> {
         .into_iter()
         .map(|(line, _)| {
             let mut line = line.split('\t');
+            let title = line.next().unwrap_or("").into();
+            let (icon, image) = line.next().map_or((ROption::RNone, ROption::RNone), |second| {
+                if second.starts_with("image:") {
+                    (ROption::RNone, ROption::RSome(second.chars().skip("image:".len()).collect().into()))
+                } else {
+                    (ROption::RSome(second.into()), ROption::RNone)
+                }
+            });
+
             Match {
-                title: line.next().unwrap_or("").into(),
+                title,
                 description: ROption::RNone,
                 use_pango: false,
-                icon: ROption::RNone,
-                image: line
-                    .next()
-                    .map_or(ROption::RNone, |p| ROption::RSome(p.into())),
+                icon,
+                image,
                 id: ROption::RNone,
             }
         })
