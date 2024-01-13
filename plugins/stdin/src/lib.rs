@@ -75,7 +75,9 @@ fn get_matches(input: RString, state: &State) -> RVec<Match> {
                 description: ROption::RNone,
                 use_pango: false,
                 icon: ROption::RNone,
-                image: line.next().map_or(ROption::RNone, |p| ROption::RSome(p.into())),
+                image: line
+                    .next()
+                    .map_or(ROption::RNone, |p| ROption::RSome(p.into())),
                 id: ROption::RNone,
             }
         })

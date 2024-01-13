@@ -729,15 +729,18 @@ fn handle_matches(plugin_view: PluginView, runtime_data: &RuntimeData, matches: 
             .build();
         if !runtime_data.config.hide_icons {
             if let ROption::RSome(image) = &_match.image {
-                let mut builder = gtk::Image::builder()
-                    .name(style_names::MATCH);
+                let mut builder = gtk::Image::builder().name(style_names::MATCH);
 
-                match gdk_pixbuf::Pixbuf::from_file_at_size(image.as_str(), runtime_data.config.max_image_width, runtime_data.config.max_image_height) {
+                match gdk_pixbuf::Pixbuf::from_file_at_size(
+                    image.as_str(),
+                    runtime_data.config.max_image_width,
+                    runtime_data.config.max_image_height,
+                ) {
                     Ok(pixbuf) => {
                         builder = builder.pixbuf(&pixbuf);
                         hbox.add(&builder.build());
-                    },
-                    Err(why) => println!("Failed to load image file: {}", why)
+                    }
+                    Err(why) => println!("Failed to load image file: {}", why),
                 }
             } else if let ROption::RSome(icon) = &_match.icon {
                 let mut builder = gtk::Image::builder()
