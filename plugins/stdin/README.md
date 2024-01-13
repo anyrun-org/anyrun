@@ -10,7 +10,7 @@ The content to fuzzy match on needs to be piped into Anyrun.
 
 ## Icons and images
 
-The plugin uses tabs to separate the text from the custom icon or image file. This means that you need to make sure that you don't pipe any tabs, unless you want to set a custom icon or image.
+This plugin uses tabs to separate the text from the custom icon or image file. This means that you need to make sure that you don't pipe any tabs, unless you want to set a custom icon or image.
 
 This feature works by adding a tab after the title text, and then either:
 - specifying an icon name or path
