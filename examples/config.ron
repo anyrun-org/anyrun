@@ -19,10 +19,10 @@ Config(
   hide_icons: false,
 
   // The maximum width of custom images
-  max_image_width: 100,
+  max_image_width: 150,
 
   // The maximum height of custom images
-  max_image_height: 50,
+  max_image_height: 100,
 
   // ignore exclusive zones, f.e. Waybar  
   ignore_exclusive_zones: false, 
