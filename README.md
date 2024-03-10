@@ -54,7 +54,7 @@ You can use the flake:
     nixosConfigurations.HOSTNAME = nixpkgs.lib.nixosSystem {
       # ...
 
-      system.packages = [ anyrun.packages.${system}.anyrun ];
+      environment.packages = [ anyrun.packages.${system}.anyrun ];
 
       # ...
     };
