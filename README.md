@@ -92,9 +92,9 @@ We have a home-manager module available at `homeManagerModules.default`. You use
         ./some_plugin.so
         "${inputs.anyrun.packages.${pkgs.system}.anyrun-with-all-plugins}/lib/kidex"
       ];
+      x = { fraction = 0.5; };
+      y = { fraction = 0.3; };
       width = { fraction = 0.3; };
-      position = "top";
-      verticalOffset = { absolute = 0; };
       hideIcons = false;
       ignoreExclusiveZones = false;
       layer = "overlay";
