@@ -114,6 +114,11 @@
           anyrun = import ./nix/hm-module.nix inputs.self;
           default = anyrun;
         };
+
+        overlays = rec {
+          anyrun = import ./nix/overlay.nix inputs.self;
+          default = anyrun;
+        };
       };
     };
 }
