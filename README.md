@@ -45,13 +45,31 @@ You can use the flake:
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    anyrun.url = "github:Kirottu/anyrun";
+    anyrun.url = "github:anyrun-org/anyrun";
     anyrun.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = { self, nixpkgs, anyrun }: let
   in {
-    nixosConfigurations.HOSTNAME = nixpkgs.lib.nixosSystem {
+    # Variant 1: Add the overlay
+    nixosConfigurations.HOSTNAME1 = nixpkgs.lib.nixosSystem {
+      # ...
+      modules = [({pkgs, ... }: {
+        nixpkgs.overlays = [
+          # ...
+          anyrun.overlays.default
+        ];
+
+        environment.systemPackages = [ pkgs.anyrun ];
+        # Overlay also adds: pkgs.anyrun-with-all-plugins
+        #                    pkgs.anyrunPlugins.<name>
+
+        # ...
+      })];
+    };
+
+    # Variant 2: Directly access the package
+    nixosConfigurations.HOSTNAME2 = nixpkgs.lib.nixosSystem {
       # ...
 
       environment.systemPackages = [ anyrun.packages.${system}.anyrun ];
