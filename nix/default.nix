@@ -66,10 +66,10 @@ in
         --prefix ANYRUN_PLUGINS : $out/lib
     '';
 
-    meta = with lib; {
+    meta = {
       description = "A wayland native, highly customizable runner.";
       homepage = "https://github.com/Kirottu/anyrun";
-      license = with licenses; [gpl3];
+      license = with lib.licenses; [gpl3];
       maintainers = [
         {
           email = "neo@neoney.dev";
