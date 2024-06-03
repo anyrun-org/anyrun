@@ -3,6 +3,7 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    systems.url = "github:nix-systems/default-linux";
     flake-parts = {
       url = "github:hercules-ci/flake-parts";
       inputs.nixpkgs-lib.follows = "nixpkgs";
@@ -12,14 +13,12 @@
   outputs = inputs @ {flake-parts, ...}:
     flake-parts.lib.mkFlake {inherit inputs;} {
       imports = [flake-parts.flakeModules.easyOverlay];
-      systems = ["x86_64-linux" "aarch64-linux"];
+      systems = import inputs.systems;
 
       perSystem = {
-        config,
         self',
-        inputs',
+        config,
         pkgs,
-        system,
         ...
       }: let
         inherit (pkgs) callPackage;
