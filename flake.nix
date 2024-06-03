@@ -22,8 +22,7 @@
         system,
         ...
       }: let
-        inherit (inputs.nixpkgs) lib;
-        inherit (lib) getExe;
+        inherit (pkgs) callPackage;
       in {
         # provide the formatter for nix fmt
         formatter = pkgs.alejandra;
@@ -45,78 +44,47 @@
 
         packages = let
           lockFile = ./Cargo.lock;
-        in rec {
-          anyrun = pkgs.callPackage ./nix/default.nix {inherit inputs lockFile;};
-          # alias nix build .# to anyrun
-          default = anyrun;
+
+          # Since all plugin derivations are called with the exact same arguments
+          # it is possible to streamline calling packages with a single function
+          # that takes name as an argument, and handles default inherits.
+          mkPlugin = name:
+            callPackage ./nix/plugins/default.nix {
+              inherit inputs lockFile;
+              inherit name;
+            };
+        in {
+          default = self'.packages.anyrun;
+          anyrun = callPackage ./nix/default.nix {inherit inputs lockFile;};
 
           anyrun-with-all-plugins = pkgs.callPackage ./nix/default.nix {
             inherit inputs lockFile;
             dontBuildPlugins = false;
           };
 
-          # expose each plugin as a package
-          applications = pkgs.callPackage ./nix/plugins/default.nix {
-            inherit inputs lockFile;
-            name = "applications";
-          };
-
-          dictionary = pkgs.callPackage ./nix/plugins/default.nix {
-            inherit inputs lockFile;
-            name = "dictionary";
-          };
-
-          kidex = pkgs.callPackage ./nix/plugins/default.nix {
-            inherit inputs lockFile;
-            name = "kidex";
-          };
-
-          randr = pkgs.callPackage ./nix/plugins/default.nix {
-            inherit inputs lockFile;
-            name = "randr";
-          };
-
-          rink = pkgs.callPackage ./nix/plugins/default.nix {
-            inherit inputs lockFile;
-            name = "rink";
-          };
-
-          shell = pkgs.callPackage ./nix/plugins/default.nix {
-            inherit inputs lockFile;
-            name = "shell";
-          };
-
-          stdin = pkgs.callPackage ./nix/plugins/default.nix {
-            inherit inputs lockFile;
-            name = "stdin";
-          };
-
-          symbols = pkgs.callPackage ./nix/plugins/default.nix {
-            inherit inputs lockFile;
-            name = "symbols";
-          };
-
-          translate = pkgs.callPackage ./nix/plugins/default.nix {
-            inherit inputs lockFile;
-            name = "translate";
-          };
-
-          websearch = pkgs.callPackage ./nix/plugins/default.nix {
-            inherit inputs lockFile;
-            name = "websearch";
-          };
+          # Expose each plugin as a separate package. This uses the mkPlugin function
+          # to call the same derivation with same default inherits and the name of the
+          # plugin every time.
+          applications = mkPlugin "applications";
+          dictionary = mkPlugin "dictionary";
+          kidex = mkPlugin "kidex";
+          randr = mkPlugin "randr";
+          rink = mkPlugin "rink";
+          shell = mkPlugin "shell";
+          stdin = mkPlugin "stdin";
+          symbols = mkPlugin "symbols";
+          translate = mkPlugin "translate";
+          websearch = mkPlugin "websearch";
         };
 
         # Set up an overlay from packages exposed by this flake
         overlayAttrs = config.packages;
       };
 
-      flake = _: rec {
-        nixosModules.home-manager = homeManagerModules.default;
-
-        homeManagerModules = rec {
+      flake = {self, ...}: {
+        homeManagerModules = {
           anyrun = import ./nix/hm-module.nix inputs.self;
-          default = anyrun;
+          default = self.homeManagerModules.anyrun;
         };
       };
     };
