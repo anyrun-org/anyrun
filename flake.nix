@@ -11,6 +11,7 @@
 
   outputs = inputs @ {flake-parts, ...}:
     flake-parts.lib.mkFlake {inherit inputs;} {
+      imports = [flake-parts.flakeModules.easyOverlay];
       systems = ["x86_64-linux" "aarch64-linux"];
 
       perSystem = {
@@ -105,6 +106,9 @@
             name = "websearch";
           };
         };
+
+        # Set up an overlay from packages exposed by this flake
+        overlayAttrs = config.packages;
       };
 
       flake = _: rec {
