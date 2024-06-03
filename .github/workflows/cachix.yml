@@ -45,17 +45,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: cachix/install-nix-action@v26
       - uses: DeterminateSystems/magic-nix-cache-action@main
 
       - uses: cachix/cachix-action@v12
         with:
           authToken: ${{ secrets.CACHIX_TOKEN }}
-          extraPullNames: nix-community
           name: anyrun
 
       - name: Set default git branch (to reduce log spam)
         run: git config --global init.defaultBranch main
 
       - name: Build anyrun from the defined matrix
-        run: nix build .#${{ matrix.package }} --print-build-logs
+        run: nix build .#${{ matrix.package }} --print-build-logs --extra-substituters "https://anyrun.cachix.org"
