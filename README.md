@@ -11,7 +11,8 @@ A wayland native krunner-like runner, made with customizability in mind.
   - Hence the name anyrun
 - Easy to make plugins
   - You only need 4 functions!
-  - See [Rink](plugins/rink) for a simple example. More info in the documentation of the [anyrun-plugin](anyrun-plugin) crate.
+  - See [Rink](plugins/rink) for a simple example. More info in the
+    documentation of the [anyrun-plugin](anyrun-plugin) crate.
 - Responsive
   - Asynchronous running of plugin functions
 - Wayland native
@@ -22,8 +23,10 @@ A wayland native krunner-like runner, made with customizability in mind.
 
 ## Dependencies
 
-Anyrun mainly depends various GTK libraries, and rust of course for building the project. Rust you can get with [rustup](https://rustup.rs). The rest are statically linked in the binary.
-Here are the libraries you need to have to build & run it:
+Anyrun mainly depends various GTK libraries, and rust of course for building the
+project. Rust you can get with [rustup](https://rustup.rs). The rest are
+statically linked in the binary. Here are the libraries you need to have to
+build & run it:
 
 - `gtk-layer-shell (libgtk-layer-shell)`
 - `gtk3 (libgtk-3 libgdk-3)`
@@ -45,7 +48,7 @@ You can use the flake:
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    anyrun.url = "github:Kirottu/anyrun";
+    anyrun.url = "github:anyrun-org/anyrun";
     anyrun.inputs.nixpkgs.follows = "nixpkgs";
   };
 
@@ -77,9 +80,10 @@ The flake provides multiple packages:
 - translate - the translate plugin
 - websearch - the websearch plugin
 
-#### home-manager module
+#### Home-Manager module
 
-We have a home-manager module available at `homeManagerModules.default`. You use it like this:
+The anyrun flake exposes a Home-Manager module as `homeManagerModules.default`.
+You use it in your system like this:
 
 ```nix
 {
@@ -138,7 +142,8 @@ nix.settings = {
 
 ### Manual installation
 
-Make sure all of the dependencies are installed, and then run the following commands in order:
+Make sure all of the dependencies are installed, and then run the following
+commands in order:
 
 ```sh
 git clone https://github.com/Kirottu/anyrun.git # Clone the repository
@@ -152,7 +157,8 @@ cp examples/config.ron ~/.config/anyrun/config.ron # Copy the default config fil
 
 ## Plugins
 
-Anyrun requires plugins to function, as they provide the results for input. The list of plugins in this repository is as follows:
+Anyrun requires plugins to function, as they provide the results for input. The
+list of plugins in this repository is as follows:
 
 - [Applications](plugins/applications/README.md)
   - Search and run system & user specific desktop entries.
@@ -179,7 +185,8 @@ Anyrun requires plugins to function, as they provide the results for input. The 
 
 ## Configuration
 
-The default configuration directory is `$HOME/.config/anyrun` the structure of the config directory is as follows and should be respected by plugins:
+The default configuration directory is `$HOME/.config/anyrun` the structure of
+the config directory is as follows and should be respected by plugins:
 
 ```
 - anyrun
@@ -188,14 +195,17 @@ The default configuration directory is `$HOME/.config/anyrun` the structure of t
   config.ron
   style.css
   <any plugin specific config files>
-
 ```
 
-The [default config file](examples/config.ron) contains the default values, and annotates all configuration options with comments on what they are and how to use them.
+The [default config file](examples/config.ron) contains the default values, and
+annotates all configuration options with comments on what they are and how to
+use them.
 
 ## Styling
 
-Anyrun supports [GTK+ CSS](https://docs.gtk.org/gtk3/css-overview.html) styling. The names for the different widgets and widgets associated with them are as follows:
+Anyrun supports [GTK+ CSS](https://docs.gtk.org/gtk3/css-overview.html) styling.
+The names for the different widgets and widgets associated with them are as
+follows:
 
 - `entry`: The entry box
   - `GtkEntry`
@@ -209,7 +219,8 @@ Anyrun supports [GTK+ CSS](https://docs.gtk.org/gtk3/css-overview.html) styling.
   - `GtkBox`: The different boxes in the plugin view
   - `GtkImage`: The icon of the plugin
 - `match`: Widgets of a specific match
-  - `GtkBox`: The main box of the match and the box containing the title and the description if present
+  - `GtkBox`: The main box of the match and the box containing the title and the
+    description if present
   - `GtkImage`: The icon of the match (if present)
 - `match-title`: Specific for the title of the match
   - `GtkLabel`
@@ -222,13 +233,16 @@ The custom arguments for anyrun are as follows:
 
 - `--config-dir`, `-c`: Override the configuration directory
 
-The rest of the arguments are automatically generated based on the config, and can be used to override
-configuration parameters. For example if you want to temporarily only run the Applications and Symbols plugins on
-the top side of the screen, you would run `anyrun --plugins libapplications.so --plugins libsymbols.so --position top`.
+The rest of the arguments are automatically generated based on the config, and
+can be used to override configuration parameters. For example if you want to
+temporarily only run the Applications and Symbols plugins on the top side of the
+screen, you would run
+`anyrun --plugins libapplications.so --plugins libsymbols.so --position top`.
 
 # Plugin development
 
-The plugin API is intentionally very simple to use. This is all you need for a plugin:
+The plugin API is intentionally very simple to use. This is all you need for a
+plugin:
 
 `Cargo.toml`:
 
@@ -283,4 +297,5 @@ fn handler(selection: Match) -> HandleResult {
 }
 ```
 
-And that's it! That's all of the API needed to make runners. Refer to the plugins in the [plugins](plugins) folder for more examples.
+And that's it! That's all of the API needed to make runners. Refer to the
+plugins in the [plugins](plugins) folder for more examples.
