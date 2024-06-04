@@ -10,10 +10,16 @@
     };
   };
 
-  outputs = inputs @ {flake-parts, ...}:
+  outputs = {
+    self,
+    flake-parts,
+    nixpkgs,
+    systems,
+    ...
+  } @ inputs:
     flake-parts.lib.mkFlake {inherit inputs;} {
       imports = [flake-parts.flakeModules.easyOverlay];
-      systems = import inputs.systems;
+      systems = import systems;
 
       perSystem = {
         self',
@@ -80,7 +86,7 @@
         overlayAttrs = config.packages;
       };
 
-      flake = {self, ...}: {
+      flake = {
         homeManagerModules = {
           anyrun = import ./nix/hm-module.nix self;
           default = self.homeManagerModules.anyrun;
