@@ -1,7 +1,9 @@
 {
   lib,
-  glib,
   makeWrapper,
+  lockFile,
+  # Dependencies for Anyrun
+  glib,
   rustPlatform,
   atk,
   gtk3,
@@ -11,16 +13,19 @@
   rustfmt,
   cargo,
   rustc,
-  lockFile,
+  # Additional configuration arguments for the
+  # derivation. By default, we should not build
+  # any of the plugins.
   dontBuildPlugins ? true,
   ...
 }: let
-  cargoToml = builtins.fromTOML (builtins.readFile ../anyrun/Cargo.toml);
+  inherit (builtins) fromTOML readFile;
+  cargoToml = fromTOML (readFile ../anyrun/Cargo.toml);
+  pname = cargoToml.package.name;
+  version = cargoToml.package.version;
 in
-  rustPlatform.buildRustPackage rec {
-    pname = cargoToml.package.name;
-    version = cargoToml.package.version;
-
+  rustPlatform.buildRustPackage {
+    inherit pname version;
     src = ../.;
 
     buildInputs = [
