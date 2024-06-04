@@ -82,7 +82,7 @@
 
       flake = {self, ...}: {
         homeManagerModules = {
-          anyrun = import ./nix/hm-module.nix inputs.self;
+          anyrun = import ./nix/hm-module.nix self;
           default = self.homeManagerModules.anyrun;
         };
       };
