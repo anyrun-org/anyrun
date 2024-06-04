@@ -1,0 +1,35 @@
+name: Build Cargo Workspace
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  pull_request:
+    branches: ["master"]
+  push:
+    branches:
+      - "*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build Cargo Workspace
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - uses: Swatinem/rust-cache@v2
+        name: Cache dependencies
+
+      - uses: actions-rs/cargo@v1
+        name: Build crate
+        with:
+          command: build
+          args: --verbose --all-features
