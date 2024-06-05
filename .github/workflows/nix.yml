@@ -16,9 +16,26 @@ on:
       - README.md
 
 jobs:
+  check-flake:
+    name: "Check flake validity"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+        with:
+          logger: pretty
+
+      - name: Check Flake
+        run: nix flake check --accept-flake-config
+
   cachix:
     name: "Build Exposed Packages"
     runs-on: ubuntu-latest
+    needs: check-flake
     strategy:
       matrix:
         package:
