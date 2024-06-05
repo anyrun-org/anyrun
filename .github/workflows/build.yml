@@ -20,13 +20,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-     - name: Install Nix
-       uses: DeterminateSystems/nix-installer-action@main
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
         with:
           logger: pretty
 
-     - name: Get build dependencies
-       run: "nix develop .#"
+      - name: Get build dependencies
+        run: "nix develop .#"
 
       - uses: actions-rs/toolchain@v1
         with:
