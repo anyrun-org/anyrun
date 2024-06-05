@@ -1,19 +1,10 @@
-name: "Set up binary cache & push binaries"
+name: "Check flake & Build packages"
 
 on:
+  workflow_call:
   workflow_dispatch:
   pull_request:
-    branches:
-      - master
-    paths-ignore:
-      - .gitignore
-      - README.md
-  push:
-    branches:
-      - master
-    paths-ignore:
-      - .gitignore
-      - README.md
+    branches: ["master"]
 
 jobs:
   check-flake:
@@ -32,7 +23,7 @@ jobs:
       - name: Check Flake
         run: nix flake check --accept-flake-config
 
-  cachix:
+  build:
     name: "Build Exposed Packages"
     runs-on: ubuntu-latest
     needs: check-flake
@@ -64,14 +55,6 @@ jobs:
 
       - uses: cachix/install-nix-action@v26
       - uses: DeterminateSystems/magic-nix-cache-action@main
-
-      - uses: cachix/cachix-action@v12
-        with:
-          authToken: ${{ secrets.CACHIX_TOKEN }}
-          name: anyrun
-
-      - name: Set default git branch (to reduce log spam)
-        run: git config --global init.defaultBranch main
 
       - name: Build anyrun from the defined matrix
         run: nix build .#${{ matrix.package }} --print-build-logs --extra-substituters "https://anyrun.cachix.org"

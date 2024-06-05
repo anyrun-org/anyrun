@@ -1,0 +1,40 @@
+name: "Build with Cargo"
+on:
+  workflow_call:
+  workflow_dispatch:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v26
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Install dependencies
+        run: nix profile install --inputs-from .#
+
+      - uses: actions-rs/toolchain@v1
+        name: Install rust toolchain
+        with:
+          toolchain: nightly
+          override: true
+
+      - uses: Swatinem/rust-cache@v2
+        name: Add caching
+
+      - uses: actions-rs/cargo@v1
+        name: Build crate
+        with:
+          command: build
+          args: --verbose
