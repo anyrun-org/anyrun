@@ -13,6 +13,7 @@ Default config
 ```ron
 Config(
   prefix: "?",
+  browser: "xdg-open",
   // Options: Google, Ecosia, Bing, DuckDuckGo, Custom
   //
   // Custom engines can be defined as such:
