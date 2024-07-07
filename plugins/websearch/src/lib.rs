@@ -40,6 +40,7 @@ impl fmt::Display for Engine {
 #[derive(Deserialize, Debug)]
 struct Config {
     prefix: String,
+    browser: String,
     engines: Vec<Engine>,
 }
 
@@ -47,6 +48,7 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             prefix: "?".to_string(),
+            browser: "xdg-open".to_string(),
             engines: vec![Engine::Google],
         }
     }
@@ -95,7 +97,8 @@ fn handler(selection: Match, config: &Config) -> HandleResult {
     if let Err(why) = Command::new("sh")
         .arg("-c")
         .arg(format!(
-            "xdg-open https://{}",
+            "{} https://{}",
+            &config.browser,
             engine
                 .value()
                 .replace("{}", &encode(&selection.title.to_string()))
