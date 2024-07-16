@@ -87,5 +87,6 @@ in
           github = "NotAShelf";
         }
       ];
+      mainProgram = "anyrun";
     };
   }
