@@ -565,7 +565,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
                 Inhibit(true)
             }
             // Handle when the selected match is "activated"
-            constants::Return => {
+            constants::Return | constants::KP_Enter => {
                 let mut _runtime_data_clone = runtime_data_clone.borrow_mut();
 
                 let (selected_match, plugin_view) = match _runtime_data_clone
