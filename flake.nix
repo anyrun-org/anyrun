@@ -13,7 +13,6 @@
   outputs = {
     self,
     flake-parts,
-    nixpkgs,
     systems,
     ...
   } @ inputs:
@@ -32,19 +31,25 @@
         # provide the formatter for nix fmt
         formatter = pkgs.alejandra;
 
-        devShells.default = pkgs.mkShell {
-          inputsFrom = builtins.attrValues self'.packages;
+        devShells = {
+          default = pkgs.mkShell {
+            inputsFrom = builtins.attrValues self'.packages;
+            packages = with pkgs; [
+              rustc # rust compiler
+              gcc
+              cargo # rust package manager
+              clippy # opinionated rust formatter
+            ];
+          };
 
-          packages = with pkgs; [
-            alejandra # nix formatter
-            rustfmt # rust formatter
-            statix # lints and suggestions
-            deadnix # clean up unused nix code
-            rustc # rust compiler
-            gcc
-            cargo # rust package manager
-            clippy # opinionated rust formatter
-          ];
+          nix = pkgs.mkShellNoCC {
+            packages = with pkgs; [
+              alejandra # nix formatter
+              rustfmt # rust formatter
+              statix # lints and suggestions
+              deadnix # clean up unused nix code
+            ];
+          };
         };
 
         packages = let
@@ -60,9 +65,11 @@
             };
         in {
           default = self'.packages.anyrun;
-          anyrun = callPackage ./nix/default.nix {inherit inputs lockFile;};
 
-          anyrun-with-all-plugins = pkgs.callPackage ./nix/default.nix {
+          # By default the anyrun package is built without any plugins
+          # as per the `dontBuildPlugins` arg.
+          anyrun = callPackage ./nix/default.nix {inherit inputs lockFile;};
+          anyrun-with-all-plugins = callPackage ./nix/default.nix {
             inherit inputs lockFile;
             dontBuildPlugins = false;
           };
