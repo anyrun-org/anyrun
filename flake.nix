@@ -28,30 +28,6 @@
       }: let
         inherit (pkgs) callPackage;
       in {
-        # provide the formatter for nix fmt
-        formatter = pkgs.alejandra;
-
-        devShells = {
-          default = pkgs.mkShell {
-            inputsFrom = builtins.attrValues self'.packages;
-            packages = with pkgs; [
-              rustc # rust compiler
-              gcc
-              cargo # rust package manager
-              clippy # opinionated rust formatter
-            ];
-          };
-
-          nix = pkgs.mkShellNoCC {
-            packages = with pkgs; [
-              alejandra # nix formatter
-              rustfmt # rust formatter
-              statix # lints and suggestions
-              deadnix # clean up unused nix code
-            ];
-          };
-        };
-
         packages = let
           lockFile = ./Cargo.lock;
 
@@ -91,6 +67,30 @@
 
         # Set up an overlay from packages exposed by this flake
         overlayAttrs = config.packages;
+
+        devShells = {
+          default = pkgs.mkShell {
+            inputsFrom = builtins.attrValues self'.packages;
+            packages = with pkgs; [
+              rustc # rust compiler
+              gcc
+              cargo # rust package manager
+              clippy # opinionated rust formatter
+            ];
+          };
+
+          nix = pkgs.mkShellNoCC {
+            packages = with pkgs; [
+              alejandra # nix formatter
+              rustfmt # rust formatter
+              statix # lints and suggestions
+              deadnix # clean up unused nix code
+            ];
+          };
+        };
+
+        # provide the formatter for nix fmt
+        formatter = pkgs.alejandra;
       };
 
       flake = {

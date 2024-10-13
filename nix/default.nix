@@ -1,8 +1,8 @@
 {
+  inputs,
   lib,
-  makeWrapper,
-  lockFile,
   # Dependencies for Anyrun
+  makeWrapper,
   glib,
   rustPlatform,
   atk,
@@ -17,25 +17,23 @@
   # derivation. By default, we should not build
   # any of the plugins.
   dontBuildPlugins ? true,
+  lockFile,
   ...
 }: let
   inherit (builtins) fromTOML readFile;
+
   cargoToml = fromTOML (readFile ../anyrun/Cargo.toml);
   pname = cargoToml.package.name;
   version = cargoToml.package.version;
 in
   rustPlatform.buildRustPackage {
     inherit pname version;
-    src = ../.;
+    src = builtins.path {
+      path = lib.sources.cleanSource inputs.self;
+      name = "${pname}-${version}";
+    };
 
-    buildInputs = [
-      pkg-config
-      glib
-      atk
-      gtk3
-      librsvg
-      gtk-layer-shell
-    ];
+    strictDeps = true;
 
     cargoLock = {
       inherit lockFile;
@@ -51,19 +49,29 @@ in
       cargo
     ];
 
+    buildInputs = [
+      glib
+      atk
+      gtk3
+      librsvg
+      gtk-layer-shell
+    ];
+
     cargoBuildFlags =
       if dontBuildPlugins
       then ["-p ${pname}"]
       else [];
 
     doCheck = true;
-    CARGO_BUILD_INCREMENTAL = "false";
-    RUST_BACKTRACE = "full";
     copyLibs = true;
+
     buildAndTestSubdir =
       if dontBuildPlugins
       then pname
       else null;
+
+    CARGO_BUILD_INCREMENTAL = "false";
+    RUST_BACKTRACE = "full";
 
     postInstall = ''
       wrapProgram $out/bin/anyrun \
@@ -75,18 +83,7 @@ in
       description = "A wayland native, highly customizable runner.";
       homepage = "https://github.com/Kirottu/anyrun";
       license = with lib.licenses; [gpl3];
-      maintainers = [
-        {
-          email = "neo@neoney.dev";
-          github = "n3oney";
-          githubId = 30625554;
-          name = "Michał Minarowski";
-        }
-        {
-          email = "raf@notashelf.dev";
-          github = "NotAShelf";
-        }
-      ];
       mainProgram = "anyrun";
+      maintainers = with lib.maintainers; [NotAShelf n3oney];
     };
   }

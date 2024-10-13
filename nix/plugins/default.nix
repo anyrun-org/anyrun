@@ -1,5 +1,7 @@
 {
+  inputs,
   lib,
+  # Common dependencies for the plugin
   glib,
   makeWrapper,
   rustPlatform,
@@ -8,45 +10,56 @@
   gtk-layer-shell,
   pkg-config,
   librsvg,
-  inputs,
+  # Generic args
   name,
   lockFile,
+  extraInputs ? [], # allow appending buildInputs
   ...
 }: let
   cargoToml = builtins.fromTOML (builtins.readFile ../../plugins/${name}/Cargo.toml);
+  pname = cargoToml.package.name;
+  version = cargoToml.package.version;
 in
   rustPlatform.buildRustPackage {
-    pname = cargoToml.package.name;
-    version = cargoToml.package.version;
+    inherit pname version;
 
-    src = "${inputs.self}";
+    src = builtins.path {
+      path = lib.sources.cleanSource inputs.self;
+      name = "${pname}-${version}";
+    };
     cargoLock = {
       inherit lockFile;
     };
 
-    buildInputs = [
-      glib
-      atk
-      gtk3
-      librsvg
-      gtk-layer-shell
-    ];
+    strictDeps = true;
 
     nativeBuildInputs = [
       pkg-config
       makeWrapper
     ];
 
+    buildInputs =
+      [
+        glib
+        atk
+        gtk3
+        librsvg
+        gtk-layer-shell
+      ]
+      ++ extraInputs;
+
     doCheck = true;
-    CARGO_BUILD_INCREMENTAL = "false";
-    RUST_BACKTRACE = "full";
     copyLibs = true;
     cargoBuildFlags = ["-p ${name}"];
     buildAndTestSubdir = "plugins/${name}";
 
-    meta = with lib; {
+    CARGO_BUILD_INCREMENTAL = "false";
+    RUST_BACKTRACE = "full";
+
+    meta = {
       description = "The ${name} plugin for Anyrun";
       homepage = "https://github.com/Kirottu/anyrun";
-      license = with licenses; [gpl3];
+      license = with lib.licenses; [gpl3];
+      maintainers = with lib.maintainers; [NotAShelf n3oney];
     };
   }
