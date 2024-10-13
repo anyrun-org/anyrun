@@ -2,7 +2,19 @@
 
 A wayland native krunner-like runner, made with customizability in mind.
 
-# Features
+<!-- Maintenance Status Notice -->
+
+[@notashelf]: https://github.com/notashelf
+
+> [!NOTE]
+> Anyrun is currently in maintenance mode due to the original maintainer taking
+> an extended break. For the time being [@notashelf] will be reviewing and
+> merging critical bug-fixes or must-have features in the form of pull requests.
+> This is _hopefully_ not a permanent status.
+
+<!-- End of Maintenance Status Notice-->
+
+## Features
 
 - Style customizability with GTK+ CSS
   - More info in [Styling](#Styling)
@@ -19,9 +31,9 @@ A wayland native krunner-like runner, made with customizability in mind.
   - GTK layer shell for overlaying the window
   - data-control for managing the clipboard
 
-# Usage
+## Usage
 
-## Dependencies
+### Dependencies
 
 Anyrun mainly depends various GTK libraries, and rust of course for building the
 project. Rust you can get with [rustup](https://rustup.rs). The rest are
@@ -41,24 +53,28 @@ build & run it:
 
 ### Nix
 
-You can use the flake:
+You can use the provided flake:
 
 ```nix
 # flake.nix
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    anyrun.url = "github:anyrun-org/anyrun";
-    anyrun.inputs.nixpkgs.follows = "nixpkgs";
+    anyrun = {
+      url = "github:anyrun-org/anyrun";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, anyrun }: let
-  in {
-    nixosConfigurations.HOSTNAME = nixpkgs.lib.nixosSystem {
+  outputs = { self, nixpkgs, anyrun }: {
+    nixosConfigurations."<your_hostname>" = nixpkgs.lib.nixosSystem {
       # ...
-
-      environment.systemPackages = [ anyrun.packages.${system}.anyrun ];
-
+      modules = [
+        # Add Anyrun to environment.systemPackages to make it available to
+        # all system users. You may prefer `users.users.<your_username>.packages`
+        # to install it for a specified user only.
+        {environment.systemPackages = [ anyrun.packages.${system}.anyrun ];}
+      ];
       # ...
     };
   };
@@ -67,35 +83,31 @@ You can use the flake:
 
 The flake provides multiple packages:
 
-- anyrun (default) - just the anyrun binary
-- anyrun-with-all-plugins - anyrun and all builtin plugins
-- applications - the applications plugin
-- dictionary - the dictionary plugin
-- kidex - the kidex plugin
-- randr - the randr plugin
-- rink - the rink plugin
-- shell - the shell plugin
-- stdin - the stdin plugin
-- symbols - the symbols plugin
-- translate - the translate plugin
-- websearch - the websearch plugin
+- **anyrun (default)** - the Anyrun binary, without plugins
+- **anyrun-with-all-plugins** - Anyrun and all builtin plugins
+- **applications** - the applications plugin
+- **dictionary** - the dictionary plugin
+- **kidex** - the kidex plugin
+- **randr** - the randr plugin
+- **rink** - the rink plugin
+- **shell** - the shell plugin
+- **stdin** - the stdin plugin
+- **symbols** - the symbols plugin
+- **translate** - the translate plugin
+- **websearch** - the websearch plugin
 
 #### Home-Manager module
 
-The anyrun flake exposes a Home-Manager module as `homeManagerModules.default`.
-You use it in your system like this:
+The Anyrun flake exposes a Home-Manager module as `homeManagerModules.default`
+which you can use to install and configure Anyrun in your system with ease.
+
+You may use it in your system like this:
 
 ```nix
 {
   programs.anyrun = {
     enable = true;
     config = {
-      plugins = [
-        # An array of all the plugins you want, which either can be paths to the .so files, or their packages
-        inputs.anyrun.packages.${pkgs.system}.applications
-        ./some_plugin.so
-        "${inputs.anyrun.packages.${pkgs.system}.anyrun-with-all-plugins}/lib/kidex"
-      ];
       x = { fraction = 0.5; };
       y = { fraction = 0.3; };
       width = { fraction = 0.3; };
@@ -106,8 +118,18 @@ You use it in your system like this:
       closeOnClick = false;
       showResultsImmediately = false;
       maxEntries = null;
+
+      plugins = [
+        # An array of all the plugins you want, which either can be paths to the .so files, or their packages
+        inputs.anyrun.packages.${pkgs.system}.applications
+        ./some_plugin.so
+        "${inputs.anyrun.packages.${pkgs.system}.anyrun-with-all-plugins}/lib/kidex"
+      ];
     };
-    extraCss = ''
+
+    # Inline comments are supported for language injection into
+    # multi-line strings with Treesitter! (Depends on your editor)
+    extraCss = /*css */ ''
       .some_class {
         background: red;
       }
@@ -124,12 +146,12 @@ You use it in your system like this:
 }
 ```
 
-You might also want to use the binary cache to avoid building locally.
+Anyrun packages are built and cached automatically. To avoid unnecessary
+recompilations, you may use the binary cache.
 
 ```nix
 nix.settings = {
     builders-use-substitutes = true;
-    # extra substituters to add
     extra-substituters = [
         "https://anyrun.cachix.org"
     ];
@@ -140,19 +162,32 @@ nix.settings = {
 };
 ```
 
+> [!WARNING]
+> While using the Anyrun flake, overriding the `nixpkgs` input for Anyrun will
+> cause cache hits, i.e., you will have to build from source every time. To use
+> the cache, do _not_ override the Nixpkgs input.
+
 ### Manual installation
 
 Make sure all of the dependencies are installed, and then run the following
 commands in order:
 
-```sh
-git clone https://github.com/Kirottu/anyrun.git # Clone the repository
-cd anyrun # Change the active directory to it
-cargo build --release # Build all the packages
-cargo install --path anyrun/ # Install the anyrun binary
-mkdir -p ~/.config/anyrun/plugins # Create the config directory and the plugins subdirectory
-cp target/release/*.so ~/.config/anyrun/plugins # Copy all of the built plugins to the correct directory
-cp examples/config.ron ~/.config/anyrun/config.ron # Copy the default config file
+```bash
+ # Clone the repository and move to the cloned location
+git clone https://github.com/Kirottu/anyrun.git && cd anyrun
+
+# Build all packages, and install the Anyrun binary
+cargo build --release
+cargo install --path anyrun/
+
+# Create the config directory and the plugins subdirectory
+mkdir -p ~/.config/anyrun/plugins
+
+# Copy all of the built plugins to the correct directory
+cp target/release/*.so ~/.config/anyrun/plugins
+
+# Copy the default config file
+cp examples/config.ron ~/.config/anyrun/config.ron
 ```
 
 ## Plugins
@@ -176,7 +211,7 @@ list of plugins in this repository is as follows:
   - Rotate and resize; quickly change monitor configurations on the fly.
   - TODO: Only supports Hyprland, needs support for other compositors.
 - [Stdin](plugins/stdin/README.md)
-  - Turn Anyrun into a dmenu like fuzzy selector.
+  - Turn Anyrun into a dmenu-like fuzzy selector.
   - Should generally be used exclusively with the `--plugins` argument.
 - [Dictionary](plugins/dictionary/README.md)
   - Look up definitions for words
@@ -189,12 +224,12 @@ The default configuration directory is `$HOME/.config/anyrun` the structure of
 the config directory is as follows and should be respected by plugins:
 
 ```
-- anyrun
-  - plugins
-    <plugin dynamic libraries>
-  config.ron
-  style.css
-  <any plugin specific config files>
+- anyrun/
+  - plugins/
+    - <plugin dynamic libraries>
+  - config.ron
+  - style.css
+  - <any plugin specific config files>
 ```
 
 The [default config file](examples/config.ron) contains the default values, and
