@@ -22,7 +22,7 @@ jobs:
       - uses: DeterminateSystems/magic-nix-cache-action@main
 
       - name: Install dependencies
-        run: nix develop -i
+        run: nix develop --impure
 
       - uses: actions-rs/toolchain@v1
         name: Install rust toolchain
