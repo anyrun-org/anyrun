@@ -31,7 +31,6 @@ in
       inherit lockFile;
     };
 
-    enableParallelBuilding = true;
     strictDeps = true;
 
     nativeBuildInputs = [

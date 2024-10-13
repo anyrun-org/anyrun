@@ -21,8 +21,7 @@ jobs:
       - uses: cachix/install-nix-action@v26
       - uses: DeterminateSystems/magic-nix-cache-action@main
 
-      - name: Install dependencies
-        run: nix develop --impure
+      - uses: nicknovitski/nix-develop@v1
 
       - uses: actions-rs/toolchain@v1
         name: Install rust toolchain

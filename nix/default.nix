@@ -33,7 +33,6 @@ in
       name = "${pname}-${version}";
     };
 
-    enableParallelBuilding = true;
     strictDeps = true;
 
     cargoLock = {
