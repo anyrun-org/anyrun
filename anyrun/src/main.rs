@@ -484,7 +484,14 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
                 Inhibit(true)
             }
             // Handle selections
-            constants::Down | constants::Tab | constants::Up => {
+            constants::Down | constants::Tab | constants::j | constants::Up | constants::k => {
+                // Propagate unmodified J & K to the default handler
+                if event.state() != gdk::ModifierType::CONTROL_MASK
+                    && matches!(event.keyval(), constants::j | constants::k)
+                {
+                    return Inhibit(false);
+                }
+
                 // Combine all of the matches into a `Vec` to allow for easier handling of the selection
                 let combined_matches = runtime_data_clone
                     .borrow()
@@ -511,10 +518,10 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
                             // If nothing is selected select either the top or bottom match based on the input
                             if !combined_matches.is_empty() {
                                 match event.keyval() {
-                                    constants::Down | constants::Tab => combined_matches[0]
+                                    constants::Down | constants::Tab | constants::j => combined_matches[0]
                                         .1
                                         .select_row(Some(&combined_matches[0].0)),
-                                    constants::Up => {
+                                    constants::Up | constants::k => {
                                         combined_matches[combined_matches.len() - 1].1.select_row(
                                             Some(&combined_matches[combined_matches.len() - 1].0),
                                         )
@@ -537,7 +544,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
 
                 // Move the selection based on the input, loops from top to bottom and vice versa
                 match event.keyval() {
-                    constants::Down | constants::Tab => {
+                    constants::Down | constants::Tab | constants::j => {
                         if index < combined_matches.len() - 1 {
                             combined_matches[index + 1]
                                 .1
@@ -548,7 +555,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
                                 .select_row(Some(&combined_matches[0].0));
                         }
                     }
-                    constants::Up => {
+                    constants::Up | constants::k => {
                         if index > 0 {
                             combined_matches[index - 1]
                                 .1
