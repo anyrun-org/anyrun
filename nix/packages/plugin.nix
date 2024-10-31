@@ -10,6 +10,8 @@
   gtk-layer-shell,
   pkg-config,
   librsvg,
+  cargo,
+  rustc,
   # Generic args
   name,
   lockFile,
@@ -49,17 +51,22 @@ in
       ++ extraInputs;
 
     doCheck = true;
+    checkInputs = [
+      cargo
+      rustc
+    ];
+
     copyLibs = true;
     cargoBuildFlags = ["-p ${name}"];
     buildAndTestSubdir = "plugins/${name}";
 
-    CARGO_BUILD_INCREMENTAL = "false";
+    CARGO_BUILD_INCREMENTAL = 0;
     RUST_BACKTRACE = "full";
 
     meta = {
       description = "The ${name} plugin for Anyrun";
       homepage = "https://github.com/Kirottu/anyrun";
-      license = with lib.licenses; [gpl3];
+      license = [lib.licenses.gpl3];
       maintainers = with lib.maintainers; [NotAShelf n3oney];
     };
   }

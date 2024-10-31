@@ -2,13 +2,8 @@ self: {
   config,
   pkgs,
   lib,
-  hm,
   ...
 }: let
-  cfg = config.programs.anyrun;
-
-  defaultPackage = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
-
   inherit (builtins) map toJSON toString substring stringLength;
   inherit (lib.modules) mkIf mkMerge;
   inherit (lib.options) mkOption mkEnableOption literalExpression;
@@ -17,6 +12,9 @@ self: {
   inherit (lib.strings) toLower toUpper replaceStrings;
   inherit (lib.trivial) boolToString;
   inherit (lib.types) nullOr package submodule int float listOf either str enum lines bool attrs;
+
+  defaultPackage = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
+  cfg = config.programs.anyrun;
 in {
   meta.maintainers = with lib.maintainers; [n3oney NotAShelf];
 
