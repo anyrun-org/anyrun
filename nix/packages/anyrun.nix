@@ -39,8 +39,6 @@ in
       inherit lockFile;
     };
 
-    checkInputs = [cargo rustc];
-
     nativeBuildInputs = [
       pkg-config
       makeWrapper
@@ -63,6 +61,8 @@ in
       else [];
 
     doCheck = true;
+    checkInputs = [cargo rustc];
+
     copyLibs = true;
 
     buildAndTestSubdir =
@@ -70,7 +70,7 @@ in
       then pname
       else null;
 
-    CARGO_BUILD_INCREMENTAL = "false";
+    CARGO_BUILD_INCREMENTAL = 0;
     RUST_BACKTRACE = "full";
 
     postInstall = ''
@@ -82,7 +82,7 @@ in
     meta = {
       description = "A wayland native, highly customizable runner.";
       homepage = "https://github.com/Kirottu/anyrun";
-      license = with lib.licenses; [gpl3];
+      license = [lib.licenses.gpl3];
       mainProgram = "anyrun";
       maintainers = with lib.maintainers; [NotAShelf n3oney];
     };
