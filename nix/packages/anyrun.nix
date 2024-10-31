@@ -70,7 +70,7 @@ in
       then pname
       else null;
 
-    CARGO_BUILD_INCREMENTAL = 0;
+    CARGO_BUILD_INCREMENTAL = "false";
     RUST_BACKTRACE = "full";
 
     postInstall = ''
