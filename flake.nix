@@ -35,7 +35,7 @@
           # it is possible to streamline calling packages with a single function
           # that takes name as an argument, and handles default inherits.
           mkPlugin = name:
-            callPackage ./nix/plugins/default.nix {
+            callPackage ./nix/packages/plugin.nix {
               inherit inputs lockFile;
               inherit name;
             };
@@ -44,8 +44,8 @@
 
           # By default the anyrun package is built without any plugins
           # as per the `dontBuildPlugins` arg.
-          anyrun = callPackage ./nix/default.nix {inherit inputs lockFile;};
-          anyrun-with-all-plugins = callPackage ./nix/default.nix {
+          anyrun = callPackage ./nix/packages/anyrun.nix {inherit inputs lockFile;};
+          anyrun-with-all-plugins = callPackage ./nix/packages/anyrun.nix {
             inherit inputs lockFile;
             dontBuildPlugins = false;
           };
@@ -72,19 +72,19 @@
           default = pkgs.mkShell {
             inputsFrom = builtins.attrValues self'.packages;
             packages = with pkgs; [
-              rustc # rust compiler
+              rustc
               gcc
-              cargo # rust package manager
-              clippy # opinionated rust formatter
+              cargo
+              clippy
+              rustfmt
             ];
           };
 
           nix = pkgs.mkShellNoCC {
             packages = with pkgs; [
-              alejandra # nix formatter
-              rustfmt # rust formatter
-              statix # lints and suggestions
-              deadnix # clean up unused nix code
+              alejandra # formatter
+              statix # linter
+              deadnix # dead-code finder
             ];
           };
         };
@@ -95,7 +95,7 @@
 
       flake = {
         homeManagerModules = {
-          anyrun = import ./nix/hm-module.nix self;
+          anyrun = import ./nix/modules/home-manager.nix self;
           default = self.homeManagerModules.anyrun;
         };
       };

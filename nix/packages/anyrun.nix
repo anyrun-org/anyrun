@@ -22,7 +22,7 @@
 }: let
   inherit (builtins) fromTOML readFile;
 
-  cargoToml = fromTOML (readFile ../anyrun/Cargo.toml);
+  cargoToml = fromTOML (readFile ../../anyrun/Cargo.toml);
   pname = cargoToml.package.name;
   version = cargoToml.package.version;
 in
