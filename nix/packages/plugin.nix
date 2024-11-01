@@ -60,7 +60,7 @@ in
     cargoBuildFlags = ["-p ${name}"];
     buildAndTestSubdir = "plugins/${name}";
 
-    CARGO_BUILD_INCREMENTAL = 0;
+    CARGO_BUILD_INCREMENTAL = "false";
     RUST_BACKTRACE = "full";
 
     meta = {
