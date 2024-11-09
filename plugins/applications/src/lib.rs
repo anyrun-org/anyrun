@@ -1,15 +1,30 @@
-use abi_stable::std_types::{ROption, RString, RVec};
-use anyrun_plugin::{anyrun_interface::HandleResult, *};
-use fuzzy_matcher::FuzzyMatcher;
-use scrubber::DesktopEntry;
-use serde::Deserialize;
 use std::{env, fs, process::Command};
+
+use abi_stable::std_types::{ROption, RString, RVec};
+use fuzzy_matcher::FuzzyMatcher;
+use serde::Deserialize;
+
+use anyrun_plugin::{*, anyrun_interface::HandleResult};
+use scrubber::DesktopEntry;
+
+use crate::execution_stats::ExecutionStats;
 
 #[derive(Deserialize)]
 pub struct Config {
-    desktop_actions: bool,
+    /// Limit amount of entries shown by the applications plugin (default: 5)
     max_entries: usize,
+    /// Whether to evaluate desktop actions as well as desktop applications (default: false)
+    desktop_actions: bool,
+    /// Whether to use a specific terminal or just the first terminal available (default: None)
     terminal: Option<String>,
+    /// Whether to put more often used applications higher in the search rankings (default: true)
+    use_usage_statistics: bool,
+    /// How much score to add for every usage of an application (default: 50)
+    /// Each matching letter is 25 points
+    usage_score_multiplier: i64,
+    /// Maximum amount of usages to count (default: 10)
+    /// This is to limit the added score, so often used apps don't get too big of a boost
+    max_counted_usages: i64,
 }
 
 impl Default for Config {
@@ -18,6 +33,9 @@ impl Default for Config {
             desktop_actions: false,
             max_entries: 5,
             terminal: None,
+            use_usage_statistics: true,
+            usage_score_multiplier: 50,
+            max_counted_usages: 10,
         }
     }
 }
@@ -25,9 +43,11 @@ impl Default for Config {
 pub struct State {
     config: Config,
     entries: Vec<(DesktopEntry, u64)>,
+    execution_stats: Option<ExecutionStats>,
 }
 
 mod scrubber;
+mod execution_stats;
 
 const SENSIBLE_TERMINALS: &[&str] = &["alacritty", "foot", "kitty", "wezterm", "wterm"];
 
@@ -44,6 +64,11 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
             }
         })
         .unwrap();
+
+    // count the usage for the statistics
+    if let Some(stats) = &state.execution_stats {
+        stats.register_usage(&entry);
+    }
 
     if entry.term {
         match &state.config.terminal {
@@ -98,12 +123,20 @@ pub fn init(config_dir: RString) -> State {
         }
     };
 
+    // only load execution stats, if needed
+    let execution_stats = if config.use_usage_statistics {
+        let execution_stats_path = format!("{}/execution_statistics.ron", config_dir);
+        Some(ExecutionStats::from_file_or_default(&execution_stats_path, &config))
+    } else {
+        None
+    };
+
     let entries = scrubber::scrubber(&config).unwrap_or_else(|why| {
         eprintln!("Failed to load desktop entries: {}", why);
         Vec::new()
     });
 
-    State { config, entries }
+    State { config, entries, execution_stats }
 }
 
 #[get_matches]
@@ -127,6 +160,11 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
                 .sum::<i64>();
 
             let mut score = (app_score * 25 + keyword_score) - entry.offset;
+
+            // add score for often used apps
+            if let Some(stats) = &state.execution_stats {
+                score += stats.get_weight(entry) * state.config.usage_score_multiplier;
+            }
 
             // prioritize actions
             if entry.desc.is_some() {
