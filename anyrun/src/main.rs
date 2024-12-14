@@ -201,6 +201,9 @@ mod style_names {
 /// Default config directory
 pub const DEFAULT_CONFIG_DIR: &str = "/etc/anyrun";
 
+/// Default plugin directory
+pub const DEFAULT_PLUGIN_DIR: &str = "/usr/lib/anyrun/plugins";
+
 fn main() {
     let app = gtk::Application::new(Some("com.kirottu.anyrun"), Default::default());
 
@@ -356,7 +359,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
 
     plugin_paths.append(&mut vec![
         format!("{}/plugins", runtime_data.borrow().config_dir).into(),
-        format!("{}/plugins", DEFAULT_CONFIG_DIR).into(),
+        DEFAULT_PLUGIN_DIR.into(),
     ]);
 
     // Load plugins from the paths specified in the config file
@@ -369,7 +372,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
             // Load the plugin's dynamic library.
             let mut user_path =
                 PathBuf::from(&format!("{}/plugins", runtime_data.borrow().config_dir));
-            let mut global_path = PathBuf::from("/etc/anyrun/plugins");
+            let mut global_path = PathBuf::from(DEFAULT_PLUGIN_DIR);
             user_path.extend(plugin_path.iter());
             global_path.extend(plugin_path.iter());
 
