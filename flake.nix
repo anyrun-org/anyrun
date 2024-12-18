@@ -72,6 +72,7 @@
               dictionary = mkPlugin "dictionary";
               kidex = mkPlugin "kidex";
               nix-run = mkPlugin "nix-run";
+              actions = mkPlugin "actions";
               randr = mkPlugin "randr";
               rink = mkPlugin "rink";
               shell = mkPlugin "shell";
