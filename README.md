@@ -88,6 +88,7 @@ The flake provides multiple packages:
 - **applications** - the applications plugin
 - **dictionary** - the dictionary plugin
 - **kidex** - the kidex plugin
+- **powermenu** - the powermenu plugin
 - **randr** - the randr plugin
 - **rink** - the rink plugin
 - **shell** - the shell plugin
@@ -207,6 +208,8 @@ list of plugins in this repository is as follows:
   - Quickly translate text.
 - [Kidex](plugins/kidex/README.md)
   - File search provided by [Kidex](https://github.com/Kirottu/kidex).
+- [Powermenu](/plugins/powermenu/README.md)
+  - System power menu actions: lock, log out, power off, etc.
 - [Randr](plugins/randr/README.md)
   - Rotate and resize; quickly change monitor configurations on the fly.
   - TODO: Only supports Hyprland, needs support for other compositors.
