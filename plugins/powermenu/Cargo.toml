@@ -1,0 +1,15 @@
+[package]
+name    = "powermenu"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = [ "cdylib" ]
+
+[dependencies]
+abi_stable    = "0.11.3"
+anyrun-plugin = { path = "../../anyrun-plugin" }
+fuzzy-matcher = "0.3.7"
+num_enum      = "0.7.5"
+ron           = "0.12.0"
+serde         = { features = [ "derive" ], version = "1.0.228" }

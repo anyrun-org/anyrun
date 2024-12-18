@@ -208,6 +208,8 @@ inside the configuration. The list of plugins in this repository is as follows:
   - `nix run` graphical applications straight from Anyrun.
 - [niri-focus](plugins/niri-focus/README.md) `libniri_focus.so`
   - Focus active windows with fuzzy search on niri.
+- [Powermenu](plugins/powermenu/README.md) `libpowermenu.so`
+  - Power off, lock session, suspend, etc.
 
 ## Configuration
 
