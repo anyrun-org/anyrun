@@ -81,7 +81,7 @@ in
 
     meta = {
       description = "A wayland native, highly customizable runner.";
-      homepage = "https://github.com/Kirottu/anyrun";
+      homepage = "https://github.com/anyrun-org/anyrun";
       license = [lib.licenses.gpl3];
       mainProgram = "anyrun";
       maintainers = with lib.maintainers; [NotAShelf n3oney];

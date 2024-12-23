@@ -173,8 +173,8 @@ Make sure all of the dependencies are installed, and then run the following
 commands in order:
 
 ```bash
- # Clone the repository and move to the cloned location
-git clone https://github.com/Kirottu/anyrun.git && cd anyrun
+# Clone the repository and move to the cloned location
+git clone https://github.com/anyrun-org/anyrun && cd anyrun
 
 # Build all packages, and install the Anyrun binary
 cargo build --release
@@ -287,7 +287,7 @@ plugin:
 crate-type = ["cdylib"] # Required to build a dynamic library that can be loaded by anyrun
 
 [dependencies]
-anyrun-plugin = { git = "https://github.com/Kirottu/anyrun" }
+anyrun-plugin = { git = "https://github.com/anyrun-org/anyrun" }
 abi_stable = "0.11.1"
 # Any other dependencies you may have
 ```
