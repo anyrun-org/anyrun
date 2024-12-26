@@ -65,7 +65,7 @@ in
 
     meta = {
       description = "The ${name} plugin for Anyrun";
-      homepage = "https://github.com/Kirottu/anyrun";
+      homepage = "https://github.com/anyrun-org/anyrun";
       license = [lib.licenses.gpl3];
       maintainers = with lib.maintainers; [NotAShelf n3oney];
     };
