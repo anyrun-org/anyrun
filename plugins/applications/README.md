@@ -18,6 +18,12 @@ Config(
   max_entries: 5, 
   // The terminal used for running terminal based desktop entries, if left as `None` a static list of terminals is used
   // to determine what terminal to use.
-  terminal: Some("alacritty"),
+  terminal: Some(Terminal(
+    // The main terminal command
+    command: "alacritty",
+    // What arguments should be passed to the terminal process to run the command correctly
+    // {} is replaced with the command in the desktop entry
+    args: "-e {}",
+  )),
 )
 ```

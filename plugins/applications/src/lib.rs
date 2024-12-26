@@ -9,7 +9,13 @@ use std::{env, fs, process::Command};
 pub struct Config {
     desktop_actions: bool,
     max_entries: usize,
-    terminal: Option<String>,
+    terminal: Option<Terminal>,
+}
+
+#[derive(Deserialize)]
+pub struct Terminal {
+    command: String,
+    args: String,
 }
 
 impl Default for Config {
@@ -29,8 +35,6 @@ pub struct State {
 
 mod scrubber;
 
-const SENSIBLE_TERMINALS: &[&str] = &["alacritty", "foot", "kitty", "wezterm", "wterm"];
-
 #[handler]
 pub fn handler(selection: Match, state: &State) -> HandleResult {
     let entry = state
@@ -48,18 +52,58 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
     if entry.term {
         match &state.config.terminal {
             Some(term) => {
-                if let Err(why) = Command::new(term).arg("-e").arg(&entry.exec).spawn() {
+                if let Err(why) = Command::new("sh")
+                    .arg("-c")
+                    .arg(format!(
+                        "{} {}",
+                        term.command,
+                        term.args.replace("{}", &entry.exec)
+                    ))
+                    .spawn()
+                {
                     eprintln!("Error running desktop entry: {}", why);
                 }
             }
             None => {
-                for term in SENSIBLE_TERMINALS {
-                    if Command::new(term)
-                        .arg("-e")
-                        .arg(&entry.exec)
-                        .spawn()
-                        .is_ok()
+                let sensible_terminals = &[
+                    Terminal {
+                        command: "alacritty".to_string(),
+                        args: "-e {}".to_string(),
+                    },
+                    Terminal {
+                        command: "foot".to_string(),
+                        args: "-e \"{}\"".to_string(),
+                    },
+                    Terminal {
+                        command: "kitty".to_string(),
+                        args: "-e \"{}\"".to_string(),
+                    },
+                    Terminal {
+                        command: "wezterm".to_string(),
+                        args: "-e \"{}\"".to_string(),
+                    },
+                    Terminal {
+                        command: "wterm".to_string(),
+                        args: "-e \"{}\"".to_string(),
+                    },
+                ];
+                for term in sensible_terminals {
+                    if Command::new("which")
+                        .arg(&term.command)
+                        .output()
+                        .is_ok_and(|output| output.status.success())
                     {
+                        if let Err(why) = Command::new("sh")
+                            .arg("-c")
+                            .arg(format!(
+                                "{} {}",
+                                term.command,
+                                term.args.replace("{}", &entry.exec)
+                            ))
+                            .spawn()
+                        {
+                            eprintln!("Error running desktop entry: {}", why);
+                        }
                         break;
                     }
                 }
@@ -72,13 +116,16 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
             .arg("-c")
             .arg(&entry.exec)
             .current_dir(if let Some(path) = &entry.path {
-                if path.exists() { path } else { current_dir }
+                if path.exists() {
+                    path
+                } else {
+                    current_dir
+                }
             } else {
                 current_dir
             })
             .spawn()
-    }
-    {
+    } {
         eprintln!("Error running desktop entry: {}", why);
     }
 
