@@ -1,7 +1,7 @@
 use abi_stable::std_types::{ROption, RString, RVec};
 use anyrun_plugin::{anyrun_interface::HandleResult, *};
 use fuzzy_matcher::FuzzyMatcher;
-use scrubber::DesktopEntry;
+use scrubber::{DesktopEntry, lower_exec};
 use serde::Deserialize;
 use std::{env, fs, process::Command};
 
@@ -48,17 +48,17 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
             }
         })
         .unwrap();
+    let (command, argv) = lower_exec(&entry.exec).unwrap_or_else(
+        |e| panic!("Unable to parse the exec key `{}`: {}", &entry.exec, e.0)
+    );
 
     if entry.term {
         match &state.config.terminal {
             Some(term) => {
-                if let Err(why) = Command::new("sh")
-                    .arg("-c")
-                    .arg(format!(
-                        "{} {}",
-                        term.command,
-                        term.args.replace("{}", &entry.exec)
-                    ))
+                if let Err(why) = Command::new(&term.command)
+                    .arg(&term.args)
+                    .arg(command)
+                    .args(argv)
                     .spawn()
                 {
                     eprintln!("Error running desktop entry: {}", why);
@@ -68,23 +68,23 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
                 let sensible_terminals = &[
                     Terminal {
                         command: "alacritty".to_string(),
-                        args: "-e {}".to_string(),
+                        args: "-e".to_string(),
                     },
                     Terminal {
                         command: "foot".to_string(),
-                        args: "-e \"{}\"".to_string(),
+                        args: "-e".to_string(),
                     },
                     Terminal {
                         command: "kitty".to_string(),
-                        args: "-e \"{}\"".to_string(),
+                        args: "-e".to_string(),
                     },
                     Terminal {
                         command: "wezterm".to_string(),
-                        args: "-e \"{}\"".to_string(),
+                        args: "-e".to_string(),
                     },
                     Terminal {
                         command: "wterm".to_string(),
-                        args: "-e \"{}\"".to_string(),
+                        args: "-e".to_string(),
                     },
                 ];
                 for term in sensible_terminals {
@@ -93,13 +93,10 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
                         .output()
                         .is_ok_and(|output| output.status.success())
                     {
-                        if let Err(why) = Command::new("sh")
-                            .arg("-c")
-                            .arg(format!(
-                                "{} {}",
-                                term.command,
-                                term.args.replace("{}", &entry.exec)
-                            ))
+                        if let Err(why) = Command::new(&term.command)
+                            .arg(&term.args)
+                            .arg(command)
+                            .args(argv)
                             .spawn()
                         {
                             eprintln!("Error running desktop entry: {}", why);
@@ -112,9 +109,8 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
     } else if let Err(why) = {
         let current_dir = &env::current_dir().unwrap();
 
-        Command::new("sh")
-            .arg("-c")
-            .arg(&entry.exec)
+        Command::new(command)
+            .args(argv)
             .current_dir(if let Some(path) = &entry.path {
                 if path.exists() {
                     path
@@ -123,8 +119,7 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
                 }
             } else {
                 current_dir
-            })
-            .spawn()
+            }).spawn()
     } {
         eprintln!("Error running desktop entry: {}", why);
     }
