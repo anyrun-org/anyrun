@@ -3,13 +3,14 @@ use anyrun_plugin::{anyrun_interface::HandleResult, *};
 use fuzzy_matcher::FuzzyMatcher;
 use scrubber::DesktopEntry;
 use serde::Deserialize;
-use std::{env, fs, process::Command};
+use std::{env, fs, path::PathBuf, process::Command};
 
 #[derive(Deserialize)]
 pub struct Config {
     desktop_actions: bool,
     max_entries: usize,
     terminal: Option<Terminal>,
+    preprocess_exec_script: Option<PathBuf>,
 }
 
 #[derive(Deserialize)]
@@ -23,6 +24,7 @@ impl Default for Config {
         Self {
             desktop_actions: false,
             max_entries: 5,
+            preprocess_exec_script: None,
             terminal: None,
         }
     }
@@ -49,6 +51,26 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
         })
         .unwrap();
 
+    let exec = if let Some(script) = &state.config.preprocess_exec_script {
+        let output = Command::new("sh")
+            .arg("-c")
+            .arg(format!(
+                "{} {} {}",
+                script.display(),
+                if entry.term { "term" } else { "no-term" },
+                &entry.exec
+            ))
+            .output()
+            .unwrap_or_else(|why| {
+                eprintln!("Error running preprocess script: {}", why);
+                std::process::exit(1);
+            });
+
+        String::from_utf8_lossy(&output.stdout).trim().to_string()
+    } else {
+        entry.exec.clone()
+    };
+
     if entry.term {
         match &state.config.terminal {
             Some(term) => {
@@ -57,7 +79,7 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
                     .arg(format!(
                         "{} {}",
                         term.command,
-                        term.args.replace("{}", &entry.exec)
+                        term.args.replace("{}", &exec)
                     ))
                     .spawn()
                 {
@@ -98,7 +120,7 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
                             .arg(format!(
                                 "{} {}",
                                 term.command,
-                                term.args.replace("{}", &entry.exec)
+                                term.args.replace("{}", &exec)
                             ))
                             .spawn()
                         {
@@ -114,7 +136,7 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
 
         Command::new("sh")
             .arg("-c")
-            .arg(&entry.exec)
+            .arg(&exec)
             .current_dir(if let Some(path) = &entry.path {
                 if path.exists() {
                     path
