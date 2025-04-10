@@ -1,12 +1,12 @@
 use std::{
     cell::RefCell,
     env, fs,
-    io::{self, Write},
+    io::{self, BufRead, BufReader, Read, Write},
     mem,
     path::PathBuf,
     rc::Rc,
     sync::Once,
-    time::Duration,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use abi_stable::std_types::{ROption, RVec};
@@ -14,7 +14,7 @@ use anyrun_interface::{HandleResult, Match, PluginInfo, PluginRef, PollResult};
 use clap::{Parser, ValueEnum};
 use gtk::{gdk, gdk_pixbuf, gio, glib, prelude::*};
 use nix::unistd;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use wl_clipboard_rs::copy;
 
 #[anyrun_macros::config_args]
@@ -49,6 +49,10 @@ struct Config {
     max_entries: Option<usize>,
     #[serde(default = "Config::default_layer")]
     layer: Layer,
+    #[serde(default)]
+    persist_state: bool,
+    #[serde(default)]
+    state_ttl_secs: Option<u64>,
 }
 
 impl Config {
@@ -97,6 +101,8 @@ impl Default for Config {
             show_results_immediately: false,
             max_entries: None,
             layer: Self::default_layer(),
+            persist_state: false,
+            state_ttl_secs: None,
         }
     }
 }
@@ -178,6 +184,67 @@ struct RuntimeData {
     config_dir: String,
 }
 
+impl RuntimeData {
+    fn state_file(&self) -> String {
+        format!("{}/state.txt", self.config_dir)
+    }
+
+    fn save_state(&self, text: &str) -> io::Result<()> {
+        if !self.config.persist_state {
+            return Ok(());
+        }
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        
+        let mut file = fs::File::create(self.state_file())?;
+        writeln!(file, "{}", timestamp)?;
+        write!(file, "{}", text)
+    }
+
+    fn load_state(&self) -> io::Result<String> {
+        if !self.config.persist_state {
+            return Ok(String::new());
+        }
+        match fs::File::open(self.state_file()) {
+            Ok(file) => {
+                let mut reader = BufReader::new(file);
+                
+                // Read timestamp from first line
+                let mut timestamp_str = String::new();
+                reader.read_line(&mut timestamp_str)?;
+                let timestamp = timestamp_str.trim().parse::<u128>().unwrap_or(0);
+                
+                // Check if state has expired
+                if let Some(expiry_secs) = self.config.state_ttl_secs {
+                    let now = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis();
+                    if now - timestamp > u128::from(expiry_secs) * 1000 {
+                        return Ok(String::new());
+                    }
+                }
+                
+                // Read text from second line to end
+                let mut text = String::new();
+                reader.read_to_string(&mut text)?;
+                Ok(text)
+            }
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(String::new()),
+            Err(e) => Err(e),
+        }
+    }
+
+    fn clear_state(&self) -> io::Result<()> {
+        if !self.config.persist_state {
+            return Ok(());
+        }
+        fs::write(self.state_file(), "0\n")
+    }
+}
+
 /// The naming scheme for CSS styling
 ///
 /// Refer to [GTK 3.0 CSS Overview](https://docs.gtk.org/gtk3/css-overview.html)
@@ -251,7 +318,7 @@ fn main() {
 
     config.merge_opt(args.config);
 
-    let runtime_data: Rc<RefCell<RuntimeData>> = Rc::new(RefCell::new(RuntimeData {
+    let runtime_data = Rc::new(RefCell::new(RuntimeData {
         exclusive: None,
         plugins: Vec::new(),
         post_run_action: PostRunAction::None,
@@ -465,10 +532,21 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
         .name(style_names::ENTRY)
         .build();
 
-    // Refresh the matches when text input changes
+    // Set initial text from loaded state
+    if let Ok(initial_text) = runtime_data.borrow().load_state() {
+        entry.set_text(&initial_text);
+    } else {
+        eprintln!("Failed to load state");
+    }
+
+    // Update last_input, save state and refresh matches when text changes
     let runtime_data_clone = runtime_data.clone();
     entry.connect_changed(move |entry| {
-        refresh_matches(entry.text().to_string(), runtime_data_clone.clone())
+        let text = entry.text().to_string();
+        if let Err(e) = runtime_data_clone.borrow().save_state(&text) {
+            eprintln!("Failed to save state: {}", e);
+        }
+        refresh_matches(text, runtime_data_clone.clone());
     });
 
     // Handle other key presses for selection control and all other things that may be needed
@@ -584,6 +662,9 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
                     (*selected_match.data::<Match>("match").unwrap().as_ptr()).clone()
                 }) {
                     HandleResult::Close => {
+                        if let Err(e) = _runtime_data_clone.clear_state() {
+                            eprintln!("Failed to clear state: {}", e);
+                        }
                         window.close();
                         Inhibit(true)
                     }
@@ -599,12 +680,18 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
                     }
                     HandleResult::Copy(bytes) => {
                         _runtime_data_clone.post_run_action = PostRunAction::Copy(bytes.into());
+                        if let Err(e) = _runtime_data_clone.clear_state() {
+                            eprintln!("Failed to clear state: {}", e);
+                        }
                         window.close();
                         Inhibit(true)
                     }
                     HandleResult::Stdout(bytes) => {
                         if let Err(why) = io::stdout().lock().write_all(&bytes) {
                             eprintln!("Error outputting content to stdout: {}", why);
+                        }
+                        if let Err(e) = _runtime_data_clone.clear_state() {
+                            eprintln!("Failed to clear state: {}", e);
                         }
                         window.close();
                         Inhibit(true)
@@ -679,11 +766,17 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
                 main_vbox.add(&main_list);
                 main_list.show();
                 entry.grab_focus(); // Grab the focus so typing is immediately accepted by the entry box
+                entry.set_position(-1); // -1 moves cursor to end of text in case some text was restored
             }
 
-            if runtime_data.borrow().config.show_results_immediately {
-                // Get initial matches
-                refresh_matches(String::new(), runtime_data);
+            // Show initial results if state restoration is enabled or immediate results are configured
+            let should_show_results = {
+                let data = runtime_data.borrow();
+                data.config.persist_state || data.config.show_results_immediately
+            };
+            
+            if should_show_results {
+                refresh_matches(entry.text().to_string(), runtime_data);
             }
         });
 

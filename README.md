@@ -27,6 +27,10 @@ A wayland native krunner-like runner, made with customizability in mind.
     documentation of the [anyrun-plugin](anyrun-plugin) crate.
 - Responsive
   - Asynchronous running of plugin functions
+- State persistence
+  - Optional saving and restoring of input text between sessions
+  - Automatically clears state when selecting a match
+  - Can be configured to automatically discard state after a certain time
 - Wayland native
   - GTK layer shell for overlaying the window
   - data-control for managing the clipboard
@@ -117,6 +121,8 @@ You may use it in your system like this:
       hidePluginInfo = false;
       closeOnClick = false;
       showResultsImmediately = false;
+      persistState = false;
+      stateTtlSecs = null;
       maxEntries = null;
 
       plugins = [
@@ -229,12 +235,29 @@ the config directory is as follows and should be respected by plugins:
     - <plugin dynamic libraries>
   - config.ron
   - style.css
+  - state.ron    # Optional, used to retain state when state saving is enabled
   - <any plugin specific config files>
 ```
 
 The [default config file](examples/config.ron) contains the default values, and
 annotates all configuration options with comments on what they are and how to
 use them.
+
+### State Saving
+
+When `persist_state` is set to `true` in the config, Anyrun will:
+- Save the input text to `state.ron` when the window is closed
+- Restore this text when Anyrun is launched again
+- Clear the saved state when a match is selected
+
+You can optionally set `state_ttl_secs` to automatically discard saved state after a certain time. For example:
+```ron
+// Enable state persistence with 2-minute TTL
+persist_state: true,
+state_ttl_secs: Some(120)
+```
+
+This is useful for preserving your input between sessions, especially for longer queries or calculations.
 
 ## Styling
 
