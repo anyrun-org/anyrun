@@ -226,7 +226,7 @@ list of plugins in this repository is as follows:
 
 ## Configuration
 
-The default configuration directory is `$HOME/.config/anyrun` the structure of
+The default configuration directory in the config dir (`$XDG_CONFIG_HOME/anyrun` or `$HOME/.config/anyrun`), the structure of
 the config directory is as follows and should be respected by plugins:
 
 ```
@@ -235,7 +235,6 @@ the config directory is as follows and should be respected by plugins:
     - <plugin dynamic libraries>
   - config.ron
   - style.css
-  - state.ron    # Optional, used to retain state when state saving is enabled
   - <any plugin specific config files>
 ```
 
@@ -246,9 +245,9 @@ use them.
 ### State Saving
 
 When `persist_state` is set to `true` in the config, Anyrun will:
-- Save the input text to `state.ron` when the window is closed
+- Save the input text to a state file (`$XDG_STATE_HOME/anyrun` or `$HOME/.local/state/anyrun`), when the window is closed
 - Restore this text when Anyrun is launched again
-- Clear the saved state when a match is selected
+- Clear the saved state when a match is selected or copied
 
 You can optionally set `state_ttl_secs` to automatically discard saved state after a certain time. For example:
 ```ron
