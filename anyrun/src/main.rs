@@ -184,6 +184,7 @@ struct RuntimeData {
     error_label: String,
     config_dir: String,
     state_dir: Option<String>,
+    last_input: Option<String>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -253,6 +254,7 @@ impl RuntimeData {
             error_label,
             config_dir,
             state_dir,
+            last_input: None,
         }
     }
 
@@ -265,7 +267,7 @@ impl RuntimeData {
         if !self.config.persist_state {
             return Ok(());
         }
-
+        
         let state = PersistentState {
             timestamp: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -273,11 +275,11 @@ impl RuntimeData {
                 .as_secs(),
             text: text.to_string(),
         };
-
+        
         fs::write(self.state_file(), ron::ser::to_string_pretty(&state, ron::ser::PrettyConfig::default())
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?)
     }
-
+    
     fn load_state(&self) -> io::Result<Option<String>> {
         if !self.config.persist_state {
             return Ok(None);
@@ -310,11 +312,22 @@ impl RuntimeData {
         if !self.config.persist_state {
             return Ok(());
         }
-
+        
         match fs::remove_file(self.state_file()) {
             Ok(()) => Ok(()),
             Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()), // File doesn't exist = already cleared
             Err(e) => Err(e),
+        }
+    }
+
+    fn persist_state(&self) -> io::Result<()> {
+        if !self.config.persist_state {
+            return Ok(());
+        }
+        
+        match &self.last_input {
+            Some(text) => self.save_state(text),
+            None => self.clear_state(),
         }
     }
 }
@@ -565,20 +578,35 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
         .name(style_names::ENTRY)
         .build();
 
-    // Update last_input, save state and refresh matches when text changes
+    // Refresh the matches when text input changes
     let runtime_data_clone = runtime_data.clone();
     entry.connect_changed(move |entry| {
         let text = entry.text().to_string();
-        if let Err(e) = runtime_data_clone.borrow().save_state(&text) {
-            eprintln!("Failed to save state: {}", e);
+        
+        refresh_matches(text.clone(), runtime_data_clone.clone());
+        
+        let runtime_data_update = runtime_data_clone.clone();
+        
+        // idle_add_local_once is needed to avoid borrow conflicts with the entry widget
+        glib::idle_add_local_once(move || {
+            runtime_data_update.borrow_mut().last_input = Some(text);
+        });
+    });
+
+
+    // Persist state when window is removed
+    let runtime_data_clone = runtime_data.clone();
+    window.connect_delete_event(move |_, _| {
+        if let Err(e) = runtime_data_clone.borrow().persist_state() {
+            eprintln!("Failed to handle state persistence on shutdown: {}", e);
         }
-        refresh_matches(text, runtime_data_clone.clone());
+        Inhibit(false)
     });
 
     // Handle other key presses for selection control and all other things that may be needed
     let entry_clone = entry.clone();
     let runtime_data_clone = runtime_data.clone();
-
+    
     window.connect_key_press_event(move |window, event| {
         use gdk::keys::constants;
         match event.keyval() {
@@ -688,9 +716,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
                     (*selected_match.data::<Match>("match").unwrap().as_ptr()).clone()
                 }) {
                     HandleResult::Close => {
-                        if let Err(e) = _runtime_data_clone.clear_state() {
-                            eprintln!("Failed to clear state: {}", e);
-                        }
+                        _runtime_data_clone.last_input = None;
                         window.close();
                         Inhibit(true)
                     }
@@ -706,9 +732,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
                     }
                     HandleResult::Copy(bytes) => {
                         _runtime_data_clone.post_run_action = PostRunAction::Copy(bytes.into());
-                        if let Err(e) = _runtime_data_clone.clear_state() {
-                            eprintln!("Failed to clear state: {}", e);
-                        }
+                        _runtime_data_clone.last_input = None;
                         window.close();
                         Inhibit(true)
                     }
@@ -716,9 +740,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
                         if let Err(why) = io::stdout().lock().write_all(&bytes) {
                             eprintln!("Error outputting content to stdout: {}", why);
                         }
-                        if let Err(e) = _runtime_data_clone.clear_state() {
-                            eprintln!("Failed to clear state: {}", e);
-                        }
+                        _runtime_data_clone.last_input = None;
                         window.close();
                         Inhibit(true)
                     }
