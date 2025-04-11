@@ -12,6 +12,7 @@ use std::{
 use abi_stable::std_types::{ROption, RVec};
 use anyrun_interface::{HandleResult, Match, PluginInfo, PluginRef, PollResult};
 use clap::{Parser, ValueEnum};
+use dirs;
 use gtk::{gdk, gdk_pixbuf, gio, glib, prelude::*};
 use nix::unistd;
 use serde::{Deserialize, Serialize};
@@ -182,11 +183,76 @@ struct RuntimeData {
     /// Used for displaying errors later on
     error_label: String,
     config_dir: String,
+    state_dir: Option<String>,
 }
 
 impl RuntimeData {
+    fn new(config_dir_path: Option<String>, cli_config: ConfigArgs) -> Self {
+        // Setup config directory
+        let config_dir = config_dir_path.unwrap_or_else(|| {
+            dirs::config_dir()
+                .map(|dir| dir.join("anyrun"))
+                .and_then(|path| path.to_str().map(String::from))
+                .filter(|path| PathBuf::from(path).exists())
+                .unwrap_or_else(|| DEFAULT_CONFIG_DIR.to_string())
+        });
+
+        // Load config, if unable to then read default config
+        let (mut config, error_label) = match fs::read_to_string(format!("{}/config.ron", config_dir)) {
+            Ok(content) => ron::from_str(&content)
+                .map(|config| (config, String::new()))
+                .unwrap_or_else(|why| {
+                    (
+                        Config::default(),
+                        format!(
+                            "Failed to parse Anyrun config file, using default config: {}",
+                            why
+                        ),
+                    )
+                }),
+            Err(why) => (
+                Config::default(),
+                format!(
+                    "Failed to read Anyrun config file, using default config: {}",
+                    why
+                ),
+            ),
+        };
+
+        // Merge CLI config if provided
+        config.merge_opt(cli_config);
+
+        // Setup state directory only if persistence is enabled
+        let state_dir = if config.persist_state {
+            let state_dir = dirs::state_dir()
+                .unwrap_or_else(|| dirs::cache_dir().expect("Failed to get state or cache directory"))
+                .join("anyrun");
+
+            // Ensure atomically that the directory exists
+            if let Err(e) = fs::create_dir_all(&state_dir) {
+                eprintln!("Failed to create state directory at {}: {}", state_dir.display(), e);
+                std::process::exit(1);
+            }
+            
+            Some(state_dir.to_str().unwrap().to_string())
+        } else {
+            None
+        };
+
+        Self {
+            exclusive: None,
+            plugins: Vec::new(),
+            post_run_action: PostRunAction::None,
+            config,
+            error_label,
+            config_dir,
+            state_dir,
+        }
+    }
+
     fn state_file(&self) -> String {
-        format!("{}/state.txt", self.config_dir)
+        let state_dir = self.state_dir.as_ref().expect("state operations called when persistence is disabled");
+        PathBuf::from(state_dir).join("state.txt").to_str().unwrap().to_string()
     }
 
     fn save_state(&self, text: &str) -> io::Result<()> {
@@ -281,51 +347,10 @@ fn main() {
 
     let args = Args::parse();
 
-    // Figure out the config dir
-    let user_dir = format!(
-        "{}/.config/anyrun",
-        env::var("HOME").expect("Could not determine home directory! Is $HOME set?")
-    );
-    let config_dir = args.config_dir.unwrap_or_else(|| {
-        if PathBuf::from(&user_dir).exists() {
-            user_dir
-        } else {
-            DEFAULT_CONFIG_DIR.to_string()
-        }
-    });
-
-    // Load config, if unable to then read default config. If an error occurs the message will be displayed.
-    let (mut config, error_label) = match fs::read_to_string(format!("{}/config.ron", config_dir)) {
-        Ok(content) => ron::from_str(&content)
-            .map(|config| (config, String::new()))
-            .unwrap_or_else(|why| {
-                (
-                    Config::default(),
-                    format!(
-                        "Failed to parse Anyrun config file, using default config: {}",
-                        why
-                    ),
-                )
-            }),
-        Err(why) => (
-            Config::default(),
-            format!(
-                "Failed to read Anyrun config file, using default config: {}",
-                why
-            ),
-        ),
-    };
-
-    config.merge_opt(args.config);
-
-    let runtime_data = Rc::new(RefCell::new(RuntimeData {
-        exclusive: None,
-        plugins: Vec::new(),
-        post_run_action: PostRunAction::None,
-        config,
-        error_label,
-        config_dir,
-    }));
+    let runtime_data = Rc::new(RefCell::new(RuntimeData::new(
+        args.config_dir,
+        args.config,
+    )));
 
     let runtime_data_clone = runtime_data.clone();
     app.connect_activate(move |app| activate(app, runtime_data_clone.clone()));
