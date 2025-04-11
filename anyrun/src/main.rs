@@ -5,7 +5,7 @@ use std::{
     mem,
     path::PathBuf,
     rc::Rc,
-    sync::Once,
+    sync::{Arc, Once},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
@@ -16,6 +16,9 @@ use dirs;
 use gtk::{gdk, gdk_pixbuf, gio, glib, prelude::*};
 use nix::unistd;
 use serde::{Deserialize, Serialize};
+use signal_hook::consts::TERM_SIGNALS;
+use signal_hook::flag as signal_flag;
+use std::sync::atomic::{AtomicBool, Ordering};
 use wl_clipboard_rs::copy;
 
 #[anyrun_macros::config_args]
@@ -373,13 +376,37 @@ fn main() {
         args.config,
     )));
 
+    // Register termination signal handlers (SIGTERM, SIGINT, etc.)
+    let termination_requested = Arc::new(AtomicBool::new(false));
+    for sig in TERM_SIGNALS {
+        signal_flag::register(*sig, Arc::clone(&termination_requested))
+            .expect("Failed to register signal handler");
+    }
+    
+    // Set up a periodic check for termination signals
+    let term_flag = Arc::clone(&termination_requested);
+    let runtime_data_sig = runtime_data.clone();
+    
+    glib::timeout_add_local(Duration::from_millis(100), move || {
+        if term_flag.load(Ordering::Relaxed) {
+            // A termination signal was received, save state before exiting
+            if let Err(e) = runtime_data_sig.borrow().persist_state() {
+                eprintln!("Failed to save state on signal termination: {}", e);
+            }
+            
+            std::process::exit(0);
+        }
+        
+        glib::Continue(true)
+    });
+
     let runtime_data_clone = runtime_data.clone();
     app.connect_activate(move |app| activate(app, runtime_data_clone.clone()));
 
     // Run with no args to make sure only clap is used
     app.run_with_args::<String>(&[]);
 
-    let runtime_data = runtime_data.borrow_mut();
+    let runtime_data = runtime_data.borrow();
 
     // Perform a post run action if one is set
     match &runtime_data.post_run_action {
@@ -596,11 +623,10 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
 
     // Persist state when window is removed
     let runtime_data_clone = runtime_data.clone();
-    window.connect_delete_event(move |_, _| {
+    app.connect_shutdown(move |_| {
         if let Err(e) = runtime_data_clone.borrow().persist_state() {
             eprintln!("Failed to handle state persistence on shutdown: {}", e);
         }
-        Inhibit(false)
     });
 
     // Handle other key presses for selection control and all other things that may be needed
