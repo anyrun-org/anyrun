@@ -1,7 +1,7 @@
 use std::{
     cell::RefCell,
     env, fs,
-    io::{self, BufRead, BufReader, Read, Write},
+    io::{self, Write},
     mem,
     path::PathBuf,
     rc::Rc,
@@ -46,14 +46,14 @@ struct Config {
     close_on_click: bool,
     #[serde(default)]
     show_results_immediately: bool,
-    #[serde(default)]
-    max_entries: Option<usize>,
     #[serde(default = "Config::default_layer")]
     layer: Layer,
     #[serde(default)]
     persist_state: bool,
     #[serde(default)]
     state_ttl_secs: Option<u64>,
+    #[serde(default)]
+    max_entries: Option<usize>,
 }
 
 impl Config {
@@ -186,6 +186,12 @@ struct RuntimeData {
     state_dir: Option<String>,
 }
 
+#[derive(Deserialize, Serialize)]
+struct PersistentState {
+    timestamp: u64,
+    text: String,
+}
+
 impl RuntimeData {
     fn new(config_dir_path: Option<String>, cli_config: ConfigArgs) -> Self {
         // Setup config directory
@@ -252,53 +258,50 @@ impl RuntimeData {
 
     fn state_file(&self) -> String {
         let state_dir = self.state_dir.as_ref().expect("state operations called when persistence is disabled");
-        PathBuf::from(state_dir).join("state.txt").to_str().unwrap().to_string()
+        PathBuf::from(state_dir).join("state.ron").to_str().unwrap().to_string()
     }
 
     fn save_state(&self, text: &str) -> io::Result<()> {
         if !self.config.persist_state {
             return Ok(());
         }
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis();
-        
-        let mut file = fs::File::create(self.state_file())?;
-        writeln!(file, "{}", timestamp)?;
-        write!(file, "{}", text)
+
+        let state = PersistentState {
+            timestamp: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            text: text.to_string(),
+        };
+
+        fs::write(self.state_file(), ron::ser::to_string_pretty(&state, ron::ser::PrettyConfig::default())
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?)
     }
 
-    fn load_state(&self) -> io::Result<String> {
+    fn load_state(&self) -> io::Result<Option<String>> {
         if !self.config.persist_state {
-            return Ok(String::new());
+            return Ok(None);
         }
-        match fs::File::open(self.state_file()) {
-            Ok(file) => {
-                let mut reader = BufReader::new(file);
-                
-                // Read timestamp from first line
-                let mut timestamp_str = String::new();
-                reader.read_line(&mut timestamp_str)?;
-                let timestamp = timestamp_str.trim().parse::<u128>().unwrap_or(0);
-                
+
+        match fs::read_to_string(self.state_file()) {
+            Ok(content) => {
+                let state: PersistentState = ron::from_str(&content)
+                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
                 // Check if state has expired
                 if let Some(expiry_secs) = self.config.state_ttl_secs {
                     let now = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
                         .unwrap()
-                        .as_millis();
-                    if now - timestamp > u128::from(expiry_secs) * 1000 {
-                        return Ok(String::new());
+                        .as_secs();
+                    if now - state.timestamp > u64::from(expiry_secs) {
+                        return Ok(None);
                     }
                 }
-                
-                // Read text from second line to end
-                let mut text = String::new();
-                reader.read_to_string(&mut text)?;
-                Ok(text)
+
+                Ok(Some(state.text))
             }
-            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(String::new()),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
             Err(e) => Err(e),
         }
     }
@@ -307,7 +310,12 @@ impl RuntimeData {
         if !self.config.persist_state {
             return Ok(());
         }
-        fs::write(self.state_file(), "0\n")
+
+        match fs::remove_file(self.state_file()) {
+            Ok(()) => Ok(()),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()), // File doesn't exist = already cleared
+            Err(e) => Err(e),
+        }
     }
 }
 
@@ -557,13 +565,6 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
         .name(style_names::ENTRY)
         .build();
 
-    // Set initial text from loaded state
-    if let Ok(initial_text) = runtime_data.borrow().load_state() {
-        entry.set_text(&initial_text);
-    } else {
-        eprintln!("Failed to load state");
-    }
-
     // Update last_input, save state and refresh matches when text changes
     let runtime_data_clone = runtime_data.clone();
     entry.connect_changed(move |entry| {
@@ -743,11 +744,19 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
     // Only create the widgets once to avoid issues
     let configure_once = Once::new();
 
-    // Create widgets here for proper positioning
+    // Load initial state before configuring
+    let initial_text = if runtime_data.borrow().config.persist_state {
+        runtime_data.borrow().load_state().ok().flatten()
+    } else {
+        None
+    };
+    let initial_text_clone = initial_text.clone();
+
     window.connect_configure_event(move |window, event| {
         let runtime_data = runtime_data.clone();
         let entry = entry.clone();
         let main_list = main_list.clone();
+        let initial_text_inner = initial_text_clone.clone();
 
         configure_once.call_once(move || {
             {
@@ -791,13 +800,18 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
                 main_vbox.add(&main_list);
                 main_list.show();
                 entry.grab_focus(); // Grab the focus so typing is immediately accepted by the entry box
-                entry.set_position(-1); // -1 moves cursor to end of text in case some text was restored
+
+                // Set initial text if we loaded state
+                if let Some(text) = &initial_text_inner {
+                    entry.set_text(text);
+                    entry.set_position(-1); // -1 moves cursor to end of text
+                }
             }
 
-            // Show initial results if state restoration is enabled or immediate results are configured
+            // Show initial results if state was loaded or immediate results are configured
             let should_show_results = {
                 let data = runtime_data.borrow();
-                data.config.persist_state || data.config.show_results_immediately
+                initial_text_inner.is_some() || data.config.show_results_immediately
             };
             
             if should_show_results {
