@@ -85,15 +85,32 @@ pub fn get_matches(_attr: TokenStream, item: TokenStream) -> TokenStream {
             }
         };
         quote! {
-            if let ::core::option::Option::Some(data) = #data {
-                #fn_name(input, data)
-            } else {
-                ::abi_stable::std_types::RVec::new()
+            match ::std::panic::catch_unwind(|| {
+                if let ::core::option::Option::Some(data) = #data {
+                    #fn_name(input, data)
+                } else {
+                    ::abi_stable::std_types::RVec::new()
+                }
+            }
+        ) {
+                ::core::result::Result::Ok(result) => result,
+                ::core::result::Result::Err(_) => {
+                    ::std::eprintln!("Plugin '{}' panicked", anyrun_internal_info().name);
+                    ::abi_stable::std_types::RVec::new()
+                }
             }
         }
     } else {
         quote! {
-            #fn_name(input)
+            match ::std::panic::catch_unwind(|| {
+                #fn_name(input)
+            }) {
+                ::core::result::Result::Ok(result) => result,
+                ::core::result::Result::Err(_) => {
+                    ::std::eprintln!("Plugin '{}' panicked", anyrun_internal_info().name);
+                    ::abi_stable::std_types::RVec::new()
+                }
+            }
         }
     };
 
