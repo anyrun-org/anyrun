@@ -144,6 +144,18 @@ in {
         description = "Show search results immediately when Anyrun starts";
       };
 
+      persistState = mkOption {
+        type = bool;
+        default = false;
+        description = "Whether to save and restore input text between sessions";
+      };
+
+      stateTtlSecs = mkOption {
+        type = nullOr int;
+        default = null;
+        description = "Time in seconds after which saved state is discarded";
+      };
+
       maxEntries = mkOption {
         type = nullOr int;
         default = null;
@@ -233,6 +245,12 @@ in {
             hide_plugin_info: ${boolToString cfg.config.hidePluginInfo},
             close_on_click: ${boolToString cfg.config.closeOnClick},
             show_results_immediately: ${boolToString cfg.config.showResultsImmediately},
+            persist_state: ${boolToString cfg.config.persistState},
+            state_ttl_secs: ${
+            if cfg.config.stateTtlSecs == null
+            then "None"
+            else "Some(${toString cfg.config.stateTtlSecs})"
+          },
             max_entries: ${
             if cfg.config.maxEntries == null
             then "None"
