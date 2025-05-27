@@ -35,7 +35,7 @@ fn init(config_dir: RString) -> State {
 
     State {
         config,
-        lines: stdin().lines().filter_map(|line| line.ok()).collect(),
+        lines: stdin().lines().map_while(Result::ok).collect(),
     }
 }
 

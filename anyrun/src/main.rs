@@ -816,7 +816,7 @@ fn handle_matches(plugin_view: PluginView, runtime_data: &RuntimeData, matches: 
         }
     }
 
-    if let Some((row, view)) = combined_matches.get(0) {
+    if let Some((row, view)) = combined_matches.first() {
         view.list.select_row(Some(row));
     }
 }
@@ -866,6 +866,10 @@ fn create_info_box(info: &PluginInfo, hide_icons: bool) -> gtk::Box {
     main_box
 }
 
+// The linter warns about function pointer comparisons being unpredictable.
+// However in Anyrun's case since the function pointers reside in loaded libraries
+// they will always be predictable for comparison during runtime
+#[allow(unpredictable_function_pointer_comparisons)]
 /// Refresh the matches from the plugins
 fn refresh_matches(input: String, runtime_data: Rc<RefCell<RuntimeData>>) {
     for plugin_view in runtime_data.borrow().plugins.iter() {

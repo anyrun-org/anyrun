@@ -199,7 +199,7 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
 
             // prioritize actions
             if entry.desc.is_some() {
-                score = score * 2;
+                score *= 2;
             }
 
             if score > 0 {
@@ -210,8 +210,7 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
         })
         .collect::<Vec<_>>();
 
-    entries.sort_by(|a, b| b.2.cmp(&a.2)
-        .then(a.0.name.cmp(&b.0.name)));
+    entries.sort_by(|a, b| b.2.cmp(&a.2).then(a.0.name.cmp(&b.0.name)));
 
     entries.truncate(state.config.max_entries);
     entries
