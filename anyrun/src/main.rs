@@ -214,21 +214,15 @@ fn main() {
 
     let args = Args::parse();
 
-    // Figure out the config dir
-    let user_dir = format!(
-        "{}/.config/anyrun",
-        env::var("HOME").expect("Could not determine home directory! Is $HOME set?")
-    );
-    let config_dir = args.config_dir.unwrap_or_else(|| {
-        if PathBuf::from(&user_dir).exists() {
-            user_dir
-        } else {
-            DEFAULT_CONFIG_DIR.to_string()
-        }
-    });
+    // Figure out the config dir following XDG spec
+    let config_dir = if let Some(dir) = args.config_dir {
+        dir
+    } else {
+        get_config_dir()
+    };
 
     // Load config, if unable to then read default config. If an error occurs the message will be displayed.
-    let (mut config, error_label) = match fs::read_to_string(format!("{}/config.ron", config_dir)) {
+    let (mut config, error_label) = match find_and_read_config(&config_dir) {
         Ok(content) => ron::from_str(&content)
             .map(|config| (config, String::new()))
             .unwrap_or_else(|why| {
@@ -293,6 +287,100 @@ fn main() {
     }
 }
 
+/// Get configuration directory following XDG Base Directory Specification
+fn get_config_dir() -> String {
+    // Check XDG_CONFIG_HOME first (defaults to $HOME/.config if not set)
+    let xdg_config_home = env::var("XDG_CONFIG_HOME").unwrap_or_else(|_| {
+        format!(
+            "{}/.config",
+            env::var("HOME").expect("HOME environment variable not set")
+        )
+    });
+
+    let user_dir = format!("{}/anyrun", xdg_config_home);
+
+    // Check if user config exists
+    if PathBuf::from(&user_dir).exists() {
+        return user_dir;
+    }
+
+    // Check XDG_CONFIG_DIRS (defaults to /etc/xdg if not set)
+    if let Ok(xdg_config_dirs) = env::var("XDG_CONFIG_DIRS") {
+        for dir in xdg_config_dirs.split(':') {
+            if dir.is_empty() {
+                continue;
+            }
+
+            let config_path = format!("{}/anyrun", dir);
+            if PathBuf::from(&config_path).exists() {
+                return config_path;
+            }
+        }
+    } else {
+        // Check default XDG system directory
+        let xdg_system_dir = "/etc/xdg/anyrun";
+        if PathBuf::from(xdg_system_dir).exists() {
+            return xdg_system_dir.to_string();
+        }
+    }
+
+    // Fall back to the application's default
+    DEFAULT_CONFIG_DIR.to_string()
+}
+
+/// Find and read config file according to XDG spec priorities
+fn find_and_read_config(config_dir: &str) -> io::Result<String> {
+    // First try the provided/determined config directory
+    match fs::read_to_string(format!("{}/config.ron", config_dir)) {
+        Ok(content) => return Ok(content),
+        Err(err) if err.kind() == io::ErrorKind::NotFound => {}
+        Err(err) => return Err(err),
+    }
+
+    // If we're using the default path and the config wasn't found there,
+    // we need to check other XDG paths
+    if config_dir == DEFAULT_CONFIG_DIR {
+        // Get the XDG config directories (without creating them)
+        let xdg_config_home = env::var("XDG_CONFIG_HOME").unwrap_or_else(|_| {
+            format!(
+                "{}/.config",
+                env::var("HOME").expect("HOME environment variable not set")
+            )
+        });
+
+        let user_config = format!("{}/anyrun/config.ron", xdg_config_home);
+        if PathBuf::from(&user_config).exists() {
+            return fs::read_to_string(user_config);
+        }
+
+        // Try XDG_CONFIG_DIRS
+        if let Ok(xdg_config_dirs) = env::var("XDG_CONFIG_DIRS") {
+            for dir in xdg_config_dirs.split(':') {
+                if dir.is_empty() {
+                    continue;
+                }
+
+                let config_path = format!("{}/anyrun/config.ron", dir);
+                if PathBuf::from(&config_path).exists() {
+                    return fs::read_to_string(config_path);
+                }
+            }
+        } else {
+            // Check default XDG system directory
+            let xdg_system_config = "/etc/xdg/anyrun/config.ron";
+            if PathBuf::from(xdg_system_config).exists() {
+                return fs::read_to_string(xdg_system_config);
+            }
+        }
+    }
+
+    // If we get here, we couldn't find a config file
+    Err(io::Error::new(
+        io::ErrorKind::NotFound,
+        "Could not find config.ron in any of the XDG config directories".to_string(),
+    ))
+}
+
 fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
     // Create the main window
     let window = gtk::ApplicationWindow::builder()
@@ -354,10 +442,32 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
         Err(_) => Vec::new(),
     };
 
-    plugin_paths.append(&mut vec![
-        format!("{}/plugins", runtime_data.borrow().config_dir).into(),
-        format!("{}/plugins", DEFAULT_CONFIG_DIR).into(),
-    ]);
+    // Add XDG plugin paths following XDG spec
+    let xdg_config_home = env::var("XDG_CONFIG_HOME").unwrap_or_else(|_| {
+        format!(
+            "{}/.config",
+            env::var("HOME").expect("HOME environment variable not set")
+        )
+    });
+
+    // Add user config dir plugins
+    plugin_paths.push(format!("{}/anyrun/plugins", xdg_config_home).into());
+    plugin_paths.push(format!("{}/plugins", runtime_data.borrow().config_dir).into());
+
+    // Check XDG_CONFIG_DIRS for system paths
+    if let Ok(xdg_config_dirs) = env::var("XDG_CONFIG_DIRS") {
+        for dir in xdg_config_dirs.split(':') {
+            if !dir.is_empty() {
+                plugin_paths.push(format!("{}/anyrun/plugins", dir).into());
+            }
+        }
+    } else {
+        // Default XDG system dir if XDG_CONFIG_DIRS not set
+        plugin_paths.push("/etc/xdg/anyrun/plugins".into());
+    }
+
+    // Keep the original path as fallback
+    plugin_paths.push(format!("{}/plugins", DEFAULT_CONFIG_DIR).into());
 
     // Load plugins from the paths specified in the config file
     let plugins = runtime_data
@@ -366,18 +476,11 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
         .plugins
         .iter()
         .map(|plugin_path| {
-            // Load the plugin's dynamic library.
-            let mut user_path =
-                PathBuf::from(&format!("{}/plugins", runtime_data.borrow().config_dir));
-            let mut global_path = PathBuf::from("/etc/anyrun/plugins");
-            user_path.extend(plugin_path.iter());
-            global_path.extend(plugin_path.iter());
-
-            // Load the plugin's dynamic library.
-
+            // If the plugin path is absolute, use it directly
             let plugin = if plugin_path.is_absolute() {
                 abi_stable::library::lib_header_from_path(plugin_path)
             } else {
+                // Otherwise search for the plugin in the plugin paths
                 let path = plugin_paths
                     .clone()
                     .into_iter()
