@@ -9,7 +9,7 @@ fn main() {
     let mut file = File::create(format!("{}/unicode.rs", env::var("OUT_DIR").unwrap()))
         .expect("Unable to create unicode output file!");
 
-    file.write_all(b"#[allow(text_direction_codepoint_in_literal)]\nconst UNICODE_CHARS: &[(&str, &str)] = &[\n")
+    file.write_all(b"#[allow(text_direction_codepoint_in_literal)]\n#[allow(clippy::invisible_characters)]\nconst UNICODE_CHARS: &[(&str, &str)] = &[\n")
         .unwrap();
     string.lines().for_each(|line| {
         let fields = line.split(';').collect::<Vec<_>>();

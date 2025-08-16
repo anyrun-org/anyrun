@@ -53,53 +53,11 @@ build & run it:
 
 ### Nix
 
-You can use the provided flake:
-
-```nix
-# flake.nix
-{
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    anyrun = {
-      url = "github:anyrun-org/anyrun";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-  };
-
-  outputs = { self, nixpkgs, anyrun }: {
-    nixosConfigurations."<your_hostname>" = nixpkgs.lib.nixosSystem {
-      # ...
-      modules = [
-        # Add Anyrun to environment.systemPackages to make it available to
-        # all system users. You may prefer `users.users.<your_username>.packages`
-        # to install it for a specified user only.
-        {environment.systemPackages = [ anyrun.packages.${system}.anyrun ];}
-      ];
-      # ...
-    };
-  };
-}
-```
-
-The flake provides multiple packages:
-
-- **anyrun (default)** - the Anyrun binary, without plugins
-- **anyrun-with-all-plugins** - Anyrun and all builtin plugins
-- **applications** - the applications plugin
-- **dictionary** - the dictionary plugin
-- **kidex** - the kidex plugin
-- **randr** - the randr plugin
-- **rink** - the rink plugin
-- **shell** - the shell plugin
-- **stdin** - the stdin plugin
-- **symbols** - the symbols plugin
-- **translate** - the translate plugin
-- **websearch** - the websearch plugin
+An Anyrun package that contains all the official plugins is available in [nixpkgs](https://search.nixos.org/packages?channel=unstable&show=anyrun&from=0&size=50&sort=relevance&type=packages&query=anyrun).
 
 #### Home-Manager module
 
-The Anyrun flake exposes a Home-Manager module as `homeManagerModules.default`
-which you can use to install and configure Anyrun in your system with ease.
+The preferred way to use Home-Manager with Anyrun is by using the upstream module.
 
 You may use it in your system like this:
 
@@ -120,10 +78,8 @@ You may use it in your system like this:
       maxEntries = null;
 
       plugins = [
-        # An array of all the plugins you want, which either can be paths to the .so files, or their packages
-        inputs.anyrun.packages.${pkgs.system}.applications
-        ./some_plugin.so
-        "${inputs.anyrun.packages.${pkgs.system}.anyrun-with-all-plugins}/lib/kidex"
+        "${pkgs.anyrun}/lib/libapplications.so"
+        "${pkgs.anyrun}/lib/libsymbols.so"
       ];
     };
 
@@ -217,6 +173,8 @@ list of plugins in this repository is as follows:
   - Look up definitions for words
 - [Websearch](plugins/websearch/README.md)
   - Search the web with configurable engines: Google, Ecosia, Bing, DuckDuckGo.
+- [Nix-run](plugins/nix-run/README.md)
+  - `nix run` graphical applications straight from Anyrun.
 
 ## Configuration
 
