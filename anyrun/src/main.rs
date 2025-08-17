@@ -5,7 +5,6 @@ use std::{
     mem,
     path::PathBuf,
     rc::Rc,
-    sync::Once,
     time::Duration,
 };
 
@@ -31,6 +30,10 @@ struct Config {
 
     #[serde(default = "Config::default_height")]
     height: RelativeNum,
+
+    /// Margin to put around the main box, allows for shadow styling
+    #[serde(default)]
+    margin: u32,
 
     #[serde(default = "Config::default_plugins")]
     plugins: Vec<PathBuf>,
@@ -89,6 +92,7 @@ impl Default for Config {
             y: Self::default_y(),
             width: Self::default_width(),
             height: Self::default_height(),
+            margin: 0,
             plugins: Self::default_plugins(),
             hide_icons: false,
             hide_plugin_info: false,
@@ -305,9 +309,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
 
     // Make layer-window fullscreen
     gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Top, true);
-    gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Bottom, true);
     gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Left, true);
-    gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Right, true);
 
     gtk_layer_shell::set_namespace(&window, "anyrun");
 
@@ -627,71 +629,76 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
             }
         });
     }
-
-    // Only create the widgets once to avoid issues
-    let configure_once = Once::new();
-
-    // Create widgets here for proper positioning
-    window.connect_configure_event(move |window, event| {
-        let runtime_data = runtime_data.clone();
-        let entry = entry.clone();
-        let main_list = main_list.clone();
-
-        configure_once.call_once(move || {
-            {
-                let runtime_data = runtime_data.borrow();
-
-                let width = runtime_data.config.width.to_val(event.size().0);
-                let x = runtime_data.config.x.to_val(event.size().0) - width / 2;
-                let height = runtime_data.config.height.to_val(event.size().1);
-                let y = runtime_data.config.y.to_val(event.size().1) - height / 2;
-
-                // The GtkFixed widget is used for absolute positioning of the main box
-                let fixed = gtk::Fixed::builder().build();
-                let main_vbox = gtk::Box::builder()
-                    .orientation(gtk::Orientation::Vertical)
-                    .halign(gtk::Align::Center)
-                    .vexpand(false)
-                    .width_request(width)
-                    .height_request(height)
-                    .name(style_names::MAIN)
-                    .build();
-                main_vbox.add(&entry);
-
-                // Display the error message
-                if !runtime_data.error_label.is_empty() {
-                    main_vbox.add(
-                        &gtk::Label::builder()
-                            .label(&format!(
-                                r#"<span foreground="red">{}</span>"#,
-                                runtime_data.error_label
-                            ))
-                            .use_markup(true)
-                            .build(),
-                    );
-                }
-
-                fixed.put(&main_vbox, x, y);
-                window.add(&fixed);
-                window.show_all();
-
-                // Add and show the list later, to avoid showing empty plugin categories on launch
-                main_vbox.add(&main_list);
-                main_list.show();
-                entry.grab_focus(); // Grab the focus so typing is immediately accepted by the entry box
-            }
-
-            if runtime_data.borrow().config.show_results_immediately {
-                // Get initial matches
-                refresh_matches(String::new(), runtime_data);
-            }
-        });
-
-        false
-    });
-
     // Show the window initially, so it gets allocated and configured
     window.show_all();
+    let monitor = window
+        .display()
+        .monitor_at_window(window.window().as_ref().unwrap())
+        .unwrap();
+
+    let width = runtime_data
+        .borrow()
+        .config
+        .width
+        .to_val(monitor.geometry().width() as u32);
+    let x = runtime_data
+        .borrow()
+        .config
+        .x
+        .to_val(monitor.geometry().width() as u32)
+        - (width + runtime_data.borrow().config.margin as i32 * 2) / 2;
+    let height = runtime_data
+        .borrow()
+        .config
+        .height
+        .to_val(monitor.geometry().height() as u32);
+    let y = runtime_data
+        .borrow()
+        .config
+        .y
+        .to_val(monitor.geometry().height() as u32)
+        - (height + runtime_data.borrow().config.margin as i32 * 2) / 2;
+
+    gtk_layer_shell::set_margin(&window, gtk_layer_shell::Edge::Left, x);
+    gtk_layer_shell::set_margin(&window, gtk_layer_shell::Edge::Top, y);
+
+    // The GtkFixed widget is used for absolute positioning of the main box
+    let main_vbox = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .halign(gtk::Align::Center)
+        .vexpand(false)
+        .width_request(width)
+        .height_request(height)
+        .margin(runtime_data.borrow().config.margin as i32)
+        .name(style_names::MAIN)
+        .build();
+    main_vbox.add(&entry);
+
+    // Display the error message
+    if !runtime_data.borrow().error_label.is_empty() {
+        main_vbox.add(
+            &gtk::Label::builder()
+                .label(&format!(
+                    r#"<span foreground="red">{}</span>"#,
+                    runtime_data.borrow().error_label
+                ))
+                .use_markup(true)
+                .build(),
+        );
+    }
+
+    window.add(&main_vbox);
+    window.show_all();
+
+    // Add and show the list later, to avoid showing empty plugin categories on launch
+    main_vbox.add(&main_list);
+    main_list.show();
+    entry.grab_focus(); // Grab the focus so typing is immediately accepted by the entry box
+
+    if runtime_data.borrow().config.show_results_immediately {
+        // Get initial matches
+        refresh_matches(String::new(), runtime_data);
+    }
 }
 
 fn handle_matches(plugin_view: PluginView, runtime_data: &RuntimeData, matches: RVec<Match>) {

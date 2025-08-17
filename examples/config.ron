@@ -14,6 +14,9 @@ Config(
 
   // The minimum height of the runner, the runner will expand to fit all the entries
   height: Absolute(0),
+
+  // A margin to be made around the window, useful for shadow styling with CSS
+  margin: 0,
   
   // Hide match and plugin info icons  
   hide_icons: false, 
