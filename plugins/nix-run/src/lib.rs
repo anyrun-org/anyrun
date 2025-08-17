@@ -22,6 +22,7 @@ struct Config {
     channel: String,
     max_entries: usize,
     allow_unfree: bool,
+    prefix: String,
 }
 
 #[derive(Deserialize)]
@@ -53,6 +54,7 @@ impl Default for Config {
             channel: "nixos-unstable".to_string(),
             max_entries: 3,
             allow_unfree: false,
+            prefix: ":nr ".to_string(),
         }
     }
 }
@@ -168,6 +170,12 @@ fn info() -> PluginInfo {
 
 #[get_matches]
 fn get_matches(input: RString, state: &mut State) -> RVec<Match> {
+    let input = if let Some(input) = input.strip_prefix(&state.config.prefix) {
+        input.trim()
+    } else {
+        return RVec::new();
+    };
+
     let matcher = fuzzy_matcher::skim::SkimMatcherV2::default().smart_case();
     let packages = state.packages.lock().unwrap();
     let mut entries = packages
@@ -178,9 +186,9 @@ fn get_matches(input: RString, state: &mut State) -> RVec<Match> {
             if package.meta.unfree.is_some_and(|unfree| unfree) && !state.config.allow_unfree {
                 return None;
             }
-            let score = matcher.fuzzy_match(name, &input).unwrap_or(0)
+            let score = matcher.fuzzy_match(name, input).unwrap_or(0)
                 + matcher
-                    .fuzzy_match(package.meta.main_program.as_ref().unwrap(), &input)
+                    .fuzzy_match(package.meta.main_program.as_ref().unwrap(), input)
                     .unwrap_or(0);
 
             if score > 0 {

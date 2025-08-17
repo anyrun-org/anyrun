@@ -1487,6 +1487,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "niri-focus"
+version = "0.1.0"
+dependencies = [
+ "abi_stable",
+ "anyrun-plugin",
+ "fuzzy-matcher",
+ "niri-ipc",
+ "ron 0.10.1",
+ "serde",
+]
+
+[[package]]
+name = "niri-ipc"
+version = "25.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc3e165f7854b2f83054a2e8f7024baa49666ad25cdb95b8fb9fd17c48045605"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "nix"
 version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
