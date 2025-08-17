@@ -5,16 +5,20 @@ use std::{
     mem,
     path::PathBuf,
     rc::Rc,
-    sync::Once,
-    time::Duration,
+    sync::{Arc, Once},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use abi_stable::std_types::{ROption, RVec};
 use anyrun_interface::{HandleResult, Match, PluginInfo, PluginRef, PollResult};
 use clap::{Parser, ValueEnum};
+use dirs;
 use gtk::{gdk, gdk_pixbuf, gio, glib, prelude::*};
 use nix::unistd;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use signal_hook::consts::TERM_SIGNALS;
+use signal_hook::flag as signal_flag;
+use std::sync::atomic::{AtomicBool, Ordering};
 use wl_clipboard_rs::copy;
 
 #[anyrun_macros::config_args]
@@ -45,10 +49,14 @@ struct Config {
     close_on_click: bool,
     #[serde(default)]
     show_results_immediately: bool,
-    #[serde(default)]
-    max_entries: Option<usize>,
     #[serde(default = "Config::default_layer")]
     layer: Layer,
+    #[serde(default)]
+    persist_state: bool,
+    #[serde(default)]
+    state_ttl_secs: Option<u64>,
+    #[serde(default)]
+    max_entries: Option<usize>,
 }
 
 impl Config {
@@ -97,6 +105,8 @@ impl Default for Config {
             show_results_immediately: false,
             max_entries: None,
             layer: Self::default_layer(),
+            persist_state: false,
+            state_ttl_secs: None,
         }
     }
 }
@@ -176,6 +186,153 @@ struct RuntimeData {
     /// Used for displaying errors later on
     error_label: String,
     config_dir: String,
+    state_dir: Option<String>,
+    last_input: Option<String>,
+}
+
+#[derive(Deserialize, Serialize)]
+struct PersistentState {
+    timestamp: u64,
+    text: String,
+}
+
+impl RuntimeData {
+    fn new(config_dir_path: Option<String>, cli_config: ConfigArgs) -> Self {
+        // Setup config directory
+        let config_dir = config_dir_path.unwrap_or_else(|| {
+            dirs::config_dir()
+                .map(|dir| dir.join("anyrun"))
+                .and_then(|path| path.to_str().map(String::from))
+                .filter(|path| PathBuf::from(path).exists())
+                .unwrap_or_else(|| DEFAULT_CONFIG_DIR.to_string())
+        });
+
+        // Load config, if unable to then read default config
+        let (mut config, error_label) = match fs::read_to_string(format!("{}/config.ron", config_dir)) {
+            Ok(content) => ron::from_str(&content)
+                .map(|config| (config, String::new()))
+                .unwrap_or_else(|why| {
+                    (
+                        Config::default(),
+                        format!(
+                            "Failed to parse Anyrun config file, using default config: {}",
+                            why
+                        ),
+                    )
+                }),
+            Err(why) => (
+                Config::default(),
+                format!(
+                    "Failed to read Anyrun config file, using default config: {}",
+                    why
+                ),
+            ),
+        };
+
+        // Merge CLI config if provided
+        config.merge_opt(cli_config);
+
+        // Setup state directory only if persistence is enabled
+        let state_dir = if config.persist_state {
+            let state_dir = dirs::state_dir()
+                .unwrap_or_else(|| dirs::cache_dir().expect("Failed to get state or cache directory"))
+                .join("anyrun");
+
+            // Ensure atomically that the directory exists
+            if let Err(e) = fs::create_dir_all(&state_dir) {
+                eprintln!("Failed to create state directory at {}: {}", state_dir.display(), e);
+                std::process::exit(1);
+            }
+            
+            Some(state_dir.to_str().unwrap().to_string())
+        } else {
+            None
+        };
+
+        Self {
+            exclusive: None,
+            plugins: Vec::new(),
+            post_run_action: PostRunAction::None,
+            config,
+            error_label,
+            config_dir,
+            state_dir,
+            last_input: None,
+        }
+    }
+
+    fn state_file(&self) -> String {
+        let state_dir = self.state_dir.as_ref().expect("state operations called when persistence is disabled");
+        PathBuf::from(state_dir).join("state.ron").to_str().unwrap().to_string()
+    }
+
+    fn save_state(&self, text: &str) -> io::Result<()> {
+        if !self.config.persist_state {
+            return Ok(());
+        }
+        
+        let state = PersistentState {
+            timestamp: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            text: text.to_string(),
+        };
+        
+        fs::write(self.state_file(), ron::ser::to_string_pretty(&state, ron::ser::PrettyConfig::default())
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?)
+    }
+    
+    fn load_state(&self) -> io::Result<Option<String>> {
+        if !self.config.persist_state {
+            return Ok(None);
+        }
+
+        match fs::read_to_string(self.state_file()) {
+            Ok(content) => {
+                let state: PersistentState = ron::from_str(&content)
+                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+                // Check if state has expired
+                if let Some(expiry_secs) = self.config.state_ttl_secs {
+                    let now = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs();
+                    if now - state.timestamp > u64::from(expiry_secs) {
+                        return Ok(None);
+                    }
+                }
+
+                Ok(Some(state.text))
+            }
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
+    fn clear_state(&self) -> io::Result<()> {
+        if !self.config.persist_state {
+            return Ok(());
+        }
+        
+        match fs::remove_file(self.state_file()) {
+            Ok(()) => Ok(()),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()), // File doesn't exist = already cleared
+            Err(e) => Err(e),
+        }
+    }
+
+    fn persist_state(&self) -> io::Result<()> {
+        if !self.config.persist_state {
+            return Ok(());
+        }
+        
+        match &self.last_input {
+            Some(text) => self.save_state(text),
+            None => self.clear_state(),
+        }
+    }
 }
 
 /// The naming scheme for CSS styling
@@ -214,51 +371,34 @@ fn main() {
 
     let args = Args::parse();
 
-    // Figure out the config dir
-    let user_dir = format!(
-        "{}/.config/anyrun",
-        env::var("HOME").expect("Could not determine home directory! Is $HOME set?")
-    );
-    let config_dir = args.config_dir.unwrap_or_else(|| {
-        if PathBuf::from(&user_dir).exists() {
-            user_dir
-        } else {
-            DEFAULT_CONFIG_DIR.to_string()
+    let runtime_data = Rc::new(RefCell::new(RuntimeData::new(
+        args.config_dir,
+        args.config,
+    )));
+
+    // Register termination signal handlers (SIGTERM, SIGINT, etc.)
+    let termination_requested = Arc::new(AtomicBool::new(false));
+    for sig in TERM_SIGNALS {
+        signal_flag::register(*sig, Arc::clone(&termination_requested))
+            .expect("Failed to register signal handler");
+    }
+    
+    // Set up a periodic check for termination signals
+    let term_flag = Arc::clone(&termination_requested);
+    let runtime_data_sig = runtime_data.clone();
+    
+    glib::timeout_add_local(Duration::from_millis(100), move || {
+        if term_flag.load(Ordering::Relaxed) {
+            // A termination signal was received, save state before exiting
+            if let Err(e) = runtime_data_sig.borrow().persist_state() {
+                eprintln!("Failed to save state on signal termination: {}", e);
+            }
+            
+            std::process::exit(0);
         }
+        
+        glib::Continue(true)
     });
-
-    // Load config, if unable to then read default config. If an error occurs the message will be displayed.
-    let (mut config, error_label) = match fs::read_to_string(format!("{}/config.ron", config_dir)) {
-        Ok(content) => ron::from_str(&content)
-            .map(|config| (config, String::new()))
-            .unwrap_or_else(|why| {
-                (
-                    Config::default(),
-                    format!(
-                        "Failed to parse Anyrun config file, using default config: {}",
-                        why
-                    ),
-                )
-            }),
-        Err(why) => (
-            Config::default(),
-            format!(
-                "Failed to read Anyrun config file, using default config: {}",
-                why
-            ),
-        ),
-    };
-
-    config.merge_opt(args.config);
-
-    let runtime_data: Rc<RefCell<RuntimeData>> = Rc::new(RefCell::new(RuntimeData {
-        exclusive: None,
-        plugins: Vec::new(),
-        post_run_action: PostRunAction::None,
-        config,
-        error_label,
-        config_dir,
-    }));
 
     let runtime_data_clone = runtime_data.clone();
     app.connect_activate(move |app| activate(app, runtime_data_clone.clone()));
@@ -266,7 +406,7 @@ fn main() {
     // Run with no args to make sure only clap is used
     app.run_with_args::<String>(&[]);
 
-    let runtime_data = runtime_data.borrow_mut();
+    let runtime_data = runtime_data.borrow();
 
     // Perform a post run action if one is set
     match &runtime_data.post_run_action {
@@ -468,13 +608,31 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
     // Refresh the matches when text input changes
     let runtime_data_clone = runtime_data.clone();
     entry.connect_changed(move |entry| {
-        refresh_matches(entry.text().to_string(), runtime_data_clone.clone())
+        let text = entry.text().to_string();
+        
+        refresh_matches(text.clone(), runtime_data_clone.clone());
+        
+        let runtime_data_update = runtime_data_clone.clone();
+        
+        // idle_add_local_once is needed to avoid borrow conflicts with the entry widget
+        glib::idle_add_local_once(move || {
+            runtime_data_update.borrow_mut().last_input = Some(text);
+        });
+    });
+
+
+    // Persist state when window is removed
+    let runtime_data_clone = runtime_data.clone();
+    app.connect_shutdown(move |_| {
+        if let Err(e) = runtime_data_clone.borrow().persist_state() {
+            eprintln!("Failed to handle state persistence on shutdown: {}", e);
+        }
     });
 
     // Handle other key presses for selection control and all other things that may be needed
     let entry_clone = entry.clone();
     let runtime_data_clone = runtime_data.clone();
-
+    
     window.connect_key_press_event(move |window, event| {
         use gdk::keys::constants;
         match event.keyval() {
@@ -584,6 +742,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
                     (*selected_match.data::<Match>("match").unwrap().as_ptr()).clone()
                 }) {
                     HandleResult::Close => {
+                        _runtime_data_clone.last_input = None;
                         window.close();
                         Inhibit(true)
                     }
@@ -599,6 +758,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
                     }
                     HandleResult::Copy(bytes) => {
                         _runtime_data_clone.post_run_action = PostRunAction::Copy(bytes.into());
+                        _runtime_data_clone.last_input = None;
                         window.close();
                         Inhibit(true)
                     }
@@ -606,6 +766,7 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
                         if let Err(why) = io::stdout().lock().write_all(&bytes) {
                             eprintln!("Error outputting content to stdout: {}", why);
                         }
+                        _runtime_data_clone.last_input = None;
                         window.close();
                         Inhibit(true)
                     }
@@ -631,11 +792,19 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
     // Only create the widgets once to avoid issues
     let configure_once = Once::new();
 
-    // Create widgets here for proper positioning
+    // Load initial state before configuring
+    let initial_text = if runtime_data.borrow().config.persist_state {
+        runtime_data.borrow().load_state().ok().flatten()
+    } else {
+        None
+    };
+    let initial_text_clone = initial_text.clone();
+
     window.connect_configure_event(move |window, event| {
         let runtime_data = runtime_data.clone();
         let entry = entry.clone();
         let main_list = main_list.clone();
+        let initial_text_inner = initial_text_clone.clone();
 
         configure_once.call_once(move || {
             {
@@ -679,11 +848,22 @@ fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
                 main_vbox.add(&main_list);
                 main_list.show();
                 entry.grab_focus(); // Grab the focus so typing is immediately accepted by the entry box
+
+                // Set initial text if we loaded state
+                if let Some(text) = &initial_text_inner {
+                    entry.set_text(text);
+                    entry.set_position(-1); // -1 moves cursor to end of text
+                }
             }
 
-            if runtime_data.borrow().config.show_results_immediately {
-                // Get initial matches
-                refresh_matches(String::new(), runtime_data);
+            // Show initial results if state was loaded or immediate results are configured
+            let should_show_results = {
+                let data = runtime_data.borrow();
+                initial_text_inner.is_some() || data.config.show_results_immediately
+            };
+            
+            if should_show_results {
+                refresh_matches(entry.text().to_string(), runtime_data);
             }
         });
 

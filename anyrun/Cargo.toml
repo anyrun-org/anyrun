@@ -15,5 +15,7 @@ serde = { version = "1.0.210", features = ["derive"] }
 anyrun-interface = { path = "../anyrun-interface" }
 wl-clipboard-rs = "0.9.1"
 nix = { version = "0.29", default-features = false, features = ["process"] }
+signal-hook = "0.3.17"
 clap = { version = "4.2.7", features = ["derive"] }
 chrono = { version = "0.4.38", default-features = false, features = ["clock"] }
+dirs = "5.0.1"

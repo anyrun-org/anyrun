@@ -33,9 +33,16 @@ Config(
   // Show search results immediately when Anyrun starts
   show_results_immediately: false,
 
+  // Whether to save and restore input text between sessions
+  persist_state: false,
+
+  // Time in seconds after which saved state is discarded
+  // For example, set to 120 to clear state after 2 minutes of inactivity
+  state_ttl_secs: None,
+  
   // Limit amount of entries shown in total
   max_entries: None,
-  
+
   // List of plugins to be loaded by default, can be specified with a relative path to be loaded from the
   // `<anyrun config dir>/plugins` directory or with an absolute path to just load the file the path points to.
   plugins: [
