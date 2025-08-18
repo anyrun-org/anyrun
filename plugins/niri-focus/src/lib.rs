@@ -100,8 +100,15 @@ fn get_matches(input: RString, state: &Option<State>) -> RVec<Match> {
     entries
         .into_iter()
         .map(|(window, _)| Match {
-            title: format!("Focus: {}", window.title.clone().unwrap_or_default()).into(),
-            description: window.app_id.clone().map(Into::<RString>::into).into(),
+            title: window.title.clone().unwrap_or_default().into(),
+            description: ROption::RSome(
+                window
+                    .app_id
+                    .clone()
+                    .map(|app_id| format!("Focus window - {app_id}"))
+                    .unwrap_or("Focus window".to_string())
+                    .into(),
+            ),
             use_pango: false,
             icon: window.app_id.clone().map(Into::<RString>::into).into(),
             id: ROption::RSome(window.id),
