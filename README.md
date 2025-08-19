@@ -175,6 +175,8 @@ list of plugins in this repository is as follows:
   - Search the web with configurable engines: Google, Ecosia, Bing, DuckDuckGo.
 - [Nix-run](plugins/nix-run/README.md)
   - `nix run` graphical applications straight from Anyrun.
+- [niri-focus](plugins/niri-focus/README.md)
+  - Focus active windows with fuzzy search on niri.
 
 ## Configuration
 

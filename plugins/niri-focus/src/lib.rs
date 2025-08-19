@@ -20,7 +20,7 @@ impl Default for Config {
 struct State {
     config: Config,
     socket: Socket,
-    windows: Vec<Window>,
+    windows: Vec<(Option<String>, Window)>,
 }
 
 #[init]
@@ -50,10 +50,31 @@ fn init(config_dir: RString) -> Option<State> {
         return None;
     };
 
+    let entries = freedesktop_desktop_entry::desktop_entries(
+        &freedesktop_desktop_entry::get_languages_from_env(),
+    );
+
     Some(State {
         config,
         socket,
-        windows,
+        windows: windows
+            .into_iter()
+            .map(|win| {
+                (
+                    win.app_id
+                        .as_ref()
+                        .and_then(|app_id| {
+                            freedesktop_desktop_entry::find_app_by_id(
+                                &entries,
+                                freedesktop_desktop_entry::unicase::Ascii::new(app_id),
+                            )
+                        })
+                        .and_then(|entry| entry.icon())
+                        .map(|icon| icon.to_string()),
+                    win,
+                )
+            })
+            .collect(),
     })
 }
 
@@ -74,7 +95,7 @@ fn get_matches(input: RString, state: &Option<State>) -> RVec<Match> {
     let mut entries = state
         .windows
         .iter()
-        .filter_map(|window| {
+        .filter_map(|(icon, window)| {
             let score = window
                 .title
                 .as_ref()
@@ -87,7 +108,7 @@ fn get_matches(input: RString, state: &Option<State>) -> RVec<Match> {
                     .unwrap_or(0);
 
             if score > 0 {
-                Some((window, score))
+                Some(((icon, window), score))
             } else {
                 None
             }
@@ -99,7 +120,7 @@ fn get_matches(input: RString, state: &Option<State>) -> RVec<Match> {
 
     entries
         .into_iter()
-        .map(|(window, _)| Match {
+        .map(|((icon, window), _)| Match {
             title: window.title.clone().unwrap_or_default().into(),
             description: ROption::RSome(
                 window
@@ -110,7 +131,7 @@ fn get_matches(input: RString, state: &Option<State>) -> RVec<Match> {
                     .into(),
             ),
             use_pango: false,
-            icon: window.app_id.clone().map(Into::<RString>::into).into(),
+            icon: icon.as_ref().map(|icon| icon.clone().into()).into(),
             id: ROption::RSome(window.id),
         })
         .collect()
