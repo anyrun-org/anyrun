@@ -9,18 +9,17 @@ fn main() {
     let mut file = File::create(format!("{}/unicode.rs", env::var("OUT_DIR").unwrap()))
         .expect("Unable to create unicode output file!");
 
-    file.write_all(b"#[allow(text_direction_codepoint_in_literal)]\n#[allow(clippy::invisible_characters)]\nconst UNICODE_CHARS: &[(&str, &str)] = &[\n")
+    file.write_all(b"const UNICODE_CHARS: &[(&str, &str)] = &[\n")
         .unwrap();
     string.lines().for_each(|line| {
         let fields = line.split(';').collect::<Vec<_>>();
-        let chr = match char::from_u32(u32::from_str_radix(fields[0], 16).unwrap()) {
-            Some(char) => char,
-            None => return,
-        };
-
-        if fields[1] != "<control>" {
-            file.write_all(format!("(r#\"{}\"#, r#\"{}\"#),\n", fields[1], chr).as_bytes())
-                .unwrap();
+        if fields[1] != "<control>"
+            && u32::from_str_radix(fields[0], 16)
+                .ok()
+                .and_then(char::from_u32)
+                .is_some()
+        {
+            writeln!(file, "(r#\"{}\"#, \"\\u{{{}}}\"),", fields[1], fields[0]).unwrap();
         }
     });
 
