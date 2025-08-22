@@ -206,9 +206,10 @@ follows:
   - `GtkEntry`
 - `window`: The window
   - `GtkWindow`
-- `main`: "Main" parts of the layout
-  - `GtkListBox`: The main list containing the plugins
-  - `GtkBox`: The box combining the main list and the entry box
+- `main`: The box combining the main list and the entry box
+  - `GtkBox`
+- `matches`: The box containing all the results
+  - `GtkBox`
 - `plugin`: Anything for the entire plugin
   - `GtkLabel`: The name of the plugin
   - `GtkBox`: The different boxes in the plugin view

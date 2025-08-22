@@ -14,8 +14,7 @@ use abi_stable::{
 pub struct Plugin {
     pub init: extern "C" fn(RString),
     pub info: extern "C" fn() -> PluginInfo,
-    pub get_matches: extern "C" fn(RString) -> u64,
-    pub poll_matches: extern "C" fn(u64) -> PollResult,
+    pub get_matches: extern "C" fn(RString) -> RVec<Match>,
     pub handle_selection: extern "C" fn(Match) -> HandleResult,
 }
 
@@ -33,7 +32,7 @@ pub struct PluginInfo {
 /// The `title` and `description` support pango markup when `use_pango` is set to true.
 /// Refer to [Pango Markup](https://docs.gtk.org/Pango/pango_markup.html) for how to use pango markup.
 #[repr(C)]
-#[derive(StableAbi, Clone)]
+#[derive(StableAbi, Clone, Debug)]
 pub struct Match {
     pub title: RString,
     pub description: ROption<RString>,
@@ -58,14 +57,6 @@ pub enum HandleResult {
     Copy(RVec<u8>),
     /// Output the content to stdout, printing to stdout has issues in plugins.
     Stdout(RVec<u8>),
-}
-
-#[repr(C)]
-#[derive(StableAbi)]
-pub enum PollResult {
-    Ready(RVec<Match>),
-    Pending,
-    Cancelled,
 }
 
 impl RootModule for PluginRef {

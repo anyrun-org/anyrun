@@ -8,8 +8,6 @@ edition = "2021"
 [dependencies]
 anyrun-macros = { path = "../anyrun-macros" }
 abi_stable = "0.11.1"
-gtk = "0.16.2"
-gtk-layer-shell = { version = "0.5.1", features = ["v0_6"] }
 ron = "0.8.0"
 serde = { version = "1.0.210", features = ["derive"] }
 anyrun-interface = { path = "../anyrun-interface" }
@@ -17,3 +15,6 @@ wl-clipboard-rs = "0.9.1"
 nix = { version = "0.29", default-features = false, features = ["process"] }
 clap = { version = "4.2.7", features = ["derive"] }
 chrono = { version = "0.4.38", default-features = false, features = ["clock"] }
+relm4 = "0.9.1"
+gtk4-layer-shell = "0.5.0"
+gtk4 = "0.9.0"
