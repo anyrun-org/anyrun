@@ -13,11 +13,9 @@ Config(
   width: Absolute(800),
 
   // The minimum height of the runner, the runner will expand to fit all the entries
-  height: Absolute(0),
-
-  // A margin to be made around the window, useful for shadow styling with CSS
-  margin: 0,
-  
+  // NOTE: If this is set to 0, the window will never shrink after being expanded
+  height: Absolute(1),
+ 
   // Hide match and plugin info icons  
   hide_icons: false, 
 
@@ -46,5 +44,24 @@ Config(
     "libsymbols.so",
     "libshell.so",
     "libtranslate.so",
+  ],
+
+  keybinds: [
+    Keybind(
+      key: "Return",
+      action: Select, 
+    ),
+    Keybind(
+      key: "Up",
+      action: Up, 
+    ),
+    Keybind(
+      key: "Down",
+      action: Down, 
+    ),
+    Keybind(
+      key: "Escape",
+      action: Close, 
+    ),
   ],
 )

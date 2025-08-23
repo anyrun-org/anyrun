@@ -2,21 +2,10 @@
 
 A wayland native krunner-like runner, made with customizability in mind.
 
-<!-- Maintenance Status Notice -->
-
-[@notashelf]: https://github.com/notashelf
-
-> [!NOTE]
-> Anyrun is currently in maintenance mode due to the original maintainer taking
-> an extended break. For the time being [@notashelf] will be reviewing and
-> merging critical bug-fixes or must-have features in the form of pull requests.
-> This is _hopefully_ not a permanent status.
-
-<!-- End of Maintenance Status Notice-->
 
 ## Features
 
-- Style customizability with GTK+ CSS
+- Style customizability with GTK4 CSS
   - More info in [Styling](#Styling)
 - Can do basically anything
   - As long as it can work with input and selection
@@ -198,30 +187,32 @@ use them.
 
 ## Styling
 
-Anyrun supports [GTK+ CSS](https://docs.gtk.org/gtk3/css-overview.html) styling.
-The names for the different widgets and widgets associated with them are as
-follows:
+Anyrun supports [GTK4 CSS](https://docs.gtk.org/gtk4/css-properties.html) styling.
+The style classes and widgets that use them are as follows:
 
-- `entry`: The entry box
-  - `GtkEntry`
-- `window`: The window
-  - `GtkWindow`
-- `main`: The box combining the main list and the entry box
-  - `GtkBox`
-- `matches`: The box containing all the results
-  - `GtkBox`
-- `plugin`: Anything for the entire plugin
-  - `GtkLabel`: The name of the plugin
-  - `GtkBox`: The different boxes in the plugin view
-  - `GtkImage`: The icon of the plugin
-- `match`: Widgets of a specific match
-  - `GtkBox`: The main box of the match and the box containing the title and the
-    description if present
-  - `GtkImage`: The icon of the match (if present)
-- `match-title`: Specific for the title of the match
-  - `GtkLabel`
-- `match-desc`: Specific for the description of the match
-  - `GtkLabel`
+- No class, unique widget:
+  - `GtkText`: The main entry box
+  - `GtkWindow`: The main window
+- `.main`:
+  - `GtkBox`: The box that contains everything else
+- `.matches`:
+  - `GtkBox`: The box that contains all the results & info boxes
+- `.plugin`:
+  - `GtkBox`: The main plugin box
+  - `.info`:
+    - `GtkBox`: Box containing the plugin info
+    - `GtkImage`: Icon of the plugin
+    - `GtkLabel`: Name of the plugin
+- `.match`:
+  - `GtkBox`: The box containing all contents of a match
+  - `GtkImage`: The icon (if present)
+  - `.title`:
+    - `GtkLabel`: The title
+  - `.description`
+    - `GtkLabel`: The description (if present)
+
+Refer to the [default style](anyrun/res/style.css) for an example, and use `GTK_DEBUG=interactive anyrun`
+to edit styles live.
 
 ## Arguments
 

@@ -1,25 +1,57 @@
-#window {
-  background-color: rgba(0, 0, 0, 0);
+window {
+  background: transparent;
 }
 
-box#main {
+box.main {
+  padding: 5px;
+  margin: 10px;
   border-radius: 10px;
+  border: 2px solid @theme_selected_bg_color;
   background-color: @theme_bg_color;
+  box-shadow: 0 0 5px black;
 }
 
-list#main {
+
+text {
+  min-height: 30px;
+  padding: 5px;
+  border-radius: 5px;
+  margin-bottom: 5px;
+}
+
+.matches {
   background-color: rgba(0, 0, 0, 0);
   border-radius: 10px;
 }
 
-list#plugin {
+box.plugin.info {
+  min-width: 200px;
+}
+
+list.plugin {
   background-color: rgba(0, 0, 0, 0);
 }
 
-label#match-desc {
+label.match.description {
   font-size: 10px;
 }
 
-label#plugin {
+label.plugin.info {
   font-size: 14px;
+}
+
+.match:selected {
+  border-left: 4px solid @theme_selected_bg_color;
+  background: transparent;
+  animation: fade 0.1s linear;
+}
+
+@keyframes fade {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
 }
