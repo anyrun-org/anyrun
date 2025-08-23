@@ -8,7 +8,7 @@ use abi_stable::{
 };
 
 #[repr(C)]
-#[derive(StableAbi)]
+#[derive(StableAbi, Debug)]
 #[sabi(kind(Prefix(prefix_ref = PluginRef)))]
 #[sabi(missing_field(panic))]
 pub struct Plugin {

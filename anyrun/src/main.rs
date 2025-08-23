@@ -7,221 +7,30 @@ use std::{
 };
 
 use anyrun_interface::{HandleResult, PluginRef};
-use anyrun_macros::ConfigArgs;
-use clap::{Parser, ValueEnum};
+use clap::Parser;
 use gtk::{gdk, glib, prelude::*};
 use gtk4 as gtk;
 use gtk4_layer_shell::{Edge, KeyboardMode, LayerShell};
 use nix::unistd;
 use relm4::prelude::*;
-use serde::{de::Visitor, Deserialize, Deserializer};
 use wl_clipboard_rs::copy;
 
-use crate::plugin_box::{PluginBox, PluginBoxInput, PluginBoxOutput, PluginMatch};
+use crate::{
+    config::{Action, Config, ConfigArgs, Keybind},
+    plugin_box::{PluginBox, PluginBoxInput, PluginBoxOutput, PluginMatch},
+};
 
+mod config;
 mod plugin_box;
 
-#[derive(Deserialize, ConfigArgs)]
-struct Config {
-    #[serde(default = "Config::default_x")]
-    x: RelativeNum,
+// Default search paths, maintain backwards compatibility
+pub const CONFIG_DIRS: &[&str] = &["/etc/xdg/anyrun", "/etc/anyrun"];
+pub const PLUGIN_PATHS: &[&str] = &["/usr/lib/anyrun", "/etc/anyrun/plugins"];
 
-    #[serde(default = "Config::default_y")]
-    y: RelativeNum,
-
-    #[serde(default = "Config::default_width")]
-    width: RelativeNum,
-
-    #[serde(default = "Config::default_height")]
-    height: RelativeNum,
-
-    /// Margin to put around the main box, allows for shadow styling
-    #[serde(default)]
-    margin: u32,
-
-    #[serde(default = "Config::default_plugins")]
-    plugins: Vec<PathBuf>,
-
-    #[serde(default)]
-    hide_icons: bool,
-    #[serde(default)]
-    hide_plugin_info: bool,
-    #[serde(default)]
-    ignore_exclusive_zones: bool,
-    #[serde(default)]
-    close_on_click: bool,
-    #[serde(default)]
-    show_results_immediately: bool,
-    #[serde(default)]
-    max_entries: Option<usize>,
-    #[serde(default = "Config::default_layer")]
-    layer: Layer,
-
-    #[config_args(skip)]
-    #[serde(default = "Config::default_keybinds")]
-    keybinds: Vec<Keybind>,
-}
-
-impl Config {
-    fn default_x() -> RelativeNum {
-        RelativeNum::Fraction(0.5)
-    }
-
-    fn default_y() -> RelativeNum {
-        RelativeNum::Absolute(0)
-    }
-
-    fn default_width() -> RelativeNum {
-        RelativeNum::Fraction(0.5)
-    }
-
-    fn default_height() -> RelativeNum {
-        RelativeNum::Absolute(0)
-    }
-
-    fn default_plugins() -> Vec<PathBuf> {
-        vec![
-            "libapplications.so".into(),
-            "libsymbols.so".into(),
-            "libshell.so".into(),
-            "libtranslate.so".into(),
-        ]
-    }
-
-    fn default_layer() -> Layer {
-        Layer::Overlay
-    }
-
-    fn default_keybinds() -> Vec<Keybind> {
-        vec![
-            Keybind {
-                ctrl: false,
-                alt: false,
-                key: gdk::Key::Escape,
-                action: Action::Close,
-            },
-            Keybind {
-                ctrl: false,
-                alt: false,
-                key: gdk::Key::Return,
-                action: Action::Select,
-            },
-            Keybind {
-                ctrl: false,
-                alt: false,
-                key: gdk::Key::Up,
-                action: Action::Up,
-            },
-            Keybind {
-                ctrl: false,
-                alt: false,
-                key: gdk::Key::Down,
-                action: Action::Down,
-            },
-        ]
-    }
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            x: Self::default_x(),
-            y: Self::default_y(),
-            width: Self::default_width(),
-            height: Self::default_height(),
-            margin: 0,
-            plugins: Self::default_plugins(),
-            hide_icons: false,
-            hide_plugin_info: false,
-            ignore_exclusive_zones: false,
-            close_on_click: false,
-            show_results_immediately: false,
-            max_entries: None,
-            layer: Self::default_layer(),
-            keybinds: Self::default_keybinds(),
-        }
-    }
-}
-
-#[derive(Deserialize, Clone, ValueEnum)]
-enum Layer {
-    Background,
-    Bottom,
-    Top,
-    Overlay,
-}
-
-// Could have a better name
-#[derive(Deserialize, Clone)]
-enum RelativeNum {
-    Absolute(i32),
-    Fraction(f32),
-}
-
-impl RelativeNum {
-    fn to_val(&self, val: u32) -> i32 {
-        match self {
-            RelativeNum::Absolute(num) => *num,
-            RelativeNum::Fraction(frac) => (frac * val as f32) as i32,
-        }
-    }
-}
-
-impl From<&str> for RelativeNum {
-    fn from(value: &str) -> Self {
-        let (ty, val) = value.split_once(':').expect("Invalid RelativeNum value");
-
-        match ty {
-            "absolute" => Self::Absolute(val.parse().unwrap()),
-            "fraction" => Self::Fraction(val.parse().unwrap()),
-            _ => panic!("Invalid type of value"),
-        }
-    }
-}
-
-#[derive(Deserialize, Debug, Clone, Copy)]
-enum Action {
-    Close,
-    Select,
-    Up,
-    Down,
-}
-
-#[derive(Deserialize, Clone)]
-struct Keybind {
-    #[serde(default)]
-    ctrl: bool,
-    #[serde(default)]
-    alt: bool,
-    #[serde(deserialize_with = "Keybind::deserialize_key")]
-    key: gdk::Key,
-    action: Action,
-}
-
-impl Keybind {
-    fn deserialize_key<'de, D>(deserializer: D) -> Result<gdk::Key, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct KeyVisitor;
-
-        impl<'de> Visitor<'de> for KeyVisitor {
-            type Value = gdk::Key;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("A plaintext key in the GDK format")
-            }
-
-            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                gdk::Key::from_name(v).ok_or(E::custom("Key name is not valid"))
-            }
-        }
-
-        deserializer.deserialize_str(KeyVisitor)
-    }
+/// Actions to run after GTK has finished
+enum PostRunAction {
+    Copy(Vec<u8>),
+    None,
 }
 
 #[derive(Parser)]
@@ -233,46 +42,8 @@ struct Args {
     config: ConfigArgs,
 }
 
-#[derive(Deserialize, Clone, ValueEnum)]
-enum Position {
-    Top,
-    Center,
-}
-
-/// Actions to run after GTK has finished
-enum PostRunAction {
-    Copy(Vec<u8>),
-    None,
-}
-
-/// The naming scheme for CSS styling
-///
-/// Refer to [GTK 3.0 CSS Overview](https://docs.gtk.org/gtk3/css-overview.html)
-/// and [GTK 3.0 CSS Properties](https://docs.gtk.org/gtk3/css-properties.html) for how to style.
-mod style_names {
-    /// The text entry box
-    pub const ENTRY: &str = "entry";
-    /// The main large box containing every widget
-    pub const MAIN: &str = "main";
-    /// The list of matches
-    pub const MATCHES: &str = "matches";
-    /// The window
-    pub const WINDOW: &str = "window";
-    /// Widgets related to the whole plugin. Including the info box
-    pub const PLUGIN: &str = "plugin";
-    /// Widgets for the specific match `MATCH_*` names are for more specific parts.
-    pub const MATCH: &str = "match";
-
-    pub const MATCH_TITLE: &str = "match-title";
-    pub const MATCH_DESC: &str = "match-desc";
-}
-
-// Default search paths, maintain backwards compatibility
-pub const CONFIG_DIRS: &[&str] = &["/etc/xdg/anyrun", "/etc/anyrun"];
-pub const PLUGIN_PATHS: &[&str] = &["/usr/lib/anyrun", "/etc/anyrun/plugins"];
-
 struct App {
-    config: Config,
+    config: Rc<Config>,
     plugins: FactoryVecDeque<PluginBox>,
     post_run_action: Rc<RefCell<PostRunAction>>,
 }
@@ -336,7 +107,7 @@ impl App {
 }
 
 #[relm4::component]
-impl<'a> Component for App {
+impl Component for App {
     type Input = AppMsg;
     type Output = ();
     type Init = (Args, Rc<RefCell<PostRunAction>>);
@@ -346,7 +117,6 @@ impl<'a> Component for App {
         gtk::Window {
             init_layer_shell: (),
             set_layer: gtk4_layer_shell::Layer::Top,
-            set_widget_name: style_names::WINDOW,
             set_anchor: (Edge::Left, true),
             set_anchor: (Edge::Top, true),
             set_keyboard_mode: KeyboardMode::OnDemand,
@@ -363,36 +133,32 @@ impl<'a> Component for App {
                 });
             },
 
-            add_controller = gtk::EventControllerKey {
-                connect_key_pressed[sender] => move |_, key, _, modifier| {
-                    sender.input(AppMsg::KeyPressed { key, modifier});
-                    glib::Propagation::Stop
-                }
-            },
-
             gtk::Box {
                 set_orientation: gtk::Orientation::Vertical,
                 set_halign: gtk::Align::Center,
                 set_vexpand: false,
                 set_hexpand: true,
-                set_widget_name: style_names::MAIN,
-                set_margin_all: model.config.margin as i32,
+                set_css_classes: &["main"],
 
                 #[name = "entry"]
-                gtk::Entry {
-                    set_widget_name: style_names::ENTRY,
+                gtk::Text {
                     set_hexpand: true,
+                    set_activates_default: false,
                     connect_changed[sender] => move |entry| {
                         sender.input(AppMsg::EntryChanged(entry.text().into()));
                     },
-                    connect_activate => move |_entry| {
-                        sender.input(AppMsg::Action(Action::Select));
+
+                    add_controller = gtk::EventControllerKey {
+                        connect_key_pressed[sender] => move |_, key, _, modifier| {
+                            sender.input(AppMsg::KeyPressed { key, modifier});
+                            glib::Propagation::Proceed
+                        }
                     }
                 },
                 #[local]
                 plugins -> gtk::Box {
                     set_orientation: gtk::Orientation::Vertical,
-                    set_widget_name: style_names::MATCHES,
+                    set_css_classes: &["matches"],
                     set_hexpand: true,
                 }
             }
@@ -445,6 +211,8 @@ impl<'a> Component for App {
 
         config.merge_opt(args.config);
 
+        let config = Rc::new(config);
+
         let plugins = gtk::Box::builder().build();
 
         let mut plugins_factory = FactoryVecDeque::<PluginBox>::builder()
@@ -490,7 +258,7 @@ impl<'a> Component for App {
                     .into(),
             );
 
-            plugins_factory.guard().push_back(plugin);
+            plugins_factory.guard().push_back((plugin, config.clone()));
         }
 
         let model = Self {
@@ -517,11 +285,9 @@ impl<'a> Component for App {
             } => {
                 let window = relm4::main_application().active_window().unwrap();
                 let width = self.config.width.to_val(mon_width);
-                let x =
-                    self.config.x.to_val(mon_width) - (width + self.config.margin as i32 * 2) / 2;
+                let x = self.config.x.to_val(mon_width) - width / 2;
                 let height = self.config.height.to_val(mon_height);
-                let y =
-                    self.config.y.to_val(mon_height) - (height + self.config.margin as i32 * 2) / 2;
+                let y = self.config.y.to_val(mon_height) - height / 2;
 
                 window.set_default_size(width, height);
                 window.child().unwrap().set_size_request(width, height);
@@ -618,6 +384,17 @@ impl<'a> Component for App {
             AppMsg::PluginOutput(PluginBoxOutput::MatchesLoaded) => {
                 if let Some((plugin, plugin_match)) = self.combined_matches().first() {
                     plugin.matches.widget().select_row(Some(&plugin_match.row));
+                }
+            }
+            // Handle clicked selections
+            AppMsg::PluginOutput(PluginBoxOutput::RowSelected(index)) => {
+                for (i, plugin) in self.plugins.iter().enumerate() {
+                    if i != index.current_index() {
+                        plugin
+                            .matches
+                            .widget()
+                            .select_row(Option::<&gtk::ListBoxRow>::None);
+                    }
                 }
             }
         }

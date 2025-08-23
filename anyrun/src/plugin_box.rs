@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, rc::Rc};
 
 use abi_stable::std_types::{ROption, RVec};
 use anyrun_interface::{Match, PluginRef};
@@ -6,7 +6,7 @@ use gtk::{glib, pango, prelude::*};
 use gtk4 as gtk;
 use relm4::prelude::*;
 
-use crate::style_names;
+use crate::Config;
 
 pub struct PluginMatch {
     pub content: Match,
@@ -22,29 +22,29 @@ impl FactoryComponent for PluginMatch {
     type ParentWidget = gtk::ListBox;
     view! {
         gtk::ListBoxRow {
-            set_widget_name: style_names::MATCH,
+            set_css_classes: &["match"],
             set_height_request: 32,
             gtk::Box {
                 set_orientation: gtk::Orientation::Horizontal,
                 set_spacing: 10,
-                set_widget_name: style_names::MATCH,
+                set_css_classes: &["match"],
                 set_hexpand: true,
 
                 #[name = "icon"]
                 gtk::Image {
                     set_pixel_size: 32,
-                    set_widget_name: style_names::MATCH,
+                    set_css_classes: &["match"]
                 },
 
                 #[name = "text"]
                 gtk::Box {
                     set_orientation: gtk::Orientation::Vertical,
-                    set_widget_name: style_names::MATCH,
+                    set_css_classes: &["match", "text-fields"],
                     set_hexpand: true,
                     set_vexpand: true,
 
                     gtk::Label {
-                        set_widget_name: style_names::MATCH_TITLE,
+                        set_css_classes: &["match", "title"],
                         set_halign: gtk::Align::Start,
                         set_valign: gtk::Align::Center,
                         set_xalign: 0.0,
@@ -57,7 +57,7 @@ impl FactoryComponent for PluginMatch {
 
                     #[name = "description"]
                     gtk::Label {
-                        set_widget_name: style_names::MATCH_DESC,
+                        set_css_classes: &["match", "description"],
                         set_wrap: true,
                         set_xalign: 0.0,
                         set_use_markup: self.content.use_pango,
@@ -109,6 +109,7 @@ impl FactoryComponent for PluginMatch {
 
 pub struct PluginBox {
     pub plugin: PluginRef,
+    config: Rc<Config>,
     visible: bool,
     enabled: bool,
     pub matches: FactoryVecDeque<PluginMatch>,
@@ -123,11 +124,12 @@ pub enum PluginBoxInput {
 #[derive(Debug)]
 pub enum PluginBoxOutput {
     MatchesLoaded,
+    RowSelected(<PluginBox as FactoryComponent>::Index),
 }
 
 #[relm4::factory(pub)]
 impl FactoryComponent for PluginBox {
-    type Init = PluginRef;
+    type Init = (PluginRef, Rc<Config>);
     type Input = PluginBoxInput;
     type Output = PluginBoxOutput;
     type CommandOutput = RVec<Match>;
@@ -137,38 +139,73 @@ impl FactoryComponent for PluginBox {
         gtk::Box {
             #[watch]
             set_visible: self.visible,
+            set_css_classes: &["plugin"],
+
+            gtk::Box {
+                set_visible: !self.config.hide_plugin_info,
+                set_css_classes: &["plugin", "info"],
+                set_orientation: gtk::Orientation::Vertical,
+
+                gtk::Box {
+                    set_orientation: gtk::Orientation::Horizontal,
+                    set_expand: false,
+
+                    gtk::Image {
+                        set_css_classes: &["plugin", "info"],
+                        set_icon_name: Some(&plugin_info.icon),
+                        set_halign: gtk::Align::Start,
+                        set_valign: gtk::Align::Start,
+                        set_pixel_size: 32,
+                    },
+                    gtk::Label {
+                        set_css_classes: &["plugin", "info"],
+                        set_label: &plugin_info.name,
+                        set_halign: gtk::Align::Start,
+                        set_valign: gtk::Align::Center,
+                    }
+                }
+            },
 
             #[local_ref]
-            matches -> gtk::ListBox {}
+            matches -> gtk::ListBox {
+                set_css_classes: &["plugin"],
+                set_hexpand: true,
+                connect_row_selected[index] => move |_list, row| {
+                    if row.is_some() {
+                        sender.output(PluginBoxOutput::RowSelected(index.clone())).unwrap();
+                    }
+                }
+            }
         }
     }
 
     fn init_widgets(
         &mut self,
-        _index: &Self::Index,
+        index: &Self::Index,
         root: Self::Root,
         _returned_widget: &<Self::ParentWidget as relm4::factory::FactoryView>::ReturnedWidget,
-        _sender: FactorySender<Self>,
+        sender: FactorySender<Self>,
     ) -> Self::Widgets {
         let matches = self.matches.widget();
+        let plugin_info = self.plugin.info()();
 
         let widgets = view_output!();
 
         widgets
     }
 
-    fn init_model(plugin: Self::Init, _index: &Self::Index, _sender: FactorySender<Self>) -> Self {
+    fn init_model(
+        (plugin, config): Self::Init,
+        _index: &Self::Index,
+        _sender: FactorySender<Self>,
+    ) -> Self {
         let matches = FactoryVecDeque::builder()
-            .launch(
-                gtk::ListBox::builder()
-                    .css_name(style_names::PLUGIN)
-                    .hexpand(true)
-                    .build(),
-            )
+            .launch(gtk::ListBox::default())
             .detach();
 
         Self {
             plugin,
+            config,
             visible: false,
             enabled: true,
             matches,

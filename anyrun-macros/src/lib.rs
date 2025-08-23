@@ -184,14 +184,33 @@ pub fn init(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
 #[proc_macro_derive(ConfigArgs, attributes(config_args))]
 pub fn config_args(item: TokenStream) -> TokenStream {
-    let item = parse_macro_input!(item as syn::ItemStruct);
+    let item = parse_macro_input!(item as syn::DeriveInput);
+    let mut public = false;
+    for attr in &item.attrs {
+        if attr.path().is_ident("config_args") {
+            attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("pub") {
+                    public = true;
+                    return Ok(());
+                }
+
+                Err(meta.error("Unrecognized macro input"))
+            })
+            .unwrap();
+        }
+    }
     let ident = &item.ident;
+
+    let syn::Data::Struct(data) = item.data else {
+        panic!("ConfigArgs only works on structs");
+    };
 
     let opt_ident = Ident::new(&format!("{}Args", item.ident), Span::call_site().into());
 
     let mut operations = quote!();
     let mut fields = quote!();
-    for field in item.fields.iter() {
+
+    for field in data.fields.iter() {
         let mut skip = false;
         for attr in &field.attrs {
             if attr.path().is_ident("config_args") {
@@ -226,14 +245,20 @@ pub fn config_args(item: TokenStream) -> TokenStream {
         };
     }
 
+    let (struct_decl, fn_decl) = if public {
+        (quote!(pub struct #opt_ident), quote!(pub fn merge_opt))
+    } else {
+        (quote!(struct #opt_ident), quote!(fn merge_opt))
+    };
+
     quote! {
         #[derive(::clap::Args)]
-        struct #opt_ident {
+        #struct_decl {
             #fields
         }
 
         impl #ident {
-            fn merge_opt(&mut self, opt: #opt_ident) {
+            #fn_decl(&mut self, opt: #opt_ident) {
                 #operations
             }
         }
