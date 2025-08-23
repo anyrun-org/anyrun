@@ -169,7 +169,7 @@ dependencies = [
 
 [[package]]
 name = "anyrun"
-version = "0.1.0"
+version = "25.8.0"
 dependencies = [
  "abi_stable",
  "anyrun-interface",
@@ -187,14 +187,14 @@ dependencies = [
 
 [[package]]
 name = "anyrun-interface"
-version = "0.1.0"
+version = "25.8.0"
 dependencies = [
  "abi_stable",
 ]
 
 [[package]]
 name = "anyrun-macros"
-version = "0.1.0"
+version = "25.8.0"
 dependencies = [
  "quote",
  "syn 2.0.106",
@@ -202,7 +202,7 @@ dependencies = [
 
 [[package]]
 name = "anyrun-plugin"
-version = "0.1.0"
+version = "25.8.0"
 dependencies = [
  "abi_stable",
  "anyrun-interface",
@@ -211,7 +211,7 @@ dependencies = [
 
 [[package]]
 name = "applications"
-version = "0.1.0"
+version = "25.8.0"
 dependencies = [
  "abi_stable",
  "anyrun-plugin",
@@ -572,7 +572,7 @@ dependencies = [
 
 [[package]]
 name = "dictionary"
-version = "0.1.0"
+version = "25.8.0"
 dependencies = [
  "abi_stable",
  "anyrun-plugin",
@@ -1601,7 +1601,7 @@ checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
 
 [[package]]
 name = "kidex"
-version = "0.1.0"
+version = "25.8.0"
 dependencies = [
  "abi_stable",
  "anyrun-plugin",
@@ -1764,7 +1764,7 @@ dependencies = [
 
 [[package]]
 name = "niri-focus"
-version = "0.1.0"
+version = "25.8.0"
 dependencies = [
  "abi_stable",
  "anyrun-plugin",
@@ -1799,7 +1799,7 @@ dependencies = [
 
 [[package]]
 name = "nix-run"
-version = "0.1.0"
+version = "25.8.0"
 dependencies = [
  "abi_stable",
  "anyrun-plugin",
@@ -2271,7 +2271,7 @@ dependencies = [
 
 [[package]]
 name = "randr"
-version = "0.1.0"
+version = "25.8.0"
 dependencies = [
  "abi_stable",
  "anyrun-plugin",
@@ -2461,7 +2461,7 @@ dependencies = [
 
 [[package]]
 name = "rink"
-version = "0.1.0"
+version = "25.8.0"
 dependencies = [
  "abi_stable",
  "anyrun-plugin",
@@ -2722,7 +2722,7 @@ dependencies = [
 
 [[package]]
 name = "shell"
-version = "0.1.0"
+version = "25.8.0"
 dependencies = [
  "abi_stable",
  "anyrun-plugin",
@@ -2791,7 +2791,7 @@ checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
 name = "stdin"
-version = "0.1.0"
+version = "25.8.0"
 dependencies = [
  "abi_stable",
  "anyrun-plugin",
@@ -2845,7 +2845,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "symbols"
-version = "0.1.0"
+version = "25.8.0"
 dependencies = [
  "abi_stable",
  "anyrun-plugin",
@@ -3189,7 +3189,7 @@ dependencies = [
 
 [[package]]
 name = "translate"
-version = "0.1.0"
+version = "25.8.0"
 dependencies = [
  "abi_stable",
  "anyrun-plugin",
@@ -3514,7 +3514,7 @@ dependencies = [
 
 [[package]]
 name = "websearch"
-version = "0.1.0"
+version = "25.8.0"
 dependencies = [
  "abi_stable",
  "anyrun-plugin",
