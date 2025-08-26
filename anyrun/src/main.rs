@@ -188,10 +188,15 @@ impl Component for App {
 
         let mut config = if let Some(config_dir) = &config_dir {
             match fs::read_to_string(format!("{config_dir}/style.css")) {
-                Ok(style) => relm4::set_global_css(&style),
+                Ok(style) => {
+                    relm4::set_global_css_with_priority(&style, gtk::STYLE_PROVIDER_PRIORITY_USER)
+                }
                 Err(why) => {
                     eprintln!("[anyrun] Failed to load CSS: {why}");
-                    relm4::set_global_css(include_str!("../res/style.css"));
+                    relm4::set_global_css_with_priority(
+                        include_str!("../res/style.css"),
+                        gtk::STYLE_PROVIDER_PRIORITY_USER,
+                    );
                 }
             }
             match fs::read(format!("{config_dir}/config.ron")) {
