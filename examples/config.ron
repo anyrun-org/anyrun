@@ -39,6 +39,9 @@ Config(
   
   // List of plugins to be loaded by default, can be specified with a relative path to be loaded from the
   // `<anyrun config dir>/plugins` directory or with an absolute path to just load the file the path points to.
+  //
+  // The order of plugins here specifies the order in which they appear
+  // in the results. As in it works as a priority for the plugins.
   plugins: [
     "libapplications.so",
     "libsymbols.so",
