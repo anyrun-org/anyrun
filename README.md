@@ -2,6 +2,8 @@
 
 A wayland native krunner-like runner, made with customizability in mind.
 
+<img width="950" height="702" alt="image" src="https://github.com/user-attachments/assets/0a53b435-58f5-4a7c-90f7-b3f39266f2f4" />
+
 
 ## Features
 
@@ -9,7 +11,7 @@ A wayland native krunner-like runner, made with customizability in mind.
   - More info in [Styling](#Styling)
 - Can do basically anything
   - As long as it can work with input and selection
-  - Hence the name anyrun
+  - Hence the name Anyrun
 - Easy to make plugins
   - You only need 4 functions!
   - See [Rink](plugins/rink) for a simple example. More info in the
@@ -17,20 +19,20 @@ A wayland native krunner-like runner, made with customizability in mind.
 - Responsive
   - Asynchronous running of plugin functions
 - Wayland native
-  - GTK layer shell for overlaying the window
+  - GTK4 layer shell for overlaying the window
   - data-control for managing the clipboard
 
 ## Usage
 
 ### Dependencies
 
-Anyrun mainly depends various GTK libraries, and rust of course for building the
+Anyrun mainly depends various GTK4 libraries, and rust of course for building the
 project. Rust you can get with [rustup](https://rustup.rs). The rest are
 statically linked in the binary. Here are the libraries you need to have to
 build & run it:
 
 - `gtk-layer-shell (libgtk-layer-shell)`
-- `gtk3 (libgtk-3 libgdk-3)`
+- `gtk4 (libgtk-3 libgdk-3)`
 - `pango (libpango-1.0)`
 - `cairo (libcairo libcairo-gobject)`
 - `gdk-pixbuf2 (libgdk_pixbuf-2.0)`
