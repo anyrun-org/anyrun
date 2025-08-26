@@ -140,33 +140,34 @@ cp examples/config.ron ~/.config/anyrun/config.ron
 ## Plugins
 
 Anyrun requires plugins to function, as they provide the results for input. The
-list of plugins in this repository is as follows:
+library name after the plugin name is what you use for including the plugin
+inside the configuration. The list of plugins in this repository is as follows:
 
-- [Applications](plugins/applications/README.md)
+- [Applications](plugins/applications/README.md) `libapplications.so`
   - Search and run system & user specific desktop entries.
-- [Symbols](plugins/symbols/README.md)
+- [Symbols](plugins/symbols/README.md) `libsymbols.so`
   - Search unicode symbols.
-- [Rink](plugins/rink/README.md)
+- [Rink](plugins/rink/README.md) `librink.so`
   - Calculator & unit conversion.
-- [Shell](plugins/shell/README.md)
+- [Shell](plugins/shell/README.md) `libshell.so`
   - Run shell commands.
-- [Translate](plugins/translate/README.md)
+- [Translate](plugins/translate/README.md) `libtranslate.so`
   - Quickly translate text.
-- [Kidex](plugins/kidex/README.md)
+- [Kidex](plugins/kidex/README.md) `libkidex.so`
   - File search provided by [Kidex](https://github.com/Kirottu/kidex).
-- [Randr](plugins/randr/README.md)
+- [Randr](plugins/randr/README.md) `librandr.so`
   - Rotate and resize; quickly change monitor configurations on the fly.
   - TODO: Only supports Hyprland, needs support for other compositors.
-- [Stdin](plugins/stdin/README.md)
+- [Stdin](plugins/stdin/README.md) `libstdin.so`
   - Turn Anyrun into a dmenu-like fuzzy selector.
   - Should generally be used exclusively with the `--plugins` argument.
-- [Dictionary](plugins/dictionary/README.md)
+- [Dictionary](plugins/dictionary/README.md) `libdictionary.so`
   - Look up definitions for words
-- [Websearch](plugins/websearch/README.md)
+- [Websearch](plugins/websearch/README.md) `libwebsearch.so`
   - Search the web with configurable engines: Google, Ecosia, Bing, DuckDuckGo.
-- [Nix-run](plugins/nix-run/README.md)
+- [Nix-run](plugins/nix-run/README.md) `libnix_run.so`
   - `nix run` graphical applications straight from Anyrun.
-- [niri-focus](plugins/niri-focus/README.md)
+- [niri-focus](plugins/niri-focus/README.md) `libniri_focus.so`
   - Focus active windows with fuzzy search on niri.
 
 ## Configuration
