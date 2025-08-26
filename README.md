@@ -31,8 +31,8 @@ project. Rust you can get with [rustup](https://rustup.rs). The rest are
 statically linked in the binary. Here are the libraries you need to have to
 build & run it:
 
-- `gtk-layer-shell (libgtk-layer-shell)`
-- `gtk4 (libgtk-3 libgdk-3)`
+- `gtk4-layer-shell (libgtk4-layer-shell)`
+- `gtk4 (libgtk-4 libgdk-4)`
 - `pango (libpango-1.0)`
 - `cairo (libcairo libcairo-gobject)`
 - `gdk-pixbuf2 (libgdk_pixbuf-2.0)`
