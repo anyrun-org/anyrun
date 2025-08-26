@@ -305,7 +305,9 @@ impl Component for App {
                 }
             }
             AppMsg::Action(action) => match action {
-                Action::Close => root.close(),
+                Action::Close => {
+                    relm4::main_application().quit();
+                }
                 Action::Select => {
                     if let Some((_, plugin, plugin_match)) = self.current_selection() {
                         match plugin.plugin.handle_selection()(plugin_match.content.clone()) {
@@ -337,11 +339,11 @@ impl Component for App {
                             HandleResult::Copy(rvec) => {
                                 *self.post_run_action.borrow_mut() =
                                     PostRunAction::Copy(rvec.into());
-                                root.close();
+                                sender.input(AppMsg::Action(Action::Close));
                             }
                             HandleResult::Stdout(rvec) => {
                                 io::stdout().lock().write_all(&rvec).unwrap();
-                                root.close();
+                                sender.input(AppMsg::Action(Action::Close));
                             }
                         }
                     }
