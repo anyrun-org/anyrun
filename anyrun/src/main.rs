@@ -311,6 +311,7 @@ impl Component for App {
             }
             AppMsg::Action(action) => match action {
                 Action::Close => {
+                    root.close();
                     relm4::main_application().quit();
                 }
                 Action::Select => {
