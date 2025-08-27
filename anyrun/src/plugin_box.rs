@@ -109,10 +109,14 @@ impl FactoryComponent for PluginMatch {
 
 pub struct PluginBox {
     pub plugin: PluginRef,
+    pub matches: FactoryVecDeque<PluginMatch>,
     config: Rc<Config>,
     visible: bool,
     enabled: bool,
-    pub matches: FactoryVecDeque<PluginMatch>,
+    /// Id that is incremented every time new matches are requested from a plugin
+    /// This is to make sure only the one that was actually requested for this input
+    /// is shown
+    id: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -132,7 +136,7 @@ impl FactoryComponent for PluginBox {
     type Init = (PluginRef, Rc<Config>);
     type Input = PluginBoxInput;
     type Output = PluginBoxOutput;
-    type CommandOutput = RVec<Match>;
+    type CommandOutput = (u64, RVec<Match>);
     type ParentWidget = gtk::Box;
 
     view! {
@@ -205,10 +209,11 @@ impl FactoryComponent for PluginBox {
 
         Self {
             plugin,
+            matches,
             config,
             visible: false,
             enabled: true,
-            matches,
+            id: 0,
         }
     }
 
@@ -220,12 +225,15 @@ impl FactoryComponent for PluginBox {
     ) {
         match message {
             PluginBoxInput::EntryChanged(input) => {
+                self.id += 1;
                 if self.enabled {
                     sender.spawn_command(glib::clone!(
                         #[strong(rename_to = plugin)]
                         self.plugin,
+                        #[strong(rename_to = id)]
+                        self.id,
                         move |sender| {
-                            sender.emit(plugin.get_matches()(input.into()));
+                            sender.emit((id, plugin.get_matches()(input.into())));
                         }
                     ));
                 }
@@ -246,12 +254,14 @@ impl FactoryComponent for PluginBox {
     fn update_cmd_with_view(
         &mut self,
         widgets: &mut Self::Widgets,
-        matches: Self::CommandOutput,
+        (id, matches): Self::CommandOutput,
         sender: FactorySender<Self>,
     ) {
-        if !self.enabled {
+        // Make sure only the latest matches actually get handled
+        if !self.enabled || id != self.id {
             return;
         }
+
         self.visible = !matches.is_empty();
         {
             let mut guard = self.matches.guard();
@@ -264,7 +274,6 @@ impl FactoryComponent for PluginBox {
         }
 
         sender.output(PluginBoxOutput::MatchesLoaded).unwrap();
-
         self.update_view(widgets, sender);
     }
 }
