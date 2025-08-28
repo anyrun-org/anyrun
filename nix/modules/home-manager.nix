@@ -294,7 +294,12 @@ in
                 let
                   path = "${cfg.package}/lib/lib${replaceStrings [ "-" ] [ "_" ] entry}.so";
                 in
-                if builtins.pathExists path then path else entry
+                if builtins.pathExists path then
+                  path
+                else if lib.strings.hasPrefix "/" entry then
+                  entry
+                else
+                  throw "Anyrun: Plugin ${entry} does not exist"
           ) cfg.config.plugins;
 
       keybinds =
