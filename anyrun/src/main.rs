@@ -231,15 +231,25 @@ impl Component for App {
                 let mut search_dirs = vec![format!("{user_dir}/plugins")];
                 search_dirs.extend(PLUGIN_PATHS.iter().map(|path| path.to_string()));
 
-                if let Some(path) = search_dirs.iter().find(|path| PathBuf::from(path).exists()) {
-                    PathBuf::from(path)
-                } else {
+                // TODO: Perhaps HM module like plugin path logic here
+                let Some(path) = search_dirs.iter().find_map(|path| {
+                    let mut path = PathBuf::from(path);
+                    path.extend(plugin);
+
+                    if path.exists() {
+                        Some(path)
+                    } else {
+                        None
+                    }
+                }) else {
                     eprintln!(
                         "[anyrun] Failed to locate library for plugin {}, not loading",
                         plugin.display()
                     );
                     continue;
-                }
+                };
+
+                path
             };
 
             let Ok(header) = abi_stable::library::lib_header_from_path(&path) else {
