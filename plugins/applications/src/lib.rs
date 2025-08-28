@@ -108,6 +108,10 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
                         command: "wterm".to_string(),
                         args: "-e \"{}\"".to_string(),
                     },
+                    Terminal {
+                        command: "ghostty".to_string(),
+                        args: "-e \"{}\"".to_string(),
+                    },
                 ];
                 for term in sensible_terminals {
                     if Command::new("which")
