@@ -9,7 +9,7 @@ self: {
   inherit (lib.options) mkOption mkEnableOption literalExpression;
   inherit (lib.lists) optional;
   inherit (lib.attrsets) mapAttrs' nameValuePair;
-  inherit (lib.strings) toLower toUpper replaceStrings;
+  inherit (lib.strings) concatMapStringsSep toLower toUpper replaceStrings optionalString;
   inherit (lib.trivial) boolToString;
   inherit (lib.types) nullOr package submodule int float listOf either str enum lines bool attrs;
 
@@ -149,6 +149,39 @@ in {
         default = null;
         description = "Limit amount of entries shown in total";
       };
+
+      keybinds = mkOption {
+        type = nullOr (listOf (submodule {
+          options = {
+            ctrl = mkOption {
+              type = bool;
+              default = false;
+            };
+            alt = mkOption {
+              type = bool;
+              default = false;
+            };
+            key = mkOption {
+              type = str;
+              description = ''
+                Name of the GDK keysym.
+
+                A list of possible values can be found at [https://gitlab.gnome.org/GNOME/gtk/-/blob/main/gdk/gdkkeysyms.h]
+              '';
+            };
+            action = mkOption {
+              type = enum ["close" "select" "up" "down"];
+            };
+          };
+        }));
+        default = null;
+      };
+
+      extraLines = mkOption {
+        type = nullOr lines;
+        default = null;
+        description = "Extra lines to add inside the `Config()` object";
+      };
     };
 
     extraCss = mkOption {
@@ -200,6 +233,24 @@ in {
           then "${entry}/lib/lib${replaceStrings ["-"] ["_"] entry.pname}.so"
           else entry)
         cfg.config.plugins;
+
+    keybinds =
+      if cfg.config.keybinds == null
+      then ""
+      else ''
+        keybinds: [
+          ${
+          concatMapStringsSep "\n" (x: ''
+            Keybind(
+              ${optionalString x.ctrl "ctrl: true,"}
+              ${optionalString x.alt "alt: true,"}
+              key: "${x.key}",
+              action: ${capitalize x.action},
+            ),
+          '')
+          cfg.config.keybinds
+        }],
+      '';
   in {
     assertions = [(assertNumeric cfg.config.width) (assertNumeric cfg.config.height) (assertNumeric cfg.config.x) (assertNumeric cfg.config.y)];
 
@@ -239,6 +290,8 @@ in {
             else "Some(${toString cfg.config.maxEntries})"
           },
             plugins: ${toJSON parsedPlugins},
+            ${optionalString (cfg.config.extraLines != null) cfg.config.extraLines}
+            ${keybinds}
           )
         '';
       }

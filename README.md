@@ -93,6 +93,36 @@ You may use it in your system like this:
 }
 ```
 
+Alternatively, you may use the module from this repository's flake to keep up
+with development branches:
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
+    home-manager.url = "github:nix-community/home-manager";
+    anyrun.url = "github:anyrun-org/anyrun";
+  };
+  outputs = {self, ...}@inputs: {
+    homeConfigurations.user = inputs.home-manager.lib.homeManagerConfiguration {
+      modules = [
+        ({ modulesPath, ... }: {
+          # Important! We disable home-manager's module to avoid option
+          # definition collisions
+          disabledModules = ["${modulesPath}/programs/anyrun.nix"];
+        })
+        inputs.anyrun.homeManagerModules.default
+        {
+          programs.anyrun = {
+            # ...
+          };
+        }
+      ];
+    };
+  }
+}
+```
+
 Anyrun packages are built and cached automatically. To avoid unnecessary
 recompilations, you may use the binary cache.
 
