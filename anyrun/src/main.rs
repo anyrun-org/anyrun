@@ -231,16 +231,27 @@ impl Component for App {
                 let mut search_dirs = vec![format!("{user_dir}/plugins")];
                 search_dirs.extend(PLUGIN_PATHS.iter().map(|path| path.to_string()));
 
-                // TODO: Perhaps HM module like plugin path logic here
-                let Some(path) = search_dirs.iter().find_map(|path| {
-                    let mut path = PathBuf::from(path);
+                // Attempt to load both `<plugin>` and `lib<plugin>.so` from
+                // all search paths
+                let Some(path) = search_dirs.iter().find_map(|dir| {
+                    let mut path = PathBuf::from(dir);
                     path.extend(plugin);
 
                     if path.exists() {
-                        Some(path)
-                    } else {
-                        None
+                        return Some(path);
                     }
+
+                    let mut path = PathBuf::from(dir);
+                    path.extend(&PathBuf::from(format!(
+                        "lib{}.so",
+                        plugin.to_string_lossy().replace("-", "_")
+                    )));
+
+                    if path.exists() {
+                        return Some(path);
+                    }
+
+                    None
                 }) else {
                     eprintln!(
                         "[anyrun] Failed to locate library for plugin {}, not loading",
