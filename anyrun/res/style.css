@@ -16,12 +16,15 @@ text {
   min-height: 30px;
   padding: 5px;
   border-radius: 5px;
-  margin-bottom: 5px;
 }
 
 .matches {
   background-color: rgba(0, 0, 0, 0);
   border-radius: 10px;
+}
+
+box.plugin:first-child {
+  margin-top: 5px;
 }
 
 box.plugin.info {
@@ -38,6 +41,10 @@ label.match.description {
 
 label.plugin.info {
   font-size: 14px;
+}
+
+.match {
+  background: transparent;
 }
 
 .match:selected {
