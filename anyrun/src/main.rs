@@ -33,7 +33,9 @@ enum PostRunAction {
     None,
 }
 
+/// A wayland native, highly customizable runner.
 #[derive(Parser)]
+#[command(version, about)]
 struct Args {
     /// Override the path to the config directory
     #[arg(short, long)]
