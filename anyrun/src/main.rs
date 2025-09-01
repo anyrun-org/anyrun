@@ -135,6 +135,14 @@ impl Component for App {
                 });
             },
 
+            add_controller = gtk::GestureClick {
+                connect_pressed[sender, config] => move |_, _, _, _| {
+                    if config.close_on_click {
+                        sender.input(AppMsg::Action(Action::Close));
+                    }
+                }
+            },
+
             gtk::Box {
                 set_orientation: gtk::Orientation::Vertical,
                 set_halign: gtk::Align::Center,
@@ -289,12 +297,12 @@ impl Component for App {
             plugins_factory.guard().push_back((plugin, config.clone()));
         }
 
+        let widgets = view_output!();
         let model = Self {
             post_run_action,
             config,
             plugins: plugins_factory,
         };
-        let widgets = view_output!();
 
         ComponentParts { model, widgets }
     }
