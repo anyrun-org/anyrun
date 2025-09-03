@@ -40,6 +40,7 @@ impl FactoryComponent for PluginMatch {
                 gtk::Box {
                     set_orientation: gtk::Orientation::Vertical,
                     set_css_classes: &["match", "text-fields"],
+                    set_valign: gtk::Align::Center,
                     set_hexpand: true,
                     set_vexpand: true,
 
