@@ -16,6 +16,8 @@ Config(
   allow_invalid: false,
   // How many entries should be displayed at max
   max_entries: 5,
+  // Whether to preserve the original order of entries instead of sorting by fuzzy match score
+  preserve_order: false,
 )
 
 ```
