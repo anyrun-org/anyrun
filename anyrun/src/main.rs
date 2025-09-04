@@ -4,12 +4,14 @@ use std::{
     io::{self, Write},
     path::PathBuf,
     rc::Rc,
+    sync::{mpsc, Arc},
 };
 
-use anyrun_interface::{HandleResult, PluginRef};
+use anyrun_interface::HandleResult;
+use anyrun_provider_ipc as ipc;
 use clap::Parser;
 use gtk::{gdk, glib, prelude::*};
-use gtk4 as gtk;
+use gtk4::{self as gtk};
 use gtk4_layer_shell::{Edge, KeyboardMode, LayerShell};
 use nix::unistd;
 use relm4::prelude::*;
@@ -22,10 +24,7 @@ use crate::{
 
 mod config;
 mod plugin_box;
-
-// Default search paths, maintain backwards compatibility
-pub const CONFIG_DIRS: &[&str] = &["/etc/xdg/anyrun", "/etc/anyrun"];
-pub const PLUGIN_PATHS: &[&str] = &["/usr/lib/anyrun", "/etc/anyrun/plugins"];
+mod socket;
 
 /// Actions to run after GTK has finished
 enum PostRunAction {
@@ -45,9 +44,10 @@ struct Args {
 }
 
 struct App {
-    config: Rc<Config>,
+    config: Arc<Config>,
     plugins: FactoryVecDeque<PluginBox>,
     post_run_action: Rc<RefCell<PostRunAction>>,
+    tx: mpsc::Sender<anyrun_provider_ipc::Request>,
 }
 
 #[derive(Debug)]
@@ -113,7 +113,7 @@ impl Component for App {
     type Input = AppMsg;
     type Output = ();
     type Init = (Args, Rc<RefCell<PostRunAction>>);
-    type CommandOutput = ();
+    type CommandOutput = anyrun_provider_ipc::Response;
 
     view! {
         gtk::Window {
@@ -189,7 +189,7 @@ impl Component for App {
             if PathBuf::from(&user_dir).exists() {
                 Some(user_dir.clone())
             } else {
-                CONFIG_DIRS
+                ipc::CONFIG_DIRS
                     .iter()
                     .map(|path| path.to_string())
                     .find(|path| PathBuf::from(path).exists())
@@ -226,82 +226,34 @@ impl Component for App {
 
         config.merge_opt(args.config);
 
-        let config = Rc::new(config);
+        let config = Arc::new(config);
 
         let plugins = gtk::Box::builder().build();
 
-        let mut plugins_factory = FactoryVecDeque::<PluginBox>::builder()
+        let plugins_factory = FactoryVecDeque::<PluginBox>::builder()
             .launch(plugins.clone())
             .forward(sender.input_sender(), AppMsg::PluginOutput);
 
-        for plugin in &config.plugins {
-            let path = if plugin.is_absolute() {
-                plugin.to_owned()
-            } else {
-                let mut search_dirs = vec![format!("{user_dir}/plugins")];
-                search_dirs.extend(PLUGIN_PATHS.iter().map(|path| path.to_string()));
+        let (tx, rx) = mpsc::channel();
 
-                // Attempt to load both `<plugin>` and `lib<plugin>.so` from
-                // all search paths
-                let Some(path) = search_dirs.iter().find_map(|dir| {
-                    let mut path = PathBuf::from(dir);
-                    path.extend(plugin);
-
-                    if path.exists() {
-                        return Some(path);
-                    }
-
-                    let mut path = PathBuf::from(dir);
-                    path.extend(&PathBuf::from(format!(
-                        "lib{}.so",
-                        plugin.to_string_lossy().replace("-", "_")
-                    )));
-
-                    if path.exists() {
-                        return Some(path);
-                    }
-
-                    None
-                }) else {
-                    eprintln!(
-                        "[anyrun] Failed to locate library for plugin {}, not loading",
-                        plugin.display()
-                    );
-                    continue;
-                };
-
-                path
-            };
-
-            let Ok(header) = abi_stable::library::lib_header_from_path(&path) else {
-                eprintln!("[anyrun] Failed to load plugin `{}` header", path.display());
-                continue;
-            };
-
-            let Ok(plugin) = header.init_root_module::<PluginRef>() else {
-                eprintln!(
-                    "[anyrun] Failed to init plugin `{}` root module",
-                    path.display()
-                );
-                continue;
-            };
-
-            plugin.init()(
-                config_dir
-                    .as_ref()
-                    .cloned()
-                    .unwrap_or(CONFIG_DIRS[0].to_string())
-                    .into(),
-            );
-
-            plugins_factory.guard().push_back((plugin, config.clone()));
-        }
+        sender.spawn_command(glib::clone!(
+            #[strong]
+            config,
+            #[strong]
+            config_dir,
+            move |sender| {
+                if let Err(why) = socket::worker(config, config_dir, rx, sender) {
+                    eprintln!("[anyrun] IPC worker returned an error: {why}");
+                }
+            }
+        ));
 
         let widgets = view_output!();
         let model = Self {
             post_run_action,
             config,
             plugins: plugins_factory,
+            tx,
         };
 
         ComponentParts { model, widgets }
@@ -343,46 +295,16 @@ impl Component for App {
             AppMsg::Action(action) => match action {
                 Action::Close => {
                     root.close();
-                    relm4::main_application().quit();
+                    self.tx.send(ipc::Request::Quit).unwrap();
                 }
                 Action::Select => {
                     if let Some((_, plugin, plugin_match)) = self.current_selection() {
-                        match plugin.plugin.handle_selection()(plugin_match.content.clone()) {
-                            HandleResult::Close => root.close(),
-                            HandleResult::Refresh(exclusive) => {
-                                if exclusive {
-                                    for (i, _plugin) in self.plugins.iter().enumerate() {
-                                        // While normally true, in this case the function addresses will be consistent
-                                        // at runtime so it is fine for differentiating between them
-                                        #[allow(unpredictable_function_pointer_comparisons)]
-                                        if plugin.plugin.info() == _plugin.plugin.info() {
-                                            self.plugins.send(
-                                                i,
-                                                PluginBoxInput::EntryChanged(
-                                                    widgets.entry.text().into(),
-                                                ),
-                                            );
-                                        } else {
-                                            self.plugins.send(i, PluginBoxInput::Enable(false));
-                                        }
-                                    }
-                                } else {
-                                    self.plugins.broadcast(PluginBoxInput::Enable(true));
-                                    self.plugins.broadcast(PluginBoxInput::EntryChanged(
-                                        widgets.entry.text().into(),
-                                    ));
-                                }
-                            }
-                            HandleResult::Copy(rvec) => {
-                                *self.post_run_action.borrow_mut() =
-                                    PostRunAction::Copy(rvec.into());
-                                sender.input(AppMsg::Action(Action::Close));
-                            }
-                            HandleResult::Stdout(rvec) => {
-                                io::stdout().lock().write_all(&rvec).unwrap();
-                                sender.input(AppMsg::Action(Action::Close));
-                            }
-                        }
+                        self.tx
+                            .send(ipc::Request::Handle {
+                                plugin: plugin.plugin_info.clone(),
+                                selection: plugin_match.content.clone(),
+                            })
+                            .unwrap();
                     }
                 }
                 Action::Up => {
@@ -418,7 +340,7 @@ impl Component for App {
                 }
             },
             AppMsg::EntryChanged(text) => {
-                self.plugins.broadcast(PluginBoxInput::EntryChanged(text));
+                self.tx.send(ipc::Request::Query { text }).unwrap();
             }
             AppMsg::PluginOutput(PluginBoxOutput::MatchesLoaded) => {
                 if let Some((plugin, plugin_match)) = self.combined_matches().first() {
@@ -433,6 +355,71 @@ impl Component for App {
                             .matches
                             .widget()
                             .select_row(Option::<&gtk::ListBoxRow>::None);
+                    }
+                }
+            }
+        }
+        self.update_view(widgets, sender);
+    }
+
+    fn update_cmd_with_view(
+        &mut self,
+        widgets: &mut Self::Widgets,
+        message: Self::CommandOutput,
+        sender: ComponentSender<Self>,
+        root: &Self::Root,
+    ) {
+        match message {
+            ipc::Response::Ready { info } => {
+                let mut guard = self.plugins.guard();
+                for info in info {
+                    guard.push_back((info, self.config.clone()));
+                }
+            }
+            ipc::Response::Matches { plugin, matches } => {
+                let i = self
+                    .plugins
+                    .iter()
+                    .enumerate()
+                    .find_map(|(i, plugin_box)| {
+                        if plugin_box.plugin_info == plugin {
+                            Some(i)
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap();
+
+                self.plugins.send(i, PluginBoxInput::Matches(matches));
+            }
+            ipc::Response::Handled { plugin, result } => {
+                match result {
+                    HandleResult::Close => root.close(),
+                    HandleResult::Refresh(exclusive) => {
+                        self.tx
+                            .send(ipc::Request::Query {
+                                text: widgets.entry.text().into(),
+                            })
+                            .unwrap();
+                        if exclusive {
+                            for (i, plugin_box) in self.plugins.iter().enumerate() {
+                                // While normally true, in this case the function addresses will be consistent
+                                // at runtime so it is fine for differentiating between them
+                                if plugin_box.plugin_info != plugin {
+                                    self.plugins.send(i, PluginBoxInput::Enable(false));
+                                }
+                            }
+                        } else {
+                            self.plugins.broadcast(PluginBoxInput::Enable(true));
+                        }
+                    }
+                    HandleResult::Copy(rvec) => {
+                        *self.post_run_action.borrow_mut() = PostRunAction::Copy(rvec.into());
+                        sender.input(AppMsg::Action(Action::Close));
+                    }
+                    HandleResult::Stdout(rvec) => {
+                        io::stdout().lock().write_all(&rvec).unwrap();
+                        sender.input(AppMsg::Action(Action::Close));
                     }
                 }
             }

@@ -20,6 +20,9 @@ pub struct Config {
     #[serde(default = "Config::default_plugins")]
     pub plugins: Vec<PathBuf>,
 
+    #[serde(default = "Config::default_provider")]
+    pub provider: PathBuf,
+
     #[serde(default)]
     pub hide_icons: bool,
     #[serde(default)]
@@ -65,6 +68,10 @@ impl Config {
         ]
     }
 
+    fn default_provider() -> PathBuf {
+        PathBuf::from("anyrun-provider")
+    }
+
     fn default_layer() -> Layer {
         Layer::Overlay
     }
@@ -106,6 +113,7 @@ impl Default for Config {
             width: Self::default_width(),
             height: Self::default_height(),
             plugins: Self::default_plugins(),
+            provider: Self::default_provider(),
             hide_icons: false,
             hide_plugin_info: false,
             ignore_exclusive_zones: false,

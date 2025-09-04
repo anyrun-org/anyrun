@@ -1,7 +1,7 @@
-use std::{path::PathBuf, rc::Rc};
+use std::{path::PathBuf, rc::Rc, sync::Arc};
 
 use abi_stable::std_types::{ROption, RVec};
-use anyrun_interface::{Match, PluginRef};
+use anyrun_interface::{Match, PluginInfo, PluginRef};
 use gtk::{glib, pango, prelude::*};
 use gtk4 as gtk;
 use relm4::prelude::*;
@@ -109,20 +109,16 @@ impl FactoryComponent for PluginMatch {
 }
 
 pub struct PluginBox {
-    pub plugin: PluginRef,
+    pub plugin_info: PluginInfo,
     pub matches: FactoryVecDeque<PluginMatch>,
-    config: Rc<Config>,
+    config: Arc<Config>,
     visible: bool,
     enabled: bool,
-    /// Id that is incremented every time new matches are requested from a plugin
-    /// This is to make sure only the one that was actually requested for this input
-    /// is shown
-    id: u64,
 }
 
 #[derive(Debug, Clone)]
 pub enum PluginBoxInput {
-    EntryChanged(String),
+    Matches(RVec<Match>),
     Enable(bool),
 }
 
@@ -134,7 +130,7 @@ pub enum PluginBoxOutput {
 
 #[relm4::factory(pub)]
 impl FactoryComponent for PluginBox {
-    type Init = (PluginRef, Rc<Config>);
+    type Init = (PluginInfo, Arc<Config>);
     type Input = PluginBoxInput;
     type Output = PluginBoxOutput;
     type CommandOutput = (u64, RVec<Match>);
@@ -157,14 +153,14 @@ impl FactoryComponent for PluginBox {
 
                     gtk::Image {
                         set_css_classes: &["plugin", "info"],
-                        set_icon_name: Some(&plugin_info.icon),
+                        set_icon_name: Some(&self.plugin_info.icon),
                         set_halign: gtk::Align::Start,
                         set_valign: gtk::Align::Start,
                         set_pixel_size: 32,
                     },
                     gtk::Label {
                         set_css_classes: &["plugin", "info"],
-                        set_label: &plugin_info.name,
+                        set_label: &self.plugin_info.name,
                         set_halign: gtk::Align::Start,
                         set_valign: gtk::Align::Center,
                     }
@@ -192,7 +188,6 @@ impl FactoryComponent for PluginBox {
         sender: FactorySender<Self>,
     ) -> Self::Widgets {
         let matches = self.matches.widget();
-        let plugin_info = self.plugin.info()();
 
         let widgets = view_output!();
 
@@ -200,7 +195,7 @@ impl FactoryComponent for PluginBox {
     }
 
     fn init_model(
-        (plugin, config): Self::Init,
+        (plugin_info, config): Self::Init,
         _index: &Self::Index,
         _sender: FactorySender<Self>,
     ) -> Self {
@@ -209,12 +204,11 @@ impl FactoryComponent for PluginBox {
             .detach();
 
         Self {
-            plugin,
+            plugin_info,
             matches,
             config,
             visible: false,
             enabled: true,
-            id: 0,
         }
     }
 
@@ -225,19 +219,22 @@ impl FactoryComponent for PluginBox {
         sender: FactorySender<Self>,
     ) {
         match message {
-            PluginBoxInput::EntryChanged(input) => {
-                self.id += 1;
-                if self.enabled {
-                    sender.spawn_command(glib::clone!(
-                        #[strong(rename_to = plugin)]
-                        self.plugin,
-                        #[strong(rename_to = id)]
-                        self.id,
-                        move |sender| {
-                            sender.emit((id, plugin.get_matches()(input.into())));
-                        }
-                    ));
+            PluginBoxInput::Matches(matches) => {
+                if !self.enabled {
+                    return;
                 }
+
+                self.visible = !matches.is_empty();
+                {
+                    let mut guard = self.matches.guard();
+
+                    guard.clear();
+
+                    for _match in matches {
+                        guard.push_back(_match);
+                    }
+                }
+                sender.output(PluginBoxOutput::MatchesLoaded).unwrap();
             }
             PluginBoxInput::Enable(enable) => {
                 self.enabled = enable;
@@ -249,32 +246,6 @@ impl FactoryComponent for PluginBox {
             }
         }
 
-        self.update_view(widgets, sender);
-    }
-
-    fn update_cmd_with_view(
-        &mut self,
-        widgets: &mut Self::Widgets,
-        (id, matches): Self::CommandOutput,
-        sender: FactorySender<Self>,
-    ) {
-        // Make sure only the latest matches actually get handled
-        if !self.enabled || id != self.id {
-            return;
-        }
-
-        self.visible = !matches.is_empty();
-        {
-            let mut guard = self.matches.guard();
-
-            guard.clear();
-
-            for _match in matches {
-                guard.push_back(_match);
-            }
-        }
-
-        sender.output(PluginBoxOutput::MatchesLoaded).unwrap();
         self.update_view(widgets, sender);
     }
 }

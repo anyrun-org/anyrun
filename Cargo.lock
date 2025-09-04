@@ -172,9 +172,9 @@ name = "anyrun"
 version = "25.9.0"
 dependencies = [
  "abi_stable",
- "anyrun-interface",
+ "anyrun-interface 25.9.0 (git+https://github.com/anyrun-org/anyrun-interface?branch=anyrun-provider)",
  "anyrun-macros",
- "chrono",
+ "anyrun-provider-ipc",
  "clap",
  "gtk4",
  "gtk4-layer-shell",
@@ -193,6 +193,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyrun-interface"
+version = "25.9.0"
+source = "git+https://github.com/anyrun-org/anyrun-interface?branch=anyrun-provider#7c3d4f28e2e688ab17a84695dfff74790ea85af5"
+dependencies = [
+ "abi_stable",
+ "serde",
+]
+
+[[package]]
 name = "anyrun-macros"
 version = "25.9.0"
 dependencies = [
@@ -205,8 +214,18 @@ name = "anyrun-plugin"
 version = "25.9.0"
 dependencies = [
  "abi_stable",
- "anyrun-interface",
+ "anyrun-interface 25.9.0",
  "anyrun-macros",
+]
+
+[[package]]
+name = "anyrun-provider-ipc"
+version = "0.1.0"
+source = "git+https://github.com/anyrun-org/anyrun-provider#49841790d7b40eed138951dbb58e40fbc63533d5"
+dependencies = [
+ "anyrun-interface 25.9.0 (git+https://github.com/anyrun-org/anyrun-interface?branch=anyrun-provider)",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
