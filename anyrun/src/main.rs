@@ -143,6 +143,7 @@ impl Component for App {
                 }
             },
 
+            #[name = "main"]
             gtk::Box {
                 set_orientation: gtk::Orientation::Vertical,
                 set_halign: gtk::Align::Center,
@@ -325,10 +326,25 @@ impl Component for App {
                 let height = self.config.height.to_val(mon_height);
                 let y = self.config.y.to_val(mon_height) - height / 2;
 
-                window.set_default_size(width, height);
-                window.child().unwrap().set_size_request(width, height);
-                window.set_margin(Edge::Left, x);
-                window.set_margin(Edge::Top, y);
+                if self.config.close_on_click {
+                    window.set_anchor(Edge::Bottom, true);
+                    window.set_anchor(Edge::Right, true);
+                    widgets.main.set_halign(gtk::Align::Fill);
+                    widgets.main.set_margin_start(x);
+                    widgets.main.set_margin_top(y);
+                    widgets
+                        .main
+                        .set_margin_end(mon_width as i32 - x - width);
+                    widgets
+                        .main
+                        .set_margin_bottom(mon_height as i32 - y - height);
+                } else {
+                    window.set_default_size(width, height);
+                    window.child().unwrap().set_size_request(width, height);
+                    window.set_margin(Edge::Left, x);
+                    window.set_margin(Edge::Top, y);
+                }
+
                 window.show();
             }
             AppMsg::KeyPressed { key, modifier } => {
