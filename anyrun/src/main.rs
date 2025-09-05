@@ -16,7 +16,7 @@ use relm4::prelude::*;
 use wl_clipboard_rs::copy;
 
 use crate::{
-    config::{Action, Config, ConfigArgs, Keybind},
+    config::{Action, Config, ConfigArgs, Keybind, Layer},
     plugin_box::{PluginBox, PluginBoxInput, PluginBoxOutput, PluginMatch},
 };
 
@@ -118,7 +118,12 @@ impl Component for App {
     view! {
         gtk::Window {
             init_layer_shell: (),
-            set_layer: gtk4_layer_shell::Layer::Top,
+            set_layer: match config.layer {
+                    Layer::Background => gtk4_layer_shell::Layer::Background,
+                    Layer::Bottom => gtk4_layer_shell::Layer::Bottom,
+                    Layer::Top => gtk4_layer_shell::Layer::Top,
+                    Layer::Overlay => gtk4_layer_shell::Layer::Overlay,
+                },
             set_anchor: (Edge::Left, true),
             set_anchor: (Edge::Top, true),
             set_keyboard_mode: KeyboardMode::OnDemand,
@@ -332,9 +337,7 @@ impl Component for App {
                     widgets.main.set_halign(gtk::Align::Fill);
                     widgets.main.set_margin_start(x);
                     widgets.main.set_margin_top(y);
-                    widgets
-                        .main
-                        .set_margin_end(mon_width as i32 - x - width);
+                    widgets.main.set_margin_end(mon_width as i32 - x - width);
                     widgets
                         .main
                         .set_margin_bottom(mon_height as i32 - y - height);
