@@ -349,6 +349,11 @@ impl Component for App {
                 }
 
                 window.show();
+
+                // If show_results_immediately is enabled, trigger initial search with empty input
+                if self.config.show_results_immediately {
+                    self.plugins.broadcast(PluginBoxInput::EntryChanged(String::new()));
+                }
             }
             AppMsg::KeyPressed { key, modifier } => {
                 if let Some(Keybind { action, .. }) = self.config.keybinds.iter().find(|keybind| {

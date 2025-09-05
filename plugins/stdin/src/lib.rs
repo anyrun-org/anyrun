@@ -9,6 +9,7 @@ use serde::Deserialize;
 struct Config {
     allow_invalid: bool,
     max_entries: usize,
+    preserve_order: bool,
 }
 
 impl Default for Config {
@@ -16,6 +17,7 @@ impl Default for Config {
         Self {
             allow_invalid: false,
             max_entries: 5,
+            preserve_order: false,
         }
     }
 }
@@ -60,7 +62,9 @@ fn get_matches(input: RString, state: &State) -> RVec<Match> {
         .collect::<Vec<_>>();
 
     if !lines.is_empty() {
-        lines.sort_by(|a, b| b.1.cmp(&a.1));
+        if !state.config.preserve_order {
+            lines.sort_by(|a, b| b.1.cmp(&a.1));
+        }
         lines.truncate(state.config.max_entries);
     } else if state.config.allow_invalid {
         lines.push((input.into(), 0));
