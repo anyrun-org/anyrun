@@ -252,7 +252,7 @@ pub fn config_args(item: TokenStream) -> TokenStream {
     };
 
     quote! {
-        #[derive(::clap::Args)]
+        #[derive(::clap::Args, ::std::clone::Clone)]
         #struct_decl {
             #fields
         }

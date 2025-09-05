@@ -11,10 +11,13 @@ use anyrun_interface::HandleResult;
 use anyrun_provider_ipc as ipc;
 use clap::Parser;
 use gtk::{gdk, glib, prelude::*};
-use gtk4::{self as gtk};
+use gtk4::{
+    self as gtk,
+    gio::{self, ApplicationFlags},
+};
 use gtk4_layer_shell::{Edge, KeyboardMode, LayerShell};
 use nix::unistd;
-use relm4::prelude::*;
+use relm4::{prelude::*, ComponentBuilder};
 use wl_clipboard_rs::copy;
 
 use crate::{
@@ -26,19 +29,23 @@ mod config;
 mod plugin_box;
 mod socket;
 
-/// Actions to run after GTK has finished
-enum PostRunAction {
-    Copy(Vec<u8>),
-    None,
-}
+// /// Actions to run after GTK has finished
+// enum PostRunAction {
+//     Copy(Vec<u8>),
+//     None,
+// }
 
 /// A wayland native, highly customizable runner.
-#[derive(Parser)]
+#[derive(Parser, Clone)]
 #[command(version, about)]
 struct Args {
     /// Override the path to the config directory
     #[arg(short, long)]
     config_dir: Option<String>,
+    /// Run as a daemon
+    #[arg(short, long)]
+    daemon: bool,
+
     #[command(flatten)]
     config: ConfigArgs,
 }
@@ -46,7 +53,7 @@ struct Args {
 struct App {
     config: Arc<Config>,
     plugins: FactoryVecDeque<PluginBox>,
-    post_run_action: Rc<RefCell<PostRunAction>>,
+    // post_run_action: PostRunAction,
     tx: mpsc::Sender<anyrun_provider_ipc::Request>,
 }
 
@@ -112,7 +119,7 @@ impl App {
 impl Component for App {
     type Input = AppMsg;
     type Output = ();
-    type Init = (Args, Rc<RefCell<PostRunAction>>);
+    type Init = Args;
     type CommandOutput = anyrun_provider_ipc::Response;
 
     view! {
@@ -189,7 +196,7 @@ impl Component for App {
     }
 
     fn init(
-        (args, post_run_action): Self::Init,
+        args: Self::Init,
         root: Self::Root,
         sender: relm4::ComponentSender<Self>,
     ) -> relm4::ComponentParts<Self> {
@@ -263,7 +270,6 @@ impl Component for App {
 
         let widgets = view_output!();
         let model = Self {
-            post_run_action,
             config,
             plugins: plugins_factory,
             tx,
@@ -448,7 +454,10 @@ impl Component for App {
                         }
                     }
                     HandleResult::Copy(rvec) => {
-                        *self.post_run_action.borrow_mut() = PostRunAction::Copy(rvec.into());
+                        // *self.post_run_action.borrow_mut() = PostRunAction::Copy(rvec.into());
+                        // FIXME: Maybe handle more mimetypes?
+                        root.clipboard()
+                            .set_text(&String::from_utf8(rvec.into()).unwrap());
                         sender.input(AppMsg::Action(Action::Close));
                     }
                     HandleResult::Stdout(rvec) => {
@@ -464,36 +473,48 @@ impl Component for App {
 
 fn main() {
     let args = Args::parse();
-    // This is done to avoid GTK looking up icons for an icon to match the appid
-    // Yes it is dumb
-    let gtk_app = gtk::Application::new(Option::<String>::None, Default::default());
-    let app = RelmApp::from_app(gtk_app).with_args(vec![]);
+    let flags = if args.daemon {
+        gio::ApplicationFlags::IS_SERVICE
+    } else {
+        Default::default()
+    };
+    let app = gtk::Application::new(Some("org.anyrun.anyrun"), flags);
+    // app.register(Option::<&gio::Cancellable>::None).unwrap();
 
-    let post_run_action = Rc::new(RefCell::new(PostRunAction::None));
+    let relm_app = RelmApp::from_app(app).with_args(vec![]);
 
-    app.run::<App>((args, post_run_action.clone()));
+    relm_app.run::<App>(args);
 
     // Perform a post run action if one is set
-    match &*post_run_action.borrow() {
-        PostRunAction::Copy(bytes) => match unsafe { unistd::fork() } {
-            // The parent process just exits and prints that out
-            Ok(unistd::ForkResult::Parent { .. }) => {
-                println!("Child spawned to serve copy requests.");
-            }
-            // Child process starts serving copy requests
-            Ok(unistd::ForkResult::Child) => {
-                let mut opts = copy::Options::new();
-                opts.foreground(true);
-                opts.copy(
-                    copy::Source::Bytes(bytes.clone().into_boxed_slice()),
-                    copy::MimeType::Autodetect,
-                )
-                .expect("Failed to serve copy bytes");
-            }
-            Err(why) => {
-                eprintln!("Failed to fork for copy sharing: {why}");
-            }
-        },
-        PostRunAction::None => (),
-    }; // Load bearing semicolon
+    // match &*post_run_action.borrow() {
+    //     PostRunAction::Copy(bytes) => match unsafe { unistd::fork() } {
+    //         // The parent process just exits and prints that out
+    //         Ok(unistd::ForkResult::Parent { .. }) => {
+    //             println!("Child spawned to serve copy requests.");
+    //         }
+    //         // Child process starts serving copy requests
+    //         Ok(unistd::ForkResult::Child) => {
+    //             let mut opts = copy::Options::new();
+    //             opts.foreground(true);
+    //             opts.copy(
+    //                 copy::Source::Bytes(bytes.clone().into_boxed_slice()),
+    //                 copy::MimeType::Autodetect,
+    //             )
+    //             .expect("Failed to serve copy bytes");
+    //         }
+    //         Err(why) => {
+    //             eprintln!("Failed to fork for copy sharing: {why}");
+    //         }
+    //     },
+    //     PostRunAction::None => (),
+    // }; // Load bearing semicolon
+
+    // NOTES:
+    // gtk::Application::activate event gets called in the primary process when
+    // a remote starts up
+    //
+    // gtk::Application::startup is only called in the primary (maybe??)
+    //
+    // Gotta figure out how to transmit args from the remote to the primary
+    //
 }
