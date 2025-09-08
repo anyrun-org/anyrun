@@ -7,9 +7,9 @@ pub struct DesktopEntry {
     pub exec: String,
     pub path: Option<PathBuf>,
     pub name: String,
-    pub display_name: Option<String>,
+    pub localized_name: Option<String>,
     pub keywords: Vec<String>,
-    pub display_keywords: Option<Vec<String>>,
+    pub localized_keywords: Option<Vec<String>>,
     pub desc: Option<String>,
     pub icon: String,
     pub term: bool,
@@ -21,25 +21,16 @@ const FIELD_CODE_LIST: &[&str] = &[
 ];
 
 impl DesktopEntry {
-    pub fn display_name(&self) -> String {
-        self.display_name
+    pub fn localized_name(&self) -> String {
+        self.localized_name
             .clone()
             .unwrap_or_else(|| self.name.clone())
-    }
-
-    fn display_keys<'a>(
-        key: &'a str,
-        lang_choices: &'a [&str],
-    ) -> impl Iterator<Item = String> + 'a {
-        lang_choices
-            .iter()
-            .map(move |lang| format!("{key}[{lang}]"))
     }
 
     fn from_dir_entry(
         entry: &fs::DirEntry,
         config: &Config,
-        lang_choices: Option<&[&str]>,
+        lang_choices: &LangChoices,
     ) -> Vec<Self> {
         if entry.path().extension() == Some(OsStr::new("desktop")) {
             let content = match fs::read_to_string(entry.path()) {
@@ -99,11 +90,10 @@ impl DesktopEntry {
                             },
                             path: map.get("Path").map(PathBuf::from),
                             name: map.get("Name")?.to_string(),
-                            display_name: lang_choices.and_then(|lang_choices| {
-                                Self::display_keys("Name", lang_choices)
-                                    .find_map(|key| map.get(&*key))
-                                    .map(ToString::to_string)
-                            }),
+                            localized_name: lang_choices
+                                .localized_keys("Name")
+                                .find_map(|key| map.get(&*key))
+                                .map(ToString::to_string),
                             keywords: map
                                 .get("Keywords")
                                 .map(|keywords| {
@@ -113,21 +103,18 @@ impl DesktopEntry {
                                         .collect::<Vec<_>>()
                                 })
                                 .unwrap_or_default(),
-                            display_keywords: lang_choices.and_then(|lang_choices| {
-                                Self::display_keys("Keywords", lang_choices)
-                                    .find_map(|key| map.get(&*key))
-                                    .map(|keywords| {
-                                        keywords
-                                            .split(';')
-                                            .map(|s| s.to_owned())
-                                            .collect::<Vec<_>>()
-                                    })
-                            }),
+                            localized_keywords: lang_choices
+                                .localized_keys("Keywords")
+                                .find_map(|key| map.get(&*key))
+                                .map(|keywords| {
+                                    keywords
+                                        .split(';')
+                                        .map(|s| s.to_owned())
+                                        .collect::<Vec<_>>()
+                                }),
                             desc: lang_choices
-                                .and_then(|lang_choices| {
-                                    Self::display_keys("Comment", lang_choices)
-                                        .find_map(|key| map.get(&*key))
-                                })
+                                .localized_keys("Comment")
+                                .find_map(|key| map.get(&*key))
                                 .or_else(|| map.get("Comment"))
                                 .map(ToString::to_string),
                             icon: map
@@ -179,11 +166,10 @@ impl DesktopEntry {
                                 Some(name) => name.to_string(),
                                 None => continue,
                             },
-                            display_name: lang_choices.and_then(|lang_choices| {
-                                Self::display_keys("Name", lang_choices)
-                                    .find_map(|key| map.get(&*key))
-                                    .map(ToString::to_string)
-                            }),
+                            localized_name: lang_choices
+                                .localized_keys("Name")
+                                .find_map(|key| map.get(&*key))
+                                .map(ToString::to_string),
                             keywords: map
                                 .get("Keywords")
                                 .map(|keywords| {
@@ -193,17 +179,16 @@ impl DesktopEntry {
                                         .collect::<Vec<_>>()
                                 })
                                 .unwrap_or_default(),
-                            display_keywords: lang_choices.and_then(|lang_choices| {
-                                Self::display_keys("Keywords", lang_choices)
-                                    .find_map(|key| map.get(&*key))
-                                    .map(|keywords| {
-                                        keywords
-                                            .split(';')
-                                            .map(|s| s.to_owned())
-                                            .collect::<Vec<_>>()
-                                    })
-                            }),
-                            desc: Some(entry.display_name()),
+                            localized_keywords: lang_choices
+                                .localized_keys("Keywords")
+                                .find_map(|key| map.get(&*key))
+                                .map(|keywords| {
+                                    keywords
+                                        .split(';')
+                                        .map(|s| s.to_owned())
+                                        .collect::<Vec<_>>()
+                                }),
+                            desc: Some(entry.localized_name()),
                             icon: entry.icon.clone(),
                             term: map
                                 .get("Terminal")
@@ -223,18 +208,44 @@ impl DesktopEntry {
     }
 }
 
-fn lang_choices(lang: &str) -> Vec<&str> {
-    // example: en_US.UTF-8
-    let whole = lang;
-    // example: en_US
-    let Some((prefix, _)) = whole.split_once('.') else {
-        return vec![whole];
-    };
-    // example: en
-    let Some((short, _)) = prefix.split_once('_') else {
-        return vec![whole, prefix];
-    };
-    vec![whole, prefix, short]
+#[derive(Debug, Default)]
+struct LangChoices<'a> {
+    whole: Option<&'a str>,
+    prefix: Option<&'a str>,
+    short: Option<&'a str>,
+}
+
+impl<'a> LangChoices<'a> {
+    fn new(lang: Option<&'a str>) -> Self {
+        let mut ret = Self::default();
+
+        // example: en_US.UTF-8
+        let Some(whole) = lang else {
+            return ret;
+        };
+        ret.whole = Some(whole);
+
+        // example: en_US
+        let Some((prefix, _)) = whole.split_once('.') else {
+            return ret;
+        };
+        ret.prefix = Some(prefix);
+
+        // example: en
+        let Some((short, _)) = prefix.split_once('_') else {
+            return ret;
+        };
+        ret.short = Some(short);
+
+        ret
+    }
+
+    fn localized_keys(&self, key: &'a str) -> impl Iterator<Item = String> + 'a {
+        let choices = (self.whole.into_iter())
+            .chain(self.prefix)
+            .chain(self.short);
+        choices.map(move |choice| format!("{key}[{choice}]"))
+    }
 }
 
 pub fn scrubber(config: &Config) -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std::error::Error>> {
@@ -253,7 +264,7 @@ pub fn scrubber(config: &Config) -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std
     };
 
     let lang = env::var("LANG").ok();
-    let lang_choices = lang.as_deref().map(lang_choices);
+    let lang_choices = LangChoices::new(lang.as_deref());
 
     let mut entries: HashMap<String, DesktopEntry> = match env::var("XDG_DATA_DIRS") {
         Ok(data_dirs) => {
@@ -286,7 +297,7 @@ pub fn scrubber(config: &Config) -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std
             Ok(entry) => entry,
             Err(_why) => return None,
         };
-        let entries = DesktopEntry::from_dir_entry(&entry, config, lang_choices.as_deref());
+        let entries = DesktopEntry::from_dir_entry(&entry, config, &lang_choices);
         Some(
             entries
                 .into_iter()
@@ -306,8 +317,7 @@ pub fn scrubber(config: &Config) -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std
                         Ok(entry) => entry,
                         Err(_why) => return None,
                     };
-                    let entries =
-                        DesktopEntry::from_dir_entry(&entry, config, lang_choices.as_deref());
+                    let entries = DesktopEntry::from_dir_entry(&entry, config, &lang_choices);
                     Some(
                         entries
                             .into_iter()

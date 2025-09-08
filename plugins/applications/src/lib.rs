@@ -182,31 +182,29 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
         .iter()
         .filter_map(|(entry, id)| {
             // Can be replaced by `Iterator::intersperse` once the API becomes stable.
-            macro_rules! prefix_sep {
-                ($i:expr) => {
-                    $i.as_deref()
-                        .map(|s| [" ", s].into_iter())
-                        .into_iter()
-                        .flatten()
-                };
+            fn prefix_sep(i: &Option<String>) -> impl Iterator<Item = &str> + '_ {
+                i.as_deref()
+                    .map(|s| [" ", s].into_iter())
+                    .into_iter()
+                    .flatten()
             }
 
             let app_names = ([&*entry.name].into_iter())
-                .chain(prefix_sep!(entry.display_name))
-                .chain(prefix_sep!(entry.desc))
+                .chain(prefix_sep(&entry.localized_name))
+                .chain(prefix_sep(&entry.desc))
                 .collect::<String>();
 
             let app_score = matcher.fuzzy_match(&app_names, &input).unwrap_or(0);
 
             let keyword_score = (entry.keywords.iter())
-                .chain(entry.display_keywords.iter().flat_map(|k| k.iter()))
+                .chain(entry.localized_keywords.iter().flat_map(|k| k.iter()))
                 .map(|keyword| matcher.fuzzy_match(keyword, &input).unwrap_or(0))
                 .sum::<i64>();
 
             let mut score = (app_score * 25 + keyword_score) - entry.offset;
 
             // prioritize actions
-            if entry.display_name.is_some() {
+            if entry.localized_name.is_some() {
                 score *= 2;
             }
             if entry.desc.is_some() {
@@ -227,7 +225,7 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
     entries
         .into_iter()
         .map(|(entry, id, _)| Match {
-            title: entry.display_name().into(),
+            title: entry.localized_name().into(),
             description: entry.desc.clone().map(|desc| desc.into()).into(),
             use_pango: false,
             icon: ROption::RSome(entry.icon.clone().into()),
