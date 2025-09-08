@@ -7,16 +7,25 @@ use serde::Deserialize;
 
 #[derive(Deserialize)]
 struct Config {
+    #[serde(default)]
     allow_invalid: bool,
+    #[serde(default = "Config::default_max_entries")]
     max_entries: usize,
+    #[serde(default)]
     preserve_order: bool,
+}
+
+impl Config {
+    fn default_max_entries() -> usize {
+        5
+    }
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
+            max_entries: Config::default_max_entries(),
             allow_invalid: false,
-            max_entries: 5,
             preserve_order: false,
         }
     }
