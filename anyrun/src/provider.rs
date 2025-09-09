@@ -12,6 +12,7 @@ use std::{
     time::Duration,
 };
 
+use abi_stable::pointer_trait::CanTransmuteElement;
 use anyrun_provider_ipc as ipc;
 use relm4::Sender;
 
@@ -33,7 +34,7 @@ pub fn worker(
     let _ = fs::remove_file(&socket_path);
     let listener = UnixListener::bind(&socket_path).unwrap();
 
-    let child = Command::new(&config.provider)
+    let mut child = Command::new(&config.provider)
         .stdin(Stdio::piped())
         .arg("--config-dir")
         .arg(config_dir.unwrap_or(ipc::CONFIG_DIRS[0].to_string()))
@@ -47,7 +48,7 @@ pub fn worker(
         .arg(&socket_path)
         .spawn()?;
 
-    child.stdin.unwrap().write_all(&stdin).unwrap();
+    child.stdin.as_mut().unwrap().write_all(&stdin).unwrap();
 
     let (stream, _) = listener.accept()?;
     let mut socket = ipc::Socket::new(stream);
@@ -75,6 +76,8 @@ pub fn worker(
 
     // Remove it after we are done with it
     let _ = fs::remove_file(&socket_path);
+    // Make sure it exits properly and doesn't leave a zombie process
+    let _ = child.wait();
 
     Ok(())
 }
