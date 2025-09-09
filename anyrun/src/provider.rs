@@ -1,8 +1,5 @@
 use std::{
-    any::Any,
-    env,
-    fmt::Debug,
-    fs,
+    env, fs,
     io::{self, Write},
     os::unix::net::UnixListener,
     path::PathBuf,
@@ -12,7 +9,6 @@ use std::{
     time::Duration,
 };
 
-use abi_stable::pointer_trait::CanTransmuteElement;
 use anyrun_provider_ipc as ipc;
 use relm4::Sender;
 
@@ -25,6 +21,8 @@ pub fn worker(
     sender: Sender<anyrun_provider_ipc::Response>,
     // The stdin received by the launching command
     stdin: Vec<u8>,
+    // The environment of the launching command
+    env: Vec<(String, String)>,
 ) -> io::Result<()> {
     let socket_path = format!(
         "{}/anyrun.sock",
@@ -46,6 +44,7 @@ pub fn worker(
         )
         .arg("connect-to")
         .arg(&socket_path)
+        .envs(env)
         .spawn()?;
 
     child.stdin.as_mut().unwrap().write_all(&stdin).unwrap();

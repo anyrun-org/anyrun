@@ -1,7 +1,7 @@
 use crate::{
     config::{Action, Config, Keybind},
     plugin_box::{PluginBox, PluginBoxInput, PluginBoxOutput, PluginMatch},
-    provider, Args, Show,
+    provider, Args,
 };
 use anyrun_interface::HandleResult;
 use anyrun_provider_ipc as ipc;
@@ -11,11 +11,9 @@ use gtk4_layer_shell::{Edge, KeyboardMode, LayerShell};
 use relm4::{prelude::*, ComponentBuilder, Sender};
 use serde::{Deserialize, Serialize};
 use std::{
-    cell::RefCell,
     env, fs,
     io::{self, Write},
     path::PathBuf,
-    rc::Rc,
     sync::{mpsc, Arc},
 };
 
@@ -44,6 +42,7 @@ pub enum AppMsg {
 pub struct AppInit {
     pub args: Args,
     pub stdin: Vec<u8>,
+    pub env: Vec<(String, String)>,
 }
 
 pub struct App {
@@ -255,8 +254,10 @@ impl Component for App {
             config_dir,
             #[strong(rename_to = stdin)]
             app_init.stdin,
+            #[strong(rename_to = env)]
+            app_init.env,
             move |sender| {
-                if let Err(why) = provider::worker(config, config_dir, rx, sender, stdin) {
+                if let Err(why) = provider::worker(config, config_dir, rx, sender, stdin, env) {
                     eprintln!("[anyrun] IPC worker returned an error: {why}");
                 }
             }
