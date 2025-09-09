@@ -41,6 +41,7 @@ let
     ;
 
   defaultPackage = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
+  defaultProvider = self.packages.${pkgs.stdenv.hostPlatform.system}.anyrun-provider;
   cfg = config.programs.anyrun;
 in
 {
@@ -51,6 +52,15 @@ in
 
   options.programs.anyrun = {
     enable = mkEnableOption "anyrun";
+    daemon.enable = mkOption {
+      type = bool;
+      default = true;
+      description = ''
+        Enable running Anyrun as a daemon, allowing for faster startup speed.
+
+        NOTE: This is required for clipboard functionality.
+      '';
+    };
 
     package = mkOption {
       type = nullOr package;
@@ -103,6 +113,14 @@ in
           default = null;
           description = ''
             List of anyrun plugins to use. Can either be packages, absolute plugin paths, or strings.
+          '';
+        };
+
+        provider = mkOption {
+          type = package;
+          default = defaultProvider;
+          description = ''
+            The program that is used for loading the plugins, and for the communcation with them.
           '';
         };
 
@@ -339,6 +357,24 @@ in
         else
           [ ];
 
+      systemd.user.services.anyrun = mkIf cfg.daemon.enable {
+        Unit = {
+          Description = "Anyrun daemon";
+          PartOf = "graphical-session.target";
+          After = "graphical-session.target";
+        };
+
+        Service = {
+          Type = "simple";
+          ExecStart = "${lib.getExe cfg.package} daemon";
+          Restart = "on-failure";
+        };
+
+        Install = {
+          WantedBy = [ "graphical-session.target" ];
+        };
+      };
+
       home.packages = optional (cfg.package != null) cfg.package;
 
       xdg.configFile = mkMerge [
@@ -361,6 +397,7 @@ in
                 if cfg.config.maxEntries == null then "None" else "Some(${toString cfg.config.maxEntries})"
               },
               plugins: ${toJSON parsedPlugins},
+              provider: "${lib.getExe cfg.config.provider}",
               ${optionalString (cfg.config.extraLines != null) cfg.config.extraLines}
               ${keybinds}
             )

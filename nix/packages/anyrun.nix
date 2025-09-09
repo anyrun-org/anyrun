@@ -37,6 +37,8 @@ rustPlatform.buildRustPackage {
 
   cargoLock = {
     inherit lockFile;
+    # Temporary while packages aren't yet stabilized
+    allowBuiltinFetchGit = true;
   };
 
   nativeBuildInputs = [

@@ -1,8 +1,8 @@
 use anyrun_macros::ConfigArgs;
 use clap::ValueEnum;
-use gtk::gdk;
+use gtk::{gdk, glib};
 use gtk4 as gtk;
-use serde::{de::Visitor, Deserialize, Deserializer};
+use serde::{de::Visitor, Deserialize, Deserializer, Serialize};
 use std::path::PathBuf;
 
 #[derive(Deserialize, ConfigArgs)]
@@ -34,7 +34,7 @@ pub struct Config {
     #[serde(default)]
     pub show_results_immediately: bool,
     #[serde(default)]
-    pub max_entries: Option<usize>,
+    pub max_entries: Option<u32>,
     #[serde(default = "Config::default_layer")]
     pub layer: Layer,
 
@@ -42,6 +42,7 @@ pub struct Config {
     #[serde(default = "Config::default_keybinds")]
     pub keybinds: Vec<Keybind>,
 }
+
 impl Config {
     fn default_x() -> RelativeNum {
         RelativeNum::Fraction(0.5)
@@ -126,7 +127,7 @@ impl Default for Config {
     }
 }
 
-#[derive(Deserialize, Clone, ValueEnum)]
+#[derive(Deserialize, Serialize, Clone, Debug, ValueEnum)]
 pub enum Layer {
     Background,
     Bottom,
@@ -135,17 +136,17 @@ pub enum Layer {
 }
 
 // Could have a better name
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub enum RelativeNum {
     Absolute(i32),
-    Fraction(f32),
+    Fraction(f64),
 }
 
 impl RelativeNum {
     pub fn to_val(&self, val: u32) -> i32 {
         match self {
             RelativeNum::Absolute(num) => *num,
-            RelativeNum::Fraction(frac) => (frac * val as f32) as i32,
+            RelativeNum::Fraction(frac) => (frac * val as f64) as i32,
         }
     }
 }
