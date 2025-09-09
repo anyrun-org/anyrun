@@ -1,8 +1,12 @@
 use std::{
-    env, fs, io,
+    any::Any,
+    env,
+    fmt::Debug,
+    fs,
+    io::{self, Write},
     os::unix::net::UnixListener,
     path::PathBuf,
-    process::Command,
+    process::{Command, Stdio},
     sync::{mpsc, Arc},
     thread,
     time::Duration,
@@ -18,6 +22,8 @@ pub fn worker(
     config_dir: Option<String>,
     rx: mpsc::Receiver<anyrun_provider_ipc::Request>,
     sender: Sender<anyrun_provider_ipc::Response>,
+    // The stdin received by the launching command
+    stdin: Vec<u8>,
 ) -> io::Result<()> {
     let socket_path = format!(
         "{}/anyrun.sock",
@@ -27,7 +33,8 @@ pub fn worker(
     let _ = fs::remove_file(&socket_path);
     let listener = UnixListener::bind(&socket_path).unwrap();
 
-    Command::new(&config.provider)
+    let child = Command::new(&config.provider)
+        .stdin(Stdio::piped())
         .arg("--config-dir")
         .arg(config_dir.unwrap_or(ipc::CONFIG_DIRS[0].to_string()))
         .args(
@@ -40,37 +47,30 @@ pub fn worker(
         .arg(&socket_path)
         .spawn()?;
 
+    child.stdin.unwrap().write_all(&stdin).unwrap();
+
     let (stream, _) = listener.accept()?;
     let mut socket = ipc::Socket::new(stream);
     socket.inner.get_ref().set_nonblocking(true)?;
 
-    loop {
-        match rx.try_recv() {
-            Ok(request) => {
-                socket.send(&request)?;
-                if matches!(request, ipc::Request::Quit) {
-                    break;
-                }
-            }
-            Err(mpsc::TryRecvError::Empty) => (),
-            Err(mpsc::TryRecvError::Disconnected) => {
-                eprintln!("[anyrun] GUI thread disconnected");
-                break;
+    'outer: loop {
+        for req in rx.try_iter() {
+            socket.send(&req)?;
+            if matches!(req, ipc::Request::Quit) {
+                break 'outer;
             }
         }
 
         match socket.recv() {
             Ok(response) => sender.emit(response),
             Err(why) => match why.kind() {
-                io::ErrorKind::WouldBlock => (),
-                io::ErrorKind::ConnectionAborted => break,
+                io::ErrorKind::WouldBlock => thread::sleep(Duration::from_millis(1)),
                 _ => {
                     eprintln!("[anyrun] Error reading from IPC: {why}");
+                    break;
                 }
             },
         }
-
-        thread::sleep(Duration::from_millis(10))
     }
 
     // Remove it after we are done with it

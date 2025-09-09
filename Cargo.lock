@@ -182,6 +182,7 @@ dependencies = [
  "relm4",
  "ron 0.8.1",
  "serde",
+ "serde_json",
  "wl-clipboard-rs",
 ]
 
@@ -2364,8 +2365,6 @@ checksum = "caf4aa5b0f434c91fe5c7f1ecb6a5ece2130b02ad2a590589dda5146df959001"
 [[package]]
 name = "relm4"
 version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bae902de22fd92e62641f047975abf228573425b9b8de175e8ab5b6cda10379"
 dependencies = [
  "flume",
  "fragile",
@@ -2381,14 +2380,10 @@ dependencies = [
 [[package]]
 name = "relm4-css"
 version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37dbe7a114855a22618f0e13595ce6b3f165478c13c2dfc4f4f99614da105797"
 
 [[package]]
 name = "relm4-macros"
 version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "175fce497fc6f11dde7ea56daa30ff7ad29a534bbc209d59d766659c880ba5f1"
 dependencies = [
  "proc-macro2",
  "quote",
