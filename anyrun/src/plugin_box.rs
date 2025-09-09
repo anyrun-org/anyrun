@@ -1,8 +1,8 @@
-use std::{path::PathBuf, rc::Rc, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 
 use abi_stable::std_types::{ROption, RVec};
-use anyrun_interface::{Match, PluginInfo, PluginRef};
-use gtk::{glib, pango, prelude::*};
+use anyrun_interface::{Match, PluginInfo};
+use gtk::{pango, prelude::*};
 use gtk4 as gtk;
 use relm4::prelude::*;
 

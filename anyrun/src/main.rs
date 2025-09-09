@@ -1,18 +1,16 @@
 use std::{
     cell::RefCell,
-    io::{self, BufRead, IsTerminal, Read, Write},
+    io::{self, IsTerminal, Read, Write},
     rc::Rc,
-    sync::mpsc,
 };
 
-use abi_stable::std_types::map::RefIterInterface;
 use clap::{Parser, Subcommand};
 use gtk::{glib, prelude::*};
 use gtk4::{
     self as gtk,
-    gio::{self, DBusMethodInvocation},
+    gio::{self},
 };
-use relm4::{ComponentBuilder, ComponentController, Sender};
+use relm4::Sender;
 use serde::{Deserialize, Serialize};
 
 use crate::config::{Config, ConfigArgs};
@@ -133,13 +131,14 @@ fn main() {
                 io::stdin().read_to_end(&mut buf).unwrap();
                 buf
             };
+            let env = std::env::vars().collect();
 
             if app.is_remote() {
                 let res = proxy
                     .call_sync(
                         "Show",
                         Some(
-                            &(serde_json::to_vec(&app::AppInit { args, stdin }).unwrap(),)
+                            &(serde_json::to_vec(&app::AppInit { args, stdin, env }).unwrap(),)
                                 .to_variant(),
                         ),
                         gio::DBusCallFlags::NONE,
@@ -165,6 +164,7 @@ fn main() {
                         app::AppInit {
                             args: args.clone(),
                             stdin: stdin.clone(),
+                            env: env.clone(),
                         },
                         None,
                     );

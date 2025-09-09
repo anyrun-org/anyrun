@@ -383,6 +383,7 @@ in
           Type = "simple";
           ExecStart = "${lib.getExe cfg.package} daemon";
           Restart = "on-failure";
+          KillMode = "process";
         };
 
         Install = {

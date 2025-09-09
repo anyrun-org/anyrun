@@ -1,6 +1,6 @@
 use anyrun_macros::ConfigArgs;
 use clap::ValueEnum;
-use gtk::{gdk, glib};
+use gtk::gdk;
 use gtk4 as gtk;
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize};
 use std::path::PathBuf;
