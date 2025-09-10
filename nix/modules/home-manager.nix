@@ -165,6 +165,15 @@ in
           description = "Layer shell layer (background, bottom, top or overlay)";
         };
 
+        keyboardMode = mkOption {
+          type = enum [
+            "exclusive"
+            "on-demand"
+          ];
+          default = "exclusive";
+          description = "Layer shell keyboard mode";
+        };
+
         hidePluginInfo = mkOption {
           type = bool;
           default = false;
@@ -345,26 +354,36 @@ in
         (mapAttrs' (name: value: nameValuePair ("anyrun/" + name) value) cfg.extraConfigFiles)
 
         {
-          "anyrun/config.ron".text = ''
-            Config(
-              x: ${stringifyNumeric cfg.config.x},
-              y: ${stringifyNumeric cfg.config.y},
-              width: ${stringifyNumeric cfg.config.width},
-              height: ${stringifyNumeric cfg.config.height},
-              hide_icons: ${boolToString cfg.config.hideIcons},
-              ignore_exclusive_zones: ${boolToString cfg.config.ignoreExclusiveZones},
-              layer: ${capitalize cfg.config.layer},
-              hide_plugin_info: ${boolToString cfg.config.hidePluginInfo},
-              close_on_click: ${boolToString cfg.config.closeOnClick},
-              show_results_immediately: ${boolToString cfg.config.showResultsImmediately},
-              max_entries: ${
-                if cfg.config.maxEntries == null then "None" else "Some(${toString cfg.config.maxEntries})"
-              },
-              plugins: ${toJSON parsedPlugins},
-              ${optionalString (cfg.config.extraLines != null) cfg.config.extraLines}
-              ${keybinds}
-            )
-          '';
+          "anyrun/config.ron".text =
+            let
+              keyboardMode =
+                {
+                  "exclusive" = "Exclusive";
+                  "on-demand" = "OnDemand";
+                }
+                .${cfg.config.keyboardMode};
+            in
+            ''
+              Config(
+                x: ${stringifyNumeric cfg.config.x},
+                y: ${stringifyNumeric cfg.config.y},
+                width: ${stringifyNumeric cfg.config.width},
+                height: ${stringifyNumeric cfg.config.height},
+                hide_icons: ${boolToString cfg.config.hideIcons},
+                ignore_exclusive_zones: ${boolToString cfg.config.ignoreExclusiveZones},
+                layer: ${capitalize cfg.config.layer},
+                keyboard_mode: ${keyboardMode},
+                hide_plugin_info: ${boolToString cfg.config.hidePluginInfo},
+                close_on_click: ${boolToString cfg.config.closeOnClick},
+                show_results_immediately: ${boolToString cfg.config.showResultsImmediately},
+                max_entries: ${
+                  if cfg.config.maxEntries == null then "None" else "Some(${toString cfg.config.maxEntries})"
+                },
+                plugins: ${toJSON parsedPlugins},
+                ${optionalString (cfg.config.extraLines != null) cfg.config.extraLines}
+                ${keybinds}
+              )
+            '';
         }
 
         {

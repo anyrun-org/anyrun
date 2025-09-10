@@ -34,6 +34,8 @@ pub struct Config {
     pub max_entries: Option<usize>,
     #[serde(default = "Config::default_layer")]
     pub layer: Layer,
+    #[serde(default = "Config::default_keyboard_mode")]
+    pub keyboard_mode: KeyboardMode,
 
     #[config_args(skip)]
     #[serde(default = "Config::default_keybinds")]
@@ -67,6 +69,10 @@ impl Config {
 
     fn default_layer() -> Layer {
         Layer::Overlay
+    }
+
+    fn default_keyboard_mode() -> KeyboardMode {
+        KeyboardMode::Exclusive
     }
 
     fn default_keybinds() -> Vec<Keybind> {
@@ -113,6 +119,7 @@ impl Default for Config {
             show_results_immediately: false,
             max_entries: None,
             layer: Self::default_layer(),
+            keyboard_mode: Self::default_keyboard_mode(),
             keybinds: Self::default_keybinds(),
         }
     }
@@ -124,6 +131,12 @@ pub enum Layer {
     Bottom,
     Top,
     Overlay,
+}
+
+#[derive(Deserialize, Clone, ValueEnum)]
+pub enum KeyboardMode {
+    Exclusive,
+    OnDemand,
 }
 
 // Could have a better name

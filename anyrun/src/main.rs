@@ -10,13 +10,13 @@ use anyrun_interface::{HandleResult, PluginRef};
 use clap::Parser;
 use gtk::{gdk, glib, prelude::*};
 use gtk4 as gtk;
-use gtk4_layer_shell::{Edge, KeyboardMode, LayerShell};
+use gtk4_layer_shell::{Edge, LayerShell};
 use nix::unistd;
 use relm4::prelude::*;
 use wl_clipboard_rs::copy;
 
 use crate::{
-    config::{Action, Config, ConfigArgs, Keybind, Layer},
+    config::{Action, Config, ConfigArgs, Keybind},
     plugin_box::{PluginBox, PluginBoxInput, PluginBoxOutput, PluginMatch},
 };
 
@@ -119,14 +119,17 @@ impl Component for App {
         gtk::Window {
             init_layer_shell: (),
             set_layer: match config.layer {
-                    Layer::Background => gtk4_layer_shell::Layer::Background,
-                    Layer::Bottom => gtk4_layer_shell::Layer::Bottom,
-                    Layer::Top => gtk4_layer_shell::Layer::Top,
-                    Layer::Overlay => gtk4_layer_shell::Layer::Overlay,
+                    config::Layer::Background => gtk4_layer_shell::Layer::Background,
+                    config::Layer::Bottom => gtk4_layer_shell::Layer::Bottom,
+                    config::Layer::Top => gtk4_layer_shell::Layer::Top,
+                    config::Layer::Overlay => gtk4_layer_shell::Layer::Overlay,
                 },
             set_anchor: (Edge::Left, true),
             set_anchor: (Edge::Top, true),
-            set_keyboard_mode: KeyboardMode::OnDemand,
+            set_keyboard_mode: match config.keyboard_mode {
+                config::KeyboardMode::Exclusive => gtk4_layer_shell::KeyboardMode::Exclusive,
+                config::KeyboardMode::OnDemand => gtk4_layer_shell::KeyboardMode::OnDemand,
+            },
             set_namespace: Some("anyrun"),
 
             connect_map[sender] => move |win| {
@@ -352,7 +355,8 @@ impl Component for App {
 
                 // If show_results_immediately is enabled, trigger initial search with empty input
                 if self.config.show_results_immediately {
-                    self.plugins.broadcast(PluginBoxInput::EntryChanged(String::new()));
+                    self.plugins
+                        .broadcast(PluginBoxInput::EntryChanged(String::new()));
                 }
             }
             AppMsg::KeyPressed { key, modifier } => {
