@@ -324,7 +324,7 @@ impl Component for App {
         widgets: &mut Self::Widgets,
         message: Self::Input,
         sender: ComponentSender<Self>,
-        root: &Self::Root,
+        _root: &Self::Root,
     ) {
         match message {
             AppMsg::Show {
@@ -373,13 +373,12 @@ impl Component for App {
             }
             AppMsg::Action(action) => match action {
                 Action::Close => {
-                    root.close();
                     relm4::main_application().quit();
                 }
                 Action::Select => {
                     if let Some((_, plugin, plugin_match)) = self.current_selection() {
                         match plugin.plugin.handle_selection()(plugin_match.content.clone()) {
-                            HandleResult::Close => root.close(),
+                            HandleResult::Close =>  relm4::main_application().quit(),
                             HandleResult::Refresh(exclusive) => {
                                 if exclusive {
                                     for (i, _plugin) in self.plugins.iter().enumerate() {
