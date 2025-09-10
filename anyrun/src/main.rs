@@ -170,7 +170,10 @@ impl Component for App {
                     add_controller = gtk::EventControllerKey {
                         connect_key_pressed[sender] => move |_, key, _, modifier| {
                             sender.input(AppMsg::KeyPressed { key, modifier});
-                            glib::Propagation::Proceed
+                            match key {
+                                gdk::Key::Tab => glib::Propagation::Stop,
+                                _ => glib::Propagation::Proceed,
+                            }
                         }
                     }
                 },
