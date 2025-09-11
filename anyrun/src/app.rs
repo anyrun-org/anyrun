@@ -325,17 +325,15 @@ impl Component for App {
                     root.close();
                     // FIXME: Make sure the worker has actually correctly shut down before
                     // exiting
-                    self.tx.send(ipc::Request::Quit).unwrap();
+                    let _ = self.tx.send(ipc::Request::Quit);
                     relm4::runtime_util::shutdown_all();
                 }
                 Action::Select => {
                     if let Some((_, plugin, plugin_match)) = self.current_selection() {
-                        self.tx
-                            .send(ipc::Request::Handle {
-                                plugin: plugin.plugin_info.clone(),
-                                selection: plugin_match.content.clone(),
-                            })
-                            .unwrap();
+                        let _ = self.tx.send(ipc::Request::Handle {
+                            plugin: plugin.plugin_info.clone(),
+                            selection: plugin_match.content.clone(),
+                        });
                     }
                 }
                 Action::Up => {
@@ -371,7 +369,7 @@ impl Component for App {
                 }
             },
             AppMsg::EntryChanged(text) => {
-                self.tx.send(ipc::Request::Query { text }).unwrap();
+                let _ = self.tx.send(ipc::Request::Query { text });
             }
             AppMsg::PluginOutput(PluginBoxOutput::MatchesLoaded) => {
                 if let Some((plugin, plugin_match)) = self.combined_matches().first() {
