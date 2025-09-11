@@ -140,15 +140,10 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
 
         Command::new("sh")
             .arg("-c")
-            .arg(&exec)
-            .current_dir(if let Some(path) = &entry.path {
-                if path.exists() {
-                    path
-                } else {
-                    current_dir
-                }
-            } else {
-                current_dir
+            .arg(&entry.exec)
+            .current_dir(match &entry.path {
+                Some(path) if path.exists() => path,
+                _ => current_dir,
             })
             .spawn()
     } {
@@ -186,16 +181,23 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
         .entries
         .iter()
         .filter_map(|(entry, id)| {
-            let app_score = match &entry.desc {
-                None => matcher.fuzzy_match(&entry.name, &input).unwrap_or(0),
-                Some(val) => matcher
-                    .fuzzy_match(&format!("{} {}", &val, &entry.name).to_string(), &input)
-                    .unwrap_or(0),
-            };
+            // Can be replaced by `Iterator::intersperse` once the API becomes stable.
+            fn prefix_sep(i: &Option<String>) -> impl Iterator<Item = &str> + '_ {
+                i.as_deref()
+                    .map(|s| [" ", s].into_iter())
+                    .into_iter()
+                    .flatten()
+            }
 
-            let keyword_score = entry
-                .keywords
-                .iter()
+            let app_names = ([&*entry.name].into_iter())
+                .chain(prefix_sep(&entry.localized_name))
+                .chain(prefix_sep(&entry.desc))
+                .collect::<String>();
+
+            let app_score = matcher.fuzzy_match(&app_names, &input).unwrap_or(0);
+
+            let keyword_score = (entry.keywords.iter())
+                .chain(entry.localized_keywords.iter().flat_map(|k| k.iter()))
                 .map(|keyword| matcher.fuzzy_match(keyword, &input).unwrap_or(0))
                 .sum::<i64>();
 
@@ -220,7 +222,7 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
     entries
         .into_iter()
         .map(|(entry, id, _)| Match {
-            title: entry.name.clone().into(),
+            title: entry.localized_name().into(),
             description: entry.desc.clone().map(|desc| desc.into()).into(),
             use_pango: false,
             icon: ROption::RSome(entry.icon.clone().into()),

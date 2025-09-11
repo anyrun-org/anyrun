@@ -7,7 +7,9 @@ pub struct DesktopEntry {
     pub exec: String,
     pub path: Option<PathBuf>,
     pub name: String,
+    pub localized_name: Option<String>,
     pub keywords: Vec<String>,
+    pub localized_keywords: Option<Vec<String>>,
     pub desc: Option<String>,
     pub icon: String,
     pub term: bool,
@@ -19,7 +21,17 @@ const FIELD_CODE_LIST: &[&str] = &[
 ];
 
 impl DesktopEntry {
-    fn from_dir_entry(entry: &fs::DirEntry, config: &Config) -> Vec<Self> {
+    pub fn localized_name(&self) -> String {
+        self.localized_name
+            .clone()
+            .unwrap_or_else(|| self.name.clone())
+    }
+
+    fn from_dir_entry(
+        entry: &fs::DirEntry,
+        config: &Config,
+        lang_choices: &LangChoices,
+    ) -> Vec<Self> {
         if entry.path().extension() == Some(OsStr::new("desktop")) {
             let content = match fs::read_to_string(entry.path()) {
                 Ok(content) => content,
@@ -78,6 +90,10 @@ impl DesktopEntry {
                             },
                             path: map.get("Path").map(PathBuf::from),
                             name: map.get("Name")?.to_string(),
+                            localized_name: lang_choices
+                                .localized_keys("Name")
+                                .find_map(|key| map.get(&*key))
+                                .map(ToString::to_string),
                             keywords: map
                                 .get("Keywords")
                                 .map(|keywords| {
@@ -87,7 +103,20 @@ impl DesktopEntry {
                                         .collect::<Vec<_>>()
                                 })
                                 .unwrap_or_default(),
-                            desc: None,
+                            localized_keywords: lang_choices
+                                .localized_keys("Keywords")
+                                .find_map(|key| map.get(&*key))
+                                .map(|keywords| {
+                                    keywords
+                                        .split(';')
+                                        .map(|s| s.to_owned())
+                                        .collect::<Vec<_>>()
+                                }),
+                            desc: lang_choices
+                                .localized_keys("Comment")
+                                .find_map(|key| map.get(&*key))
+                                .or_else(|| map.get("Comment"))
+                                .map(ToString::to_string),
                             icon: map
                                 .get("Icon")
                                 .unwrap_or(&"application-x-executable")
@@ -137,6 +166,10 @@ impl DesktopEntry {
                                 Some(name) => name.to_string(),
                                 None => continue,
                             },
+                            localized_name: lang_choices
+                                .localized_keys("Name")
+                                .find_map(|key| map.get(&*key))
+                                .map(ToString::to_string),
                             keywords: map
                                 .get("Keywords")
                                 .map(|keywords| {
@@ -146,7 +179,16 @@ impl DesktopEntry {
                                         .collect::<Vec<_>>()
                                 })
                                 .unwrap_or_default(),
-                            desc: Some(entry.name.clone()),
+                            localized_keywords: lang_choices
+                                .localized_keys("Keywords")
+                                .find_map(|key| map.get(&*key))
+                                .map(|keywords| {
+                                    keywords
+                                        .split(';')
+                                        .map(|s| s.to_owned())
+                                        .collect::<Vec<_>>()
+                                }),
+                            desc: Some(entry.localized_name()),
                             icon: entry.icon.clone(),
                             term: map
                                 .get("Terminal")
@@ -166,6 +208,46 @@ impl DesktopEntry {
     }
 }
 
+#[derive(Debug, Default)]
+struct LangChoices<'a> {
+    whole: Option<&'a str>,
+    prefix: Option<&'a str>,
+    short: Option<&'a str>,
+}
+
+impl<'a> LangChoices<'a> {
+    fn new(lang: Option<&'a str>) -> Self {
+        let mut ret = Self::default();
+
+        // example: en_US.UTF-8
+        let Some(whole) = lang else {
+            return ret;
+        };
+        ret.whole = Some(whole);
+
+        // example: en_US
+        let Some((prefix, _)) = whole.split_once('.') else {
+            return ret;
+        };
+        ret.prefix = Some(prefix);
+
+        // example: en
+        let Some((short, _)) = prefix.split_once('_') else {
+            return ret;
+        };
+        ret.short = Some(short);
+
+        ret
+    }
+
+    fn localized_keys(&self, key: &'a str) -> impl Iterator<Item = String> + 'a {
+        let choices = (self.whole.into_iter())
+            .chain(self.prefix)
+            .chain(self.short);
+        choices.map(move |choice| format!("{key}[{choice}]"))
+    }
+}
+
 pub fn scrubber(config: &Config) -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std::error::Error>> {
     // Create iterator over all the files in the XDG_DATA_DIRS
     // XDG compliancy is cool
@@ -180,6 +262,9 @@ pub fn scrubber(config: &Config) -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std
             )
         }
     };
+
+    let lang = env::var("LANG").ok();
+    let lang_choices = LangChoices::new(lang.as_deref());
 
     let mut entries: HashMap<String, DesktopEntry> = match env::var("XDG_DATA_DIRS") {
         Ok(data_dirs) => {
@@ -212,7 +297,7 @@ pub fn scrubber(config: &Config) -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std
             Ok(entry) => entry,
             Err(_why) => return None,
         };
-        let entries = DesktopEntry::from_dir_entry(&entry, config);
+        let entries = DesktopEntry::from_dir_entry(&entry, config, &lang_choices);
         Some(
             entries
                 .into_iter()
@@ -232,7 +317,7 @@ pub fn scrubber(config: &Config) -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std
                         Ok(entry) => entry,
                         Err(_why) => return None,
                     };
-                    let entries = DesktopEntry::from_dir_entry(&entry, config);
+                    let entries = DesktopEntry::from_dir_entry(&entry, config, &lang_choices);
                     Some(
                         entries
                             .into_iter()
