@@ -4,6 +4,10 @@ A wayland native krunner-like runner, made with customizability in mind.
 
 <img width="950" height="702" alt="image" src="https://github.com/user-attachments/assets/0a53b435-58f5-4a7c-90f7-b3f39266f2f4" />
 
+> [!NOTE]
+> If you use Nvidia and Anyrun refuses to close for you, you need to set `GSK_RENDERER=ngl` for Anyrun.
+> As in, running it with `GSK_RENDERER=ngl anyrun`. This is a [known issue](https://forums.developer.nvidia.com/t/580-65-06-gtk-4-apps-hang-when-attempting-to-exit-close/341308/6)
+> and is quite driver version dependent.
 
 ## Features
 
