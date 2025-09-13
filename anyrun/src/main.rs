@@ -252,6 +252,9 @@ impl Component for App {
                 plugin.to_owned()
             } else {
                 let mut search_dirs = vec![format!("{user_dir}/plugins")];
+                if let Ok(path) = env::var("ANYRUN_PLUGINS") {
+                    search_dirs.push(path);
+                }
                 search_dirs.extend(PLUGIN_PATHS.iter().map(|path| path.to_string()));
 
                 // Attempt to load both `<plugin>` and `lib<plugin>.so` from
