@@ -1,6 +1,6 @@
 [package]
 name = "niri-focus"
-version = "25.9.0"
+version = "25.9.1"
 edition = "2024"
 
 [lib]
