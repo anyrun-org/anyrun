@@ -180,6 +180,7 @@ impl Component for App {
                 #[local]
                 plugins -> gtk::Box {
                     set_orientation: gtk::Orientation::Vertical,
+                    set_can_focus: false,
                     set_css_classes: &["matches"],
                     set_hexpand: true,
                 }
