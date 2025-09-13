@@ -11,11 +11,12 @@ use crate::Config;
 pub struct PluginMatch {
     pub content: Match,
     pub row: gtk::ListBoxRow,
+    config: Rc<Config>,
 }
 
 #[relm4::factory(pub)]
 impl FactoryComponent for PluginMatch {
-    type Init = Match;
+    type Init = (Match, Rc<Config>);
     type Input = ();
     type Output = ();
     type CommandOutput = ();
@@ -33,6 +34,7 @@ impl FactoryComponent for PluginMatch {
                 #[name = "icon"]
                 gtk::Image {
                     set_pixel_size: 32,
+                    set_visible: false,
                     set_css_classes: &["match"]
                 },
 
@@ -81,8 +83,9 @@ impl FactoryComponent for PluginMatch {
 
         self.row = root;
 
-        match &self.content.icon {
-            ROption::RSome(icon) => {
+        if !self.config.hide_icons {
+            if let ROption::RSome(icon) = &self.content.icon {
+                widgets.icon.set_visible(true);
                 let path = PathBuf::from(icon.to_string());
                 if path.is_absolute() {
                     widgets.icon.set_from_file(Some(path));
@@ -90,7 +93,6 @@ impl FactoryComponent for PluginMatch {
                     widgets.icon.set_icon_name(Some(icon));
                 }
             }
-            ROption::RNone => widgets.icon.set_visible(false),
         }
 
         match &self.content.description {
@@ -101,10 +103,18 @@ impl FactoryComponent for PluginMatch {
         widgets
     }
 
-    fn init_model(content: Self::Init, _index: &Self::Index, _sender: FactorySender<Self>) -> Self {
+    fn init_model(
+        (content, config): Self::Init,
+        _index: &Self::Index,
+        _sender: FactorySender<Self>,
+    ) -> Self {
         let row = gtk::ListBoxRow::default();
 
-        Self { row, content }
+        Self {
+            row,
+            content,
+            config,
+        }
     }
 }
 
@@ -158,6 +168,7 @@ impl FactoryComponent for PluginBox {
                     gtk::Image {
                         set_css_classes: &["plugin", "info"],
                         set_icon_name: Some(&plugin_info.icon),
+                        set_visible: !self.config.hide_icons,
                         set_halign: gtk::Align::Start,
                         set_valign: gtk::Align::Start,
                         set_pixel_size: 32,
@@ -270,7 +281,7 @@ impl FactoryComponent for PluginBox {
             guard.clear();
 
             for _match in matches {
-                guard.push_back(_match);
+                guard.push_back((_match, self.config.clone()));
             }
         }
 
