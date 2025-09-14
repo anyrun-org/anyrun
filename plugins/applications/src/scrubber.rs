@@ -14,6 +14,7 @@ pub struct DesktopEntry {
     pub icon: String,
     pub term: bool,
     pub offset: i64,
+    pub is_action: bool,
 }
 
 const FIELD_CODE_LIST: &[&str] = &[
@@ -126,6 +127,7 @@ impl DesktopEntry {
                                 .map(|val| val.to_lowercase() == "true")
                                 .unwrap_or(false),
                             offset: 0,
+                            is_action: false,
                         })
                     } else {
                         None
@@ -195,6 +197,7 @@ impl DesktopEntry {
                                 .map(|val| val.to_lowercase() == "true")
                                 .unwrap_or(false),
                             offset: i as i64,
+                            is_action: true,
                         })
                     }
                 }

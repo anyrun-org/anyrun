@@ -204,7 +204,7 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
             let mut score = (app_score * 25 + keyword_score) - entry.offset;
 
             // prioritize actions
-            if entry.desc.is_some() {
+            if entry.is_action {
                 score *= 2;
             }
 
