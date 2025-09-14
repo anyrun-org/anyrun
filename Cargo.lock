@@ -2467,6 +2467,8 @@ dependencies = [
  "anyrun-plugin",
  "reqwest 0.11.27",
  "rink-core",
+ "ron",
+ "serde",
 ]
 
 [[package]]
