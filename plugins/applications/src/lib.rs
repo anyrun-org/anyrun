@@ -176,7 +176,7 @@ pub fn init(config_dir: RString) -> State {
 
 #[get_matches]
 pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
-    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default().smart_case();
+    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default().ignore_case();
     let mut entries = state
         .entries
         .iter()
@@ -197,15 +197,19 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
                 .map(|keyword| matcher.fuzzy_match(keyword, &input).unwrap_or(0))
                 .sum::<i64>();
 
-            // NOTE: Weights are pretty arbitrary, should probably do something about it
-            let mut score = (name_score * 25 + desc_score * 10 + keyword_score) - entry.offset;
+            let mut score = (name_score * 25 + desc_score * 2 + keyword_score) - entry.offset;
 
             // prioritize actions
             if entry.is_action {
                 score *= 2;
             }
 
-            if score > 0 {
+            // Score cutoff
+            if score > 200 {
+                println!(
+                    "{} {name_score} {desc_score} {keyword_score} = {score}",
+                    entry.name
+                );
                 Some((entry, *id, score))
             } else {
                 None
