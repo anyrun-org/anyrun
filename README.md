@@ -145,7 +145,7 @@ nix.settings = {
 
 > [!WARNING]
 > While using the Anyrun flake, overriding the `nixpkgs` input for Anyrun will
-> cause cache hits, i.e., you will have to build from source every time. To use
+> cause cache misses, i.e., you will have to build from source every time. To use
 > the cache, do _not_ override the Nixpkgs input.
 
 ### Manual installation
