@@ -176,39 +176,41 @@ pub fn init(config_dir: RString) -> State {
 
 #[get_matches]
 pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
-    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default().smart_case();
+    let matcher = fuzzy_matcher::skim::SkimMatcherV2::default().ignore_case();
     let mut entries = state
         .entries
         .iter()
         .filter_map(|(entry, id)| {
-            // Can be replaced by `Iterator::intersperse` once the API becomes stable.
-            fn prefix_sep(i: &Option<String>) -> impl Iterator<Item = &str> + '_ {
-                i.as_deref()
-                    .map(|s| [" ", s].into_iter())
-                    .into_iter()
-                    .flatten()
-            }
-
-            let app_names = ([&*entry.name].into_iter())
-                .chain(prefix_sep(&entry.localized_name))
-                .chain(prefix_sep(&entry.desc))
-                .collect::<String>();
-
-            let app_score = matcher.fuzzy_match(&app_names, &input).unwrap_or(0);
+            let name_score = matcher.fuzzy_match(&entry.name, &input).unwrap_or(0).max(
+                matcher
+                    .fuzzy_match(&entry.localized_name(), &input)
+                    .unwrap_or(0),
+            );
+            let desc_score = entry
+                .desc
+                .as_ref()
+                .and_then(|desc| matcher.fuzzy_match(desc, &input))
+                .unwrap_or(0);
 
             let keyword_score = (entry.keywords.iter())
                 .chain(entry.localized_keywords.iter().flat_map(|k| k.iter()))
-                .map(|keyword| matcher.fuzzy_match(keyword, &input).unwrap_or(0))
-                .sum::<i64>();
+                .filter_map(|keyword| matcher.fuzzy_match(keyword, &input))
+                .max()
+                .unwrap_or(0);
 
-            let mut score = (app_score * 25 + keyword_score) - entry.offset;
+            let mut score = (name_score * 10 + desc_score + keyword_score) - entry.offset;
 
             // prioritize actions
             if entry.is_action {
                 score *= 2;
             }
 
+            // Score cutoff
             if score > 0 {
+                println!(
+                    "{} {name_score} {desc_score} {keyword_score} = {score}",
+                    entry.name
+                );
                 Some((entry, *id, score))
             } else {
                 None
