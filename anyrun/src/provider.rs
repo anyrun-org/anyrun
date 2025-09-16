@@ -47,7 +47,9 @@ pub fn worker(
         .envs(env)
         .spawn()?;
 
-    child.stdin.as_mut().unwrap().write_all(&stdin).unwrap();
+    if let Some(mut child_stdin) = child.stdin.take() {
+        child_stdin.write_all(&stdin).unwrap();
+    };
 
     let (stream, _) = listener.accept()?;
     let mut socket = ipc::Socket::new(stream);
