@@ -207,10 +207,6 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
 
             // Score cutoff
             if score > 0 {
-                println!(
-                    "{} {name_score} {desc_score} {keyword_score} = {score}",
-                    entry.name
-                );
                 Some((entry, *id, score))
             } else {
                 None
