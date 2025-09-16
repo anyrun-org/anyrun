@@ -7,11 +7,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1757413486,
-        "narHash": "sha256-RLzs1REAk2l6sfJfZXIgoWKGkASUizU3+gNm09JCjU0=",
+        "lastModified": 1758040471,
+        "narHash": "sha256-jsFBGoLiciAFRs5Fi4eOvbsXtf2tLyYh+OiRhV6BGI4=",
         "owner": "anyrun-org",
         "repo": "anyrun-provider",
-        "rev": "b936a7c8856e3476e47bd2604ed9551c4d5d982c",
+        "rev": "6631af0ecb8f245cbf88e972d1522f747d6cd883",
         "type": "github"
       },
       "original": {
