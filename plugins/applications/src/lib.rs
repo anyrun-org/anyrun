@@ -194,10 +194,11 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
 
             let keyword_score = (entry.keywords.iter())
                 .chain(entry.localized_keywords.iter().flat_map(|k| k.iter()))
-                .map(|keyword| matcher.fuzzy_match(keyword, &input).unwrap_or(0))
-                .sum::<i64>();
+                .filter_map(|keyword| matcher.fuzzy_match(keyword, &input))
+                .max()
+                .unwrap_or(0);
 
-            let mut score = (name_score * 25 + desc_score * 2 + keyword_score) - entry.offset;
+            let mut score = (name_score * 10 + desc_score + keyword_score) - entry.offset;
 
             // prioritize actions
             if entry.is_action {
@@ -205,7 +206,7 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
             }
 
             // Score cutoff
-            if score > 200 {
+            if score > 0 {
                 println!(
                     "{} {name_score} {desc_score} {keyword_score} = {score}",
                     entry.name
