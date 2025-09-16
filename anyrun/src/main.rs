@@ -472,6 +472,11 @@ impl Component for App {
                     }
                 }
             }
+            AppMsg::PluginOutput(PluginBoxOutput::MatchClicked) => {
+                if self.config.close_on_click {
+                    sender.input(AppMsg::Action(Action::Select));
+                }
+            }
         }
         self.update_view(widgets, sender);
     }

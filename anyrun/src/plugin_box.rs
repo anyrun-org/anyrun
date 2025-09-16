@@ -3,7 +3,7 @@ use std::{path::PathBuf, rc::Rc};
 use abi_stable::std_types::{ROption, RVec};
 use anyrun_interface::{Match, PluginRef};
 use gtk::{glib, pango, prelude::*};
-use gtk4 as gtk;
+use gtk4::{self as gtk, ListBox};
 use relm4::prelude::*;
 
 use crate::Config;
@@ -14,11 +14,16 @@ pub struct PluginMatch {
     config: Rc<Config>,
 }
 
+#[derive(Debug)]
+pub enum MatchOutput {
+    Clicked,
+}
+
 #[relm4::factory(pub)]
 impl FactoryComponent for PluginMatch {
     type Init = (Match, Rc<Config>);
     type Input = ();
-    type Output = ();
+    type Output = MatchOutput;
     type CommandOutput = ();
     type ParentWidget = gtk::ListBox;
     view! {
@@ -26,6 +31,18 @@ impl FactoryComponent for PluginMatch {
             set_css_classes: &["match"],
             set_height_request: 32,
             gtk::Box {
+                add_controller = gtk::GestureClick {
+                    connect_pressed[sender, root] => move |gesture, _, _, _| {
+                        if let Some(binding) = root.parent() {
+                            if let Some(list_box) = binding.downcast_ref::<ListBox>() {
+                                list_box.select_row(Some(&root));
+                            }
+                        }
+                        gesture.set_state(gtk::EventSequenceState::Claimed);
+                        sender.output(MatchOutput::Clicked).unwrap();
+                    }
+                },
+
                 set_orientation: gtk::Orientation::Horizontal,
                 set_spacing: 10,
                 set_css_classes: &["match"],
@@ -77,7 +94,7 @@ impl FactoryComponent for PluginMatch {
         _index: &Self::Index,
         root: Self::Root,
         _returned_widget: &<Self::ParentWidget as relm4::factory::FactoryView>::ReturnedWidget,
-        _sender: FactorySender<Self>,
+        sender: FactorySender<Self>,
     ) -> Self::Widgets {
         let widgets = view_output!();
 
@@ -140,6 +157,7 @@ pub enum PluginBoxInput {
 pub enum PluginBoxOutput {
     MatchesLoaded,
     RowSelected(<PluginBox as FactoryComponent>::Index),
+    MatchClicked,
 }
 
 #[relm4::factory(pub)]
@@ -213,11 +231,13 @@ impl FactoryComponent for PluginBox {
     fn init_model(
         (plugin, config): Self::Init,
         _index: &Self::Index,
-        _sender: FactorySender<Self>,
+        sender: FactorySender<Self>,
     ) -> Self {
-        let matches = FactoryVecDeque::builder()
+        let matches = FactoryVecDeque::<PluginMatch>::builder()
             .launch(gtk::ListBox::default())
-            .detach();
+            .forward(sender.output_sender(), |output| match output {
+                MatchOutput::Clicked => PluginBoxOutput::MatchClicked,
+            });
 
         Self {
             plugin,
