@@ -172,7 +172,7 @@ name = "anyrun"
 version = "25.9.2"
 dependencies = [
  "abi_stable",
- "anyrun-interface 25.9.0",
+ "anyrun-interface",
  "anyrun-macros",
  "anyrun-provider-ipc",
  "clap",
@@ -188,18 +188,11 @@ dependencies = [
 
 [[package]]
 name = "anyrun-interface"
-version = "25.9.0"
-source = "git+https://github.com/anyrun-org/anyrun-interface?branch=anyrun-provider#7c3d4f28e2e688ab17a84695dfff74790ea85af5"
+version = "25.9.3"
+source = "git+https://github.com/anyrun-org/anyrun-interface#0fda402f58b44485363092246538c5244ce1d51c"
 dependencies = [
  "abi_stable",
  "serde",
-]
-
-[[package]]
-name = "anyrun-interface"
-version = "25.9.2"
-dependencies = [
- "abi_stable",
 ]
 
 [[package]]
@@ -215,16 +208,16 @@ name = "anyrun-plugin"
 version = "25.9.2"
 dependencies = [
  "abi_stable",
- "anyrun-interface 25.9.2",
+ "anyrun-interface",
  "anyrun-macros",
 ]
 
 [[package]]
 name = "anyrun-provider-ipc"
-version = "0.1.0"
-source = "git+https://github.com/anyrun-org/anyrun-provider#81d944a678a5d041c49af274ce36408d1d672333"
+version = "25.9.3"
+source = "git+https://github.com/anyrun-org/anyrun-provider#b972b86b261ff0347413ffb0bd172e18e53203c5"
 dependencies = [
- "anyrun-interface 25.9.0",
+ "anyrun-interface",
  "serde",
  "serde_json",
 ]

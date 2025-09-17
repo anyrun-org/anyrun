@@ -10,7 +10,7 @@ anyrun-macros = { path = "../anyrun-macros" }
 abi_stable = "0.11.1"
 ron = "0.8.0"
 serde = { version = "1.0.210", features = ["derive"] }
-anyrun-interface = { git = "https://github.com/anyrun-org/anyrun-interface", branch = "anyrun-provider" }
+anyrun-interface = { git = "https://github.com/anyrun-org/anyrun-interface" }
 anyrun-provider-ipc = { git = "https://github.com/anyrun-org/anyrun-provider" }
 wl-clipboard-rs = "0.9.1"
 nix = { version = "0.29", default-features = false, features = ["process"] }
