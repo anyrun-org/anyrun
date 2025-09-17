@@ -32,7 +32,7 @@ pub fn worker(
     let _ = fs::remove_file(&socket_path);
     let listener = UnixListener::bind(&socket_path).unwrap();
 
-    let mut child = Command::new(&config.provider)
+    let mut child = match Command::new(&config.provider)
         .stdin(Stdio::piped())
         .arg("--config-dir")
         .arg(config_dir.unwrap_or(ipc::CONFIG_DIRS[0].to_string()))
@@ -45,7 +45,18 @@ pub fn worker(
         .arg("connect-to")
         .arg(&socket_path)
         .envs(env)
-        .spawn()?;
+        .spawn()
+    {
+        Ok(child) => child,
+        Err(why) => match why.kind() {
+            io::ErrorKind::NotFound => {
+                eprintln!("[anyrun] `{}` Not found, make sure `anyrun-provider` is installed and available in $PATH, \
+                     or configure an alternative path via the `provider` config option.", config.provider.display());
+                return Ok(());
+            }
+            _ => return Err(why),
+        },
+    };
 
     if let Some(mut child_stdin) = child.stdin.take() {
         child_stdin.write_all(&stdin).unwrap();

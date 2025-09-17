@@ -7,7 +7,7 @@ use anyrun_interface::HandleResult;
 use anyrun_provider_ipc as ipc;
 use gtk::{gdk, gio, glib, prelude::*};
 use gtk4 as gtk;
-use gtk4_layer_shell::{Edge, KeyboardMode, LayerShell};
+use gtk4_layer_shell::{Edge, LayerShell};
 use relm4::{prelude::*, ComponentBuilder, Sender};
 use serde::{Deserialize, Serialize};
 use std::{
