@@ -3,7 +3,7 @@ use std::{path::PathBuf, rc::Rc};
 use abi_stable::std_types::{ROption, RVec};
 use anyrun_interface::{Match, PluginRef};
 use gtk::{glib, pango, prelude::*};
-use gtk4::{self as gtk, ListBox};
+use gtk4 as gtk;
 use relm4::prelude::*;
 
 use crate::Config;
@@ -34,7 +34,7 @@ impl FactoryComponent for PluginMatch {
                 add_controller = gtk::GestureClick {
                     connect_pressed[sender, root] => move |gesture, _, _, _| {
                         if let Some(binding) = root.parent() {
-                            if let Some(list_box) = binding.downcast_ref::<ListBox>() {
+                            if let Some(list_box) = binding.downcast_ref::<gtk::ListBox>() {
                                 list_box.select_row(Some(&root));
                             }
                         }
