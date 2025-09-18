@@ -119,6 +119,11 @@ impl App {
                             .select_row(Option::<&gtk::ListBoxRow>::Some(&plugin_match.row));
                     }
                 }
+            } else {
+                plugin
+                    .matches
+                    .widget()
+                    .select_row(Option::<&gtk::ListBoxRow>::None);
             }
         }
     }
