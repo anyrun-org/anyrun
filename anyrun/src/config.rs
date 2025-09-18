@@ -199,7 +199,7 @@ pub enum MouseButton {
     Primary,
     Secondary,
     Middle,
-    Unknown,
+    Unknown(u32),
 }
 
 #[derive(Deserialize, Debug, Clone, Copy)]

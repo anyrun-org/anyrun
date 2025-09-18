@@ -40,7 +40,7 @@ impl FactoryComponent for PluginMatch {
                           gtk::gdk::BUTTON_PRIMARY => MouseButton::Primary,
                           gtk::gdk::BUTTON_SECONDARY => MouseButton::Secondary,
                           gtk::gdk::BUTTON_MIDDLE => MouseButton::Middle,
-                          _ => MouseButton::Unknown,
+                          other => MouseButton::Unknown(other),
                         };
                         sender.output(MatchOutput::MouseAction(button, index.clone())).unwrap();
                     }
