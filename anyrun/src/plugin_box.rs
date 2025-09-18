@@ -6,7 +6,7 @@ use gtk::{glib, pango, prelude::*};
 use gtk4 as gtk;
 use relm4::prelude::*;
 
-use crate::Config;
+use crate::{config::MouseButton, Config};
 
 pub struct PluginMatch {
     pub content: Match,
@@ -14,11 +14,16 @@ pub struct PluginMatch {
     config: Rc<Config>,
 }
 
+#[derive(Debug)]
+pub enum MatchOutput {
+    MouseAction(MouseButton, <PluginMatch as FactoryComponent>::Index),
+}
+
 #[relm4::factory(pub)]
 impl FactoryComponent for PluginMatch {
     type Init = (Match, Rc<Config>);
     type Input = ();
-    type Output = ();
+    type Output = MatchOutput;
     type CommandOutput = ();
     type ParentWidget = gtk::ListBox;
     view! {
@@ -26,6 +31,21 @@ impl FactoryComponent for PluginMatch {
             set_css_classes: &["match"],
             set_height_request: 32,
             gtk::Box {
+
+                add_controller = gtk::GestureClick {
+                    set_button: 0,
+                    connect_pressed[sender, index] => move |gesture, _, _, _| {
+                        gesture.set_state(gtk::EventSequenceState::Claimed);
+                        let button: MouseButton = match gesture.current_button() {
+                          gtk::gdk::BUTTON_PRIMARY => MouseButton::Primary,
+                          gtk::gdk::BUTTON_SECONDARY => MouseButton::Secondary,
+                          gtk::gdk::BUTTON_MIDDLE => MouseButton::Middle,
+                          other => MouseButton::Unknown(other),
+                        };
+                        sender.output(MatchOutput::MouseAction(button, index.clone())).unwrap();
+                    }
+                },
+
                 set_orientation: gtk::Orientation::Horizontal,
                 set_spacing: 10,
                 set_css_classes: &["match"],
@@ -74,10 +94,10 @@ impl FactoryComponent for PluginMatch {
 
     fn init_widgets(
         &mut self,
-        _index: &Self::Index,
+        index: &Self::Index,
         root: Self::Root,
         _returned_widget: &<Self::ParentWidget as relm4::factory::FactoryView>::ReturnedWidget,
-        _sender: FactorySender<Self>,
+        sender: FactorySender<Self>,
     ) -> Self::Widgets {
         let widgets = view_output!();
 
@@ -140,6 +160,11 @@ pub enum PluginBoxInput {
 pub enum PluginBoxOutput {
     MatchesLoaded,
     RowSelected(<PluginBox as FactoryComponent>::Index),
+    MouseAction(
+        MouseButton,
+        <PluginMatch as FactoryComponent>::Index,
+        <PluginBox as FactoryComponent>::Index,
+    ),
 }
 
 #[relm4::factory(pub)]
@@ -212,12 +237,17 @@ impl FactoryComponent for PluginBox {
 
     fn init_model(
         (plugin, config): Self::Init,
-        _index: &Self::Index,
-        _sender: FactorySender<Self>,
+        index: &Self::Index,
+        sender: FactorySender<Self>,
     ) -> Self {
-        let matches = FactoryVecDeque::builder()
+        let ind = index.clone();
+        let matches = FactoryVecDeque::<PluginMatch>::builder()
             .launch(gtk::ListBox::default())
-            .detach();
+            .forward(sender.output_sender(), move |output| match output {
+                MatchOutput::MouseAction(button, row) => {
+                    PluginBoxOutput::MouseAction(button, row, ind.clone())
+                }
+            });
 
         Self {
             plugin,

@@ -16,7 +16,7 @@ use relm4::prelude::*;
 use wl_clipboard_rs::copy;
 
 use crate::{
-    config::{Action, Config, ConfigArgs, Keybind},
+    config::{Action, Config, ConfigArgs, Keybind, Mousebind},
     plugin_box::{PluginBox, PluginBoxInput, PluginBoxOutput, PluginMatch},
 };
 
@@ -105,6 +105,27 @@ impl App {
                     .unwrap(); // Unwrap is safe since we just obtained the selected one
                 (i, plugin, plugin_match)
             })
+    }
+
+    fn select_row(&self, plugin_ind: DynamicIndex, match_ind: DynamicIndex) {
+        // Select match row
+        for (i, plugin) in self.plugins.iter().enumerate() {
+            if i == plugin_ind.current_index() {
+                for (j, plugin_match) in plugin.matches.iter().enumerate() {
+                    if j == match_ind.current_index() {
+                        plugin
+                            .matches
+                            .widget()
+                            .select_row(Option::<&gtk::ListBoxRow>::Some(&plugin_match.row));
+                    }
+                }
+            } else {
+                plugin
+                    .matches
+                    .widget()
+                    .select_row(Option::<&gtk::ListBoxRow>::None);
+            }
+        }
     }
 }
 
@@ -377,6 +398,7 @@ impl Component for App {
                 }
             }
             AppMsg::Action(action) => match action {
+                Action::Nop => {}
                 Action::Close => {
                     root.close();
                     relm4::main_application().quit();
@@ -470,6 +492,26 @@ impl Component for App {
                             .widget()
                             .select_row(Option::<&gtk::ListBoxRow>::None);
                     }
+                }
+            }
+            AppMsg::PluginOutput(PluginBoxOutput::MouseAction(button, match_ind, plugin_ind)) => {
+                // Handle binding
+                if let Some(Mousebind { action, .. }) = self
+                    .config
+                    .mousebinds
+                    .iter()
+                    .find(|mousebind| mousebind.button == button)
+                {
+                    // Potentially select row
+                    match action {
+                        Action::Select | Action::Nop => self.select_row(plugin_ind, match_ind),
+                        _ => {
+                            // Don't select row for other actions
+                        }
+                    };
+
+                    // Perform action
+                    sender.input(AppMsg::Action(*action));
                 }
             }
         }

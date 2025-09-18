@@ -224,6 +224,7 @@ in
                     "select"
                     "up"
                     "down"
+                    "nop"
                   ];
                 };
               };
@@ -231,6 +232,34 @@ in
           );
           default = null;
         };
+
+        mousebinds = mkOption {
+          type = nullOr (
+            listOf (submodule {
+              options = {
+                button = mkOption {
+                  type = str;
+                  description = ''
+                    Mouse button name
+
+                    Primary/Secondary/Middle or Unknown(<u32>) with key code for the mouse button.
+                  '';
+                };
+                action = mkOption {
+                  type = enum [
+                    "close"
+                    "select"
+                    "up"
+                    "down"
+                    "nop"
+                  ];
+                };
+              };
+            })
+          );
+          default = null;
+        };
+
 
         extraLines = mkOption {
           type = nullOr lines;
@@ -328,6 +357,22 @@ in
                 '') cfg.config.keybinds
               }],
           '';
+
+      mousebinds =
+        if cfg.config.mousebinds == null then
+          ""
+        else
+          ''
+            mousebinds: [
+              ${
+                concatMapStringsSep "\n" (x: ''
+                  Mousebind(
+                    button: ${capitalize x.button},
+                    action: ${capitalize x.action},
+                  ),
+                '') cfg.config.mousebinds
+              }],
+          '';
     in
     {
       assertions = [
@@ -382,6 +427,7 @@ in
                 plugins: ${toJSON parsedPlugins},
                 ${optionalString (cfg.config.extraLines != null) cfg.config.extraLines}
                 ${keybinds}
+                ${mousebinds}
               )
             '';
         }

@@ -40,6 +40,10 @@ pub struct Config {
     #[config_args(skip)]
     #[serde(default = "Config::default_keybinds")]
     pub keybinds: Vec<Keybind>,
+
+    #[config_args(skip)]
+    #[serde(default = "Config::default_mousebinds")]
+    pub mousebinds: Vec<Mousebind>,
 }
 impl Config {
     fn default_x() -> RelativeNum {
@@ -103,6 +107,19 @@ impl Config {
             },
         ]
     }
+
+    fn default_mousebinds() -> Vec<Mousebind> {
+        vec![
+            Mousebind {
+                button: MouseButton::Primary,
+                action: Action::Select,
+            },
+            Mousebind {
+                button: MouseButton::Secondary,
+                action: Action::Nop,
+            },
+        ]
+    }
 }
 impl Default for Config {
     fn default() -> Self {
@@ -121,6 +138,7 @@ impl Default for Config {
             layer: Self::default_layer(),
             keyboard_mode: Self::default_keyboard_mode(),
             keybinds: Self::default_keybinds(),
+            mousebinds: Self::default_mousebinds(),
         }
     }
 }
@@ -173,6 +191,21 @@ pub enum Action {
     Select,
     Up,
     Down,
+    Nop,
+}
+
+#[derive(Deserialize, Debug, Clone, Copy, PartialEq)]
+pub enum MouseButton {
+    Primary,
+    Secondary,
+    Middle,
+    Unknown(u32),
+}
+
+#[derive(Deserialize, Debug, Clone, Copy)]
+pub struct Mousebind {
+    pub button: MouseButton,
+    pub action: Action,
 }
 
 #[derive(Deserialize, Clone)]
