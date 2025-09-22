@@ -41,6 +41,7 @@ let
     ;
 
   defaultPackage = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
+  defaultProvider = self.packages.${pkgs.stdenv.hostPlatform.system}.anyrun-provider;
   cfg = config.programs.anyrun;
 in
 {
@@ -51,6 +52,15 @@ in
 
   options.programs.anyrun = {
     enable = mkEnableOption "anyrun";
+    daemon.enable = mkOption {
+      type = bool;
+      default = true;
+      description = ''
+        Enable running Anyrun as a daemon, allowing for faster startup speed.
+
+        NOTE: This is required for clipboard functionality.
+      '';
+    };
 
     package = mkOption {
       type = nullOr package;
@@ -103,6 +113,14 @@ in
           default = null;
           description = ''
             List of anyrun plugins to use. Can either be packages, absolute plugin paths, or strings.
+          '';
+        };
+
+        provider = mkOption {
+          type = package;
+          default = defaultProvider;
+          description = ''
+            The program that is used for loading the plugins, and for the communcation with them.
           '';
         };
 
@@ -328,6 +346,12 @@ in
                 '') cfg.config.keybinds
               }],
           '';
+      keyboardMode =
+        {
+          "exclusive" = "Exclusive";
+          "on-demand" = "OnDemand";
+        }
+        .${cfg.config.keyboardMode};
     in
     {
       assertions = [
@@ -348,42 +372,53 @@ in
         else
           [ ];
 
+      systemd.user.services.anyrun = mkIf cfg.daemon.enable {
+        Unit = {
+          Description = "Anyrun daemon";
+          PartOf = "graphical-session.target";
+          After = "graphical-session.target";
+        };
+
+        Service = {
+          Type = "simple";
+          ExecStart = "${lib.getExe cfg.package} daemon";
+          Restart = "on-failure";
+          KillMode = "process";
+        };
+
+        Install = {
+          WantedBy = [ "graphical-session.target" ];
+        };
+      };
+
       home.packages = optional (cfg.package != null) cfg.package;
 
       xdg.configFile = mkMerge [
         (mapAttrs' (name: value: nameValuePair ("anyrun/" + name) value) cfg.extraConfigFiles)
 
         {
-          "anyrun/config.ron".text =
-            let
-              keyboardMode =
-                {
-                  "exclusive" = "Exclusive";
-                  "on-demand" = "OnDemand";
-                }
-                .${cfg.config.keyboardMode};
-            in
-            ''
-              Config(
-                x: ${stringifyNumeric cfg.config.x},
-                y: ${stringifyNumeric cfg.config.y},
-                width: ${stringifyNumeric cfg.config.width},
-                height: ${stringifyNumeric cfg.config.height},
-                hide_icons: ${boolToString cfg.config.hideIcons},
-                ignore_exclusive_zones: ${boolToString cfg.config.ignoreExclusiveZones},
-                layer: ${capitalize cfg.config.layer},
-                keyboard_mode: ${keyboardMode},
-                hide_plugin_info: ${boolToString cfg.config.hidePluginInfo},
-                close_on_click: ${boolToString cfg.config.closeOnClick},
-                show_results_immediately: ${boolToString cfg.config.showResultsImmediately},
-                max_entries: ${
-                  if cfg.config.maxEntries == null then "None" else "Some(${toString cfg.config.maxEntries})"
-                },
-                plugins: ${toJSON parsedPlugins},
-                ${optionalString (cfg.config.extraLines != null) cfg.config.extraLines}
-                ${keybinds}
-              )
-            '';
+          "anyrun/config.ron".text = ''
+            Config(
+              x: ${stringifyNumeric cfg.config.x},
+              y: ${stringifyNumeric cfg.config.y},
+              width: ${stringifyNumeric cfg.config.width},
+              height: ${stringifyNumeric cfg.config.height},
+              hide_icons: ${boolToString cfg.config.hideIcons},
+              ignore_exclusive_zones: ${boolToString cfg.config.ignoreExclusiveZones},
+              layer: ${capitalize cfg.config.layer},
+              keyboard_mode: ${keyboardMode},
+              hide_plugin_info: ${boolToString cfg.config.hidePluginInfo},
+              close_on_click: ${boolToString cfg.config.closeOnClick},
+              show_results_immediately: ${boolToString cfg.config.showResultsImmediately},
+              max_entries: ${
+                if cfg.config.maxEntries == null then "None" else "Some(${toString cfg.config.maxEntries})"
+              },
+              plugins: ${toJSON parsedPlugins},
+              provider: "${lib.getExe cfg.config.provider}",
+              ${optionalString (cfg.config.extraLines != null) cfg.config.extraLines}
+              ${keybinds}
+            )
+          '';
         }
 
         {

@@ -182,6 +182,7 @@ pub fn init(_attr: TokenStream, item: TokenStream) -> TokenStream {
     .into()
 }
 
+// FIXME: Needs to be split into a separate crate
 #[proc_macro_derive(ConfigArgs, attributes(config_args))]
 pub fn config_args(item: TokenStream) -> TokenStream {
     let item = parse_macro_input!(item as syn::DeriveInput);
@@ -252,7 +253,7 @@ pub fn config_args(item: TokenStream) -> TokenStream {
     };
 
     quote! {
-        #[derive(::clap::Args)]
+        #[derive(::clap::Args, ::std::clone::Clone, ::std::fmt::Debug, ::serde::Serialize, ::serde::Deserialize)]
         #struct_decl {
             #fields
         }

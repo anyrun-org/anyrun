@@ -2,7 +2,7 @@ use anyrun_macros::ConfigArgs;
 use clap::ValueEnum;
 use gtk::gdk;
 use gtk4 as gtk;
-use serde::{de::Visitor, Deserialize, Deserializer};
+use serde::{de::Visitor, Deserialize, Deserializer, Serialize};
 use std::path::PathBuf;
 
 #[derive(Deserialize, ConfigArgs)]
@@ -20,6 +20,9 @@ pub struct Config {
     #[serde(default = "Config::default_plugins")]
     pub plugins: Vec<PathBuf>,
 
+    #[serde(default = "Config::default_provider")]
+    pub provider: PathBuf,
+
     #[serde(default)]
     pub hide_icons: bool,
     #[serde(default)]
@@ -31,7 +34,7 @@ pub struct Config {
     #[serde(default)]
     pub show_results_immediately: bool,
     #[serde(default)]
-    pub max_entries: Option<usize>,
+    pub max_entries: Option<u32>,
     #[serde(default = "Config::default_layer")]
     pub layer: Layer,
     #[serde(default = "Config::default_keyboard_mode")]
@@ -41,6 +44,7 @@ pub struct Config {
     #[serde(default = "Config::default_keybinds")]
     pub keybinds: Vec<Keybind>,
 }
+
 impl Config {
     fn default_x() -> RelativeNum {
         RelativeNum::Fraction(0.5)
@@ -65,6 +69,10 @@ impl Config {
             "libshell.so".into(),
             "libtranslate.so".into(),
         ]
+    }
+
+    fn default_provider() -> PathBuf {
+        PathBuf::from("anyrun-provider")
     }
 
     fn default_layer() -> Layer {
@@ -112,6 +120,7 @@ impl Default for Config {
             width: Self::default_width(),
             height: Self::default_height(),
             plugins: Self::default_plugins(),
+            provider: Self::default_provider(),
             hide_icons: false,
             hide_plugin_info: false,
             ignore_exclusive_zones: false,
@@ -125,7 +134,7 @@ impl Default for Config {
     }
 }
 
-#[derive(Deserialize, Clone, ValueEnum)]
+#[derive(Deserialize, Serialize, Clone, Debug, ValueEnum)]
 pub enum Layer {
     Background,
     Bottom,
@@ -133,24 +142,24 @@ pub enum Layer {
     Overlay,
 }
 
-#[derive(Deserialize, Clone, ValueEnum)]
+#[derive(Deserialize, Serialize, Clone, Debug, ValueEnum)]
 pub enum KeyboardMode {
     Exclusive,
     OnDemand,
 }
 
 // Could have a better name
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub enum RelativeNum {
     Absolute(i32),
-    Fraction(f32),
+    Fraction(f64),
 }
 
 impl RelativeNum {
     pub fn to_val(&self, val: u32) -> i32 {
         match self {
             RelativeNum::Absolute(num) => *num,
-            RelativeNum::Fraction(frac) => (frac * val as f32) as i32,
+            RelativeNum::Fraction(frac) => (frac * val as f64) as i32,
         }
     }
 }

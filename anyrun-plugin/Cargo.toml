@@ -7,5 +7,5 @@ edition = "2021"
 
 [dependencies]
 abi_stable = "0.11.1"
-anyrun-interface = { path = "../anyrun-interface" }
+anyrun-interface = { git = "https://github.com/anyrun-org/anyrun-interface" }
 anyrun-macros = { path = "../anyrun-macros" }

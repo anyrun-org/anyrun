@@ -1,5 +1,25 @@
 {
   "nodes": {
+    "anyrun-provider": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1758040471,
+        "narHash": "sha256-jsFBGoLiciAFRs5Fi4eOvbsXtf2tLyYh+OiRhV6BGI4=",
+        "owner": "anyrun-org",
+        "repo": "anyrun-provider",
+        "rev": "6631af0ecb8f245cbf88e972d1522f747d6cd883",
+        "type": "github"
+      },
+      "original": {
+        "owner": "anyrun-org",
+        "repo": "anyrun-provider",
+        "type": "github"
+      }
+    },
     "flake-parts": {
       "inputs": {
         "nixpkgs-lib": [
@@ -38,6 +58,7 @@
     },
     "root": {
       "inputs": {
+        "anyrun-provider": "anyrun-provider",
         "flake-parts": "flake-parts",
         "nixpkgs": "nixpkgs",
         "systems": "systems"
