@@ -1,6 +1,6 @@
 [package]
 name = "nix-run"
-version = "25.9.2"
+version = "25.9.3"
 edition = "2024"
 
 [lib]

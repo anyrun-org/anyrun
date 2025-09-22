@@ -1,6 +1,6 @@
 [package]
 name = "dictionary"
-version = "25.9.2"
+version = "25.9.3"
 edition = "2021"
 
 [lib]
