@@ -63,6 +63,15 @@ Config(
       action: Down, 
     ),
     Keybind(
+      key: "ISO_Left_Tab",
+      action: Up,
+      shift: true,
+    ),
+    Keybind(
+      key: "Tab",
+      action: Down, 
+    ),
+    Keybind(
       key: "Escape",
       action: Close, 
     ),
