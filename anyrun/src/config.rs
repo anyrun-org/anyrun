@@ -88,25 +88,43 @@ impl Config {
             Keybind {
                 ctrl: false,
                 alt: false,
+                shift: false,
                 key: gdk::Key::Escape,
                 action: Action::Close,
             },
             Keybind {
                 ctrl: false,
                 alt: false,
+                shift: false,
                 key: gdk::Key::Return,
                 action: Action::Select,
             },
             Keybind {
                 ctrl: false,
                 alt: false,
+                shift: false,
                 key: gdk::Key::Up,
                 action: Action::Up,
             },
             Keybind {
                 ctrl: false,
                 alt: false,
+                shift: false,
                 key: gdk::Key::Down,
+                action: Action::Down,
+            },
+            Keybind {
+                ctrl: false,
+                alt: false,
+                shift: true,
+                key: gdk::Key::ISO_Left_Tab,
+                action: Action::Up,
+            },
+            Keybind {
+                ctrl: false,
+                alt: false,
+                shift: false,
+                key: gdk::Key::Tab,
                 action: Action::Down,
             },
         ]
@@ -190,6 +208,8 @@ pub struct Keybind {
     pub ctrl: bool,
     #[serde(default)]
     pub alt: bool,
+    #[serde(default)]
+    pub shift: bool,
     #[serde(deserialize_with = "Keybind::deserialize_key")]
     pub key: gdk::Key,
     pub action: Action,

@@ -336,6 +336,7 @@ impl Component for App {
                     keybind.key == key
                         && keybind.ctrl == modifier.contains(gdk::ModifierType::CONTROL_MASK)
                         && keybind.alt == modifier.contains(gdk::ModifierType::ALT_MASK)
+                        && keybind.shift == modifier.contains(gdk::ModifierType::SHIFT_MASK)
                 }) {
                     sender.input(AppMsg::Action(*action));
                 }
