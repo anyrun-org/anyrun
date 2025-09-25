@@ -8,15 +8,15 @@ use anyrun_provider_ipc as ipc;
 use gtk::{gdk, gio, glib, prelude::*};
 use gtk4 as gtk;
 use gtk4_layer_shell::{Edge, LayerShell};
-use mime_sniffer::MimeTypeSniffer;
 use relm4::{prelude::*, ComponentBuilder, Sender};
 use serde::{Deserialize, Serialize};
 use std::{
     env, fs,
-    io::{self, Read, Write},
+    io::{self, Write},
     path::PathBuf,
-    sync::{mpsc, Arc},
+    sync::Arc,
 };
+use tokio::sync::mpsc;
 
 #[derive(Deserialize, Serialize)]
 pub enum PostRunAction {
@@ -259,7 +259,7 @@ impl Component for App {
             .launch(plugins.clone())
             .forward(sender.input_sender(), AppMsg::PluginOutput);
 
-        let (tx, rx) = mpsc::channel();
+        let (tx, rx) = mpsc::channel(10);
 
         sender.spawn_command(glib::clone!(
             #[strong]
@@ -327,7 +327,7 @@ impl Component for App {
 
                 // If show_results_immediately is enabled, trigger initial search with empty input
                 if self.config.show_results_immediately {
-                    let _ = self.tx.send(anyrun_provider_ipc::Request::Query {
+                    let _ = self.tx.blocking_send(anyrun_provider_ipc::Request::Query {
                         text: String::new(),
                     });
                 }
@@ -360,12 +360,12 @@ impl Component for App {
                     root.close();
                     // FIXME: Make sure the worker has actually correctly shut down before
                     // exiting
-                    let _ = self.tx.send(ipc::Request::Quit);
+                    let _ = self.tx.blocking_send(ipc::Request::Quit);
                     relm4::runtime_util::shutdown_all();
                 }
                 Action::Select => {
                     if let Some((_, plugin, plugin_match)) = self.current_selection() {
-                        let _ = self.tx.send(ipc::Request::Handle {
+                        let _ = self.tx.blocking_send(ipc::Request::Handle {
                             plugin: plugin.plugin_info.clone(),
                             selection: plugin_match.content.clone(),
                         });
@@ -404,7 +404,7 @@ impl Component for App {
                 }
             },
             AppMsg::EntryChanged(text) => {
-                let _ = self.tx.send(ipc::Request::Query { text });
+                let _ = self.tx.blocking_send(ipc::Request::Query { text });
             }
             AppMsg::PluginOutput(PluginBoxOutput::MatchesLoaded) => {
                 if let Some((plugin, plugin_match)) = self.combined_matches().first() {
@@ -460,11 +460,9 @@ impl Component for App {
                 match result {
                     HandleResult::Close => sender.input(AppMsg::Action(Action::Close)),
                     HandleResult::Refresh(exclusive) => {
-                        self.tx
-                            .send(ipc::Request::Query {
-                                text: widgets.entry.text().into(),
-                            })
-                            .unwrap();
+                        let _ = self.tx.blocking_send(ipc::Request::Query {
+                            text: widgets.entry.text().into(),
+                        });
                         if exclusive {
                             for (i, plugin_box) in self.plugins.iter().enumerate() {
                                 // While normally true, in this case the function addresses will be consistent
@@ -479,7 +477,14 @@ impl Component for App {
                     }
                     HandleResult::Copy(rvec) => {
                         let vec = rvec.to_vec();
-                        if let Some(mime) = vec.sniff_mime_type() {
+                        let mime = tree_magic_mini::from_u8(&rvec);
+                        if match mime {
+                            "TEXT" | "STRING" | "UTF8_STRING" => true,
+                            mime if mime.starts_with("text/") => true,
+                            _ => false,
+                        } {
+                            root.clipboard().set_text(&String::from_utf8_lossy(&rvec));
+                        } else {
                             let content = gdk::ContentProvider::for_bytes(
                                 mime,
                                 &glib::Bytes::from_owned(vec.clone()),
@@ -487,8 +492,6 @@ impl Component for App {
                             if let Err(why) = root.clipboard().set_content(Some(&content)) {
                                 eprintln!("[anyrun] Error setting clipboard content: {why}");
                             }
-                        } else {
-                            root.clipboard().set_text(&String::from_utf8_lossy(&rvec));
                         }
                         sender.input(AppMsg::Action(Action::Close));
                     }
