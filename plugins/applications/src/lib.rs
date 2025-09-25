@@ -11,12 +11,20 @@ pub struct Config {
     max_entries: usize,
     terminal: Option<Terminal>,
     preprocess_exec_script: Option<PathBuf>,
+    entry_priority: Option<EntryPriority>,
 }
 
 #[derive(Deserialize)]
 pub struct Terminal {
     command: String,
     args: String,
+}
+
+#[derive(Deserialize)]
+pub enum EntryPriority {
+    ActionsFirst,
+    ApplicationsFirst,
+    NoPriority,
 }
 
 impl Default for Config {
@@ -26,6 +34,7 @@ impl Default for Config {
             max_entries: 5,
             preprocess_exec_script: None,
             terminal: None,
+            entry_priority: None,
         }
     }
 }
@@ -177,6 +186,12 @@ pub fn init(config_dir: RString) -> State {
 #[get_matches]
 pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
     let matcher = fuzzy_matcher::skim::SkimMatcherV2::default().ignore_case();
+    let entry_priority = state
+        .config
+        .entry_priority
+        .as_ref()
+        .unwrap_or(&EntryPriority::ActionsFirst);
+
     let mut entries = state
         .entries
         .iter()
@@ -200,10 +215,12 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
 
             let mut score = (name_score * 10 + desc_score + keyword_score) - entry.offset;
 
-            // prioritize actions
-            if entry.is_action {
-                score *= 2;
-            }
+            // Apply priority
+            score *= match (entry_priority, entry.is_action) {
+                (EntryPriority::ActionsFirst, true) => 2,
+                (EntryPriority::ApplicationsFirst, false) => 2,
+                _ => 1,
+            };
 
             // Score cutoff
             if score > 0 {
