@@ -172,6 +172,7 @@ dependencies = [
  "clap",
  "gtk4",
  "gtk4-layer-shell",
+ "mime-sniffer",
  "nix",
  "relm4",
  "ron 0.8.1",
@@ -209,7 +210,6 @@ dependencies = [
 [[package]]
 name = "anyrun-provider-ipc"
 version = "25.9.3"
-source = "git+https://github.com/anyrun-org/anyrun-provider#b972b86b261ff0347413ffb0bd172e18e53203c5"
 dependencies = [
  "anyrun-interface",
  "serde",
@@ -1755,6 +1755,16 @@ name = "mime"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6877bb514081ee2a7ff5ef9de3281f14a4dd4bceac4c09388074a6b5df8a139a"
+
+[[package]]
+name = "mime-sniffer"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b8b2a64cd735f1d5f17ff6701ced3cc3c54851f9448caf454cd9c923d812408"
+dependencies = [
+ "mime",
+ "url",
+]
 
 [[package]]
 name = "minimal-lexical"

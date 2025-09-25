@@ -24,6 +24,7 @@ pub struct State {
 
 enum IndexAction {
     Open,
+    Copy,
     CopyPath,
     Back,
 }
@@ -32,8 +33,9 @@ impl From<u64> for IndexAction {
     fn from(value: u64) -> Self {
         match value {
             0 => Self::Open,
-            1 => Self::CopyPath,
-            2 => Self::Back,
+            1 => Self::Copy,
+            2 => Self::CopyPath,
+            3 => Self::Back,
             _ => unreachable!(),
         }
     }
@@ -45,10 +47,20 @@ pub fn handler(selection: Match, state: &mut State) -> HandleResult {
         Some(index_entry) => match selection.id.unwrap().into() {
             IndexAction::Open => {
                 if let Err(why) = Command::new("xdg-open").arg(&index_entry.path).spawn() {
-                    println!("Error running xdg-open: {}", why);
+                    println!("[kidex] Error running xdg-open: {why}");
                 }
                 HandleResult::Close
             }
+            IndexAction::Copy => match fs::read(&index_entry.path) {
+                Ok(bytes) => HandleResult::Copy(bytes.into()),
+                Err(why) => {
+                    eprintln!(
+                        "[kidex] Error reading file {}: {why}, not copying",
+                        index_entry.path.display()
+                    );
+                    HandleResult::Close
+                }
+            },
             IndexAction::CopyPath => {
                 HandleResult::Copy(index_entry.path.clone().into_os_string().as_bytes().into())
             }
@@ -72,14 +84,14 @@ pub fn handler(selection: Match, state: &mut State) -> HandleResult {
 
 #[init]
 pub fn init(config_dir: RString) -> State {
-    let config = match fs::read_to_string(format!("{}/kidex.ron", config_dir)) {
+    let config = match fs::read_to_string(format!("{config_dir}/kidex.ron")) {
         Ok(content) => ron::from_str(&content).unwrap_or_default(),
         Err(_) => Config::default(),
     };
     let index = match kidex_common::util::get_index(None) {
         Ok(index) => index.into_iter().enumerate().collect(),
         Err(why) => {
-            println!("Failed to get kidex index: {}", why);
+            println!("[kidex] Failed to get kidex index: {why}");
             Vec::new()
         }
     };
@@ -102,6 +114,13 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
                     use_pango: false,
                     id: ROption::RSome(IndexAction::Open as u64),
                     icon: ROption::RSome("document-open".into()),
+                },
+                Match {
+                    title: "Copy File".into(),
+                    description: ROption::RSome(path.clone().into()),
+                    use_pango: false,
+                    id: ROption::RSome(IndexAction::Copy as u64),
+                    icon: ROption::RSome("edit-copy".into()),
                 },
                 Match {
                     title: "Copy Path".into(),

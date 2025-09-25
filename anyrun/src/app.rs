@@ -8,11 +8,12 @@ use anyrun_provider_ipc as ipc;
 use gtk::{gdk, gio, glib, prelude::*};
 use gtk4 as gtk;
 use gtk4_layer_shell::{Edge, LayerShell};
+use mime_sniffer::MimeTypeSniffer;
 use relm4::{prelude::*, ComponentBuilder, Sender};
 use serde::{Deserialize, Serialize};
 use std::{
     env, fs,
-    io::{self, Write},
+    io::{self, Read, Write},
     path::PathBuf,
     sync::{mpsc, Arc},
 };
@@ -477,10 +478,18 @@ impl Component for App {
                         }
                     }
                     HandleResult::Copy(rvec) => {
-                        // *self.post_run_action.borrow_mut() = PostRunAction::Copy(rvec.into());
-                        // FIXME: Maybe handle more mimetypes?
-                        root.clipboard()
-                            .set_text(&String::from_utf8(rvec.into()).unwrap());
+                        let vec = rvec.to_vec();
+                        if let Some(mime) = vec.sniff_mime_type() {
+                            let content = gdk::ContentProvider::for_bytes(
+                                mime,
+                                &glib::Bytes::from_owned(vec.clone()),
+                            );
+                            if let Err(why) = root.clipboard().set_content(Some(&content)) {
+                                eprintln!("[anyrun] Error setting clipboard content: {why}");
+                            }
+                        } else {
+                            root.clipboard().set_text(&String::from_utf8_lossy(&rvec));
+                        }
                         sender.input(AppMsg::Action(Action::Close));
                     }
                     HandleResult::Stdout(rvec) => {
