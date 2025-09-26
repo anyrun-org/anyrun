@@ -140,6 +140,14 @@ impl Component for App {
 
             connect_map[sender] => move |win| {
                 let surface = win.surface().unwrap();
+                match surface.display().monitor_at_surface(&surface) {
+                    Some(monitor) => sender.input(AppMsg::Show {
+                        width: monitor.geometry().width() as u32,
+                        height: monitor.geometry().height() as u32,
+                    }),
+                    _ => ()
+                };
+
                 let sender = sender.clone();
                 surface.connect_enter_monitor(move |_, monitor| {
                     sender.input(AppMsg::Show {
