@@ -33,7 +33,7 @@ Config(
   )),
 
   // Whether to prioritize actions or applications
-  // Could be ActionsFirst, ApplicationsFirst, or NoPriority
-  entry_priority: Some(ActionsFirst),
+  // Could be ActionsFirst (default), ApplicationsFirst, or NoPriority
+  entry_priority: ActionsFirst,
 )
 ```
