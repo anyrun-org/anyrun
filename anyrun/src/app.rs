@@ -18,6 +18,8 @@ use std::{
 };
 use tokio::sync::mpsc;
 
+const DEFAULT_CSS: &str = include_str!("../res/style.css");
+
 #[derive(Deserialize, Serialize)]
 pub enum PostRunAction {
     Stdout(Vec<u8>),
@@ -229,7 +231,7 @@ impl Component for App {
                 Err(why) => {
                     eprintln!("[anyrun] Failed to load CSS: {why}");
                     relm4::set_global_css_with_priority(
-                        include_str!("../res/style.css"),
+                        DEFAULT_CSS,
                         gtk::STYLE_PROVIDER_PRIORITY_USER,
                     );
                 }
@@ -246,6 +248,7 @@ impl Component for App {
             }
         } else {
             eprintln!("[anyrun] No config found in any searched paths");
+            relm4::set_global_css_with_priority(DEFAULT_CSS, gtk::STYLE_PROVIDER_PRIORITY_USER);
             Config::default()
         };
 
