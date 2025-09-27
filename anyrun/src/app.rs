@@ -139,6 +139,7 @@ impl Component for App {
                 config::KeyboardMode::Exclusive => gtk4_layer_shell::KeyboardMode::Exclusive,
                 config::KeyboardMode::OnDemand => gtk4_layer_shell::KeyboardMode::OnDemand,
             },
+            set_visible: false,
             set_namespace: Some("anyrun"),
 
             connect_map[sender] => move |win| {
@@ -326,7 +327,7 @@ impl Component for App {
                     root.set_margin(Edge::Left, x);
                     root.set_margin(Edge::Top, y);
                 }
-                root.show();
+                root.set_visible(true);
 
                 // If show_results_immediately is enabled, trigger initial search with empty input
                 if self.config.show_results_immediately {
