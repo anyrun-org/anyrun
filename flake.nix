@@ -30,6 +30,7 @@
           self',
           config,
           pkgs,
+          system,
           ...
         }:
         let
@@ -51,13 +52,16 @@
                 };
             in
             {
-              default = self'.packages.anyrun;
+              anyrun-provider = inputs.anyrun-provider.packages.${system}.default;
 
               # By default the anyrun package is built without any plugins
               # as per the `dontBuildPlugins` arg.
-              anyrun = callPackage ./nix/packages/anyrun.nix { inherit inputs lockFile; };
-              anyrun-with-all-plugins = callPackage ./nix/packages/anyrun.nix {
+              anyrun = callPackage ./nix/packages/anyrun.nix {
                 inherit inputs lockFile;
+                inherit (self.packages.${system}) anyrun-provider;
+              };
+
+              anyrun-with-all-plugins = self.packages.${system}.anyrun.override {
                 dontBuildPlugins = false;
               };
 
@@ -77,7 +81,7 @@
               websearch = mkPlugin "websearch";
               niri-focus = mkPlugin "niri-focus";
 
-              anyrun-provider = inputs.anyrun-provider.packages.${pkgs.system}.default;
+              default = self'.packages.anyrun;
             };
 
           # Set up an overlay from packages exposed by this flake
@@ -88,10 +92,11 @@
               inputsFrom = builtins.attrValues self'.packages;
               packages = with pkgs; [
                 rustc
-                gcc
                 cargo
+
                 clippy
                 rustfmt
+                taplo
               ];
             };
 
