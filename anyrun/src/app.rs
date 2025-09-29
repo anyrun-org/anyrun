@@ -69,7 +69,7 @@ impl App {
         let mut controller = connector.detach();
         let window = controller.widget();
         app.add_window(window);
-        window.show();
+        window.set_visible(true);
 
         controller.detach_runtime();
         controller.sender().clone()
@@ -137,7 +137,6 @@ impl Component for App {
                 config::KeyboardMode::Exclusive => gtk4_layer_shell::KeyboardMode::Exclusive,
                 config::KeyboardMode::OnDemand => gtk4_layer_shell::KeyboardMode::OnDemand,
             },
-            set_visible: false,
             set_namespace: Some("anyrun"),
 
             connect_map[sender] => move |win| {
@@ -165,6 +164,7 @@ impl Component for App {
                 set_halign: gtk::Align::Center,
                 set_vexpand: false,
                 set_hexpand: true,
+                set_visible: false,
                 set_css_classes: &["main"],
 
                 #[name = "entry"]
@@ -332,7 +332,8 @@ impl Component for App {
                     root.set_margin(Edge::Left, x);
                     root.set_margin(Edge::Top, y);
                 }
-                root.set_visible(true);
+                widgets.main.set_visible(true);
+                widgets.entry.grab_focus_without_selecting();
 
                 // If show_results_immediately is enabled, trigger initial search with empty input
                 if self.config.show_results_immediately {
