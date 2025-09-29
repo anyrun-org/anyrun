@@ -119,11 +119,15 @@
             runtimeInputs = [
               pkgs.nixfmt
               pkgs.fd
+              pkgs.taplo
             ];
 
             text = ''
               # Find Nix files in the tree and format them with Alejandra
               fd "$@" -t f -e nix -x nixfmt -q '{}'
+
+              # Same for TOML files, but with Taplo
+              fd "$@" -t f -e toml -x taplo fmt '{}'
             '';
           };
 
@@ -133,7 +137,7 @@
             # Check if codebase is properly formatted.
             # This can be initiated with `nix build .#checks.<system>.nix-fmt`
             # or with `nix flake check`
-            nix-fmt = pkgs.runCommand "nix-fmt-check" { nativeBuildInputs = [ pkgs.alejandra ]; } ''
+            nix-fmt = pkgs.runCommand "nix-fmt-check" { nativeBuildInputs = [ pkgs.nixfmt ]; } ''
               nixfmt --check ${self} < /dev/null | tee $out
             '';
           };
