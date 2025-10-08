@@ -316,8 +316,6 @@ impl Component for App {
                 root.set_anchor(Edge::Top, true);
 
                 if self.config.close_on_click {
-                    root.set_anchor(Edge::Bottom, true);
-                    root.set_anchor(Edge::Right, true);
                     root.set_default_size(mon_width as i32, mon_height as i32);
                     widgets.main.set_halign(gtk::Align::Fill);
                     widgets.main.set_margin_start(x);
