@@ -139,7 +139,7 @@ impl Component for App {
             },
             set_namespace: Some("anyrun"),
 
-            connect_map[sender] => move |win| {
+            connect_realize[sender] => move |win| {
                 let surface = win.surface().unwrap();
                 let sender = sender.clone();
                 surface.connect_enter_monitor(move |_, monitor| {
