@@ -69,7 +69,7 @@ impl App {
         let mut controller = connector.detach();
         let window = controller.widget();
         app.add_window(window);
-        window.show();
+        window.set_visible(true);
 
         controller.detach_runtime();
         controller.sender().clone()
@@ -133,15 +133,17 @@ impl Component for App {
                 config::Layer::Top => gtk4_layer_shell::Layer::Top,
                 config::Layer::Overlay => gtk4_layer_shell::Layer::Overlay,
             },
-            set_anchor: (Edge::Left, true),
-            set_anchor: (Edge::Top, true),
             set_keyboard_mode: match config.keyboard_mode {
                 config::KeyboardMode::Exclusive => gtk4_layer_shell::KeyboardMode::Exclusive,
                 config::KeyboardMode::OnDemand => gtk4_layer_shell::KeyboardMode::OnDemand,
             },
             set_namespace: Some("anyrun"),
+            // This cannot be fully transparent due to a Sway issue (https://github.com/swaywm/sway/issues/8904)
+            // so this ugly workaround is the only way to make it work
+            // FIXME: This is dumb
+            set_opacity: 0.005,
 
-            connect_map[sender] => move |win| {
+            connect_realize[sender] => move |win| {
                 let surface = win.surface().unwrap();
                 let sender = sender.clone();
                 surface.connect_enter_monitor(move |_, monitor| {
@@ -309,9 +311,14 @@ impl Component for App {
                 let height = self.config.height.to_val(mon_height);
                 let y = self.config.y.to_val(mon_height) - height / 2;
 
+                // Layer shell parameters are set up here to make sure when the window
+                // appears it appears at the center of the screen, and is then repositioned.
+                // This is maybe still not optimal, but I don't think there is another way
+                // to do this in a reasonable way.
+                root.set_anchor(Edge::Left, true);
+                root.set_anchor(Edge::Top, true);
+
                 if self.config.close_on_click {
-                    root.set_anchor(Edge::Bottom, true);
-                    root.set_anchor(Edge::Right, true);
                     root.set_default_size(mon_width as i32, mon_height as i32);
                     widgets.main.set_halign(gtk::Align::Fill);
                     widgets.main.set_margin_start(x);
@@ -326,7 +333,8 @@ impl Component for App {
                     root.set_margin(Edge::Left, x);
                     root.set_margin(Edge::Top, y);
                 }
-                root.show();
+                root.set_opacity(1.0); // Continuation of the Sway hack
+                widgets.entry.grab_focus_without_selecting();
 
                 // If show_results_immediately is enabled, trigger initial search with empty input
                 if self.config.show_results_immediately {
