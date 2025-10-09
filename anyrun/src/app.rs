@@ -138,6 +138,10 @@ impl Component for App {
                 config::KeyboardMode::OnDemand => gtk4_layer_shell::KeyboardMode::OnDemand,
             },
             set_namespace: Some("anyrun"),
+            // This cannot be fully transparent due to a Sway issue (https://github.com/swaywm/sway/issues/8904)
+            // so this ugly workaround is the only way to make it work
+            // FIXME: This is dumb
+            set_opacity: 0.005,
 
             connect_realize[sender] => move |win| {
                 let surface = win.surface().unwrap();
@@ -164,10 +168,6 @@ impl Component for App {
                 set_halign: gtk::Align::Center,
                 set_vexpand: false,
                 set_hexpand: true,
-                // This cannot be fully transparent due to a Sway issue (https://github.com/swaywm/sway/issues/8904)
-                // so this ugly workaround is the only way to make it work
-                // FIXME: This is dumb
-                set_opacity: 0.005,
                 set_css_classes: &["main"],
 
                 #[name = "entry"]
@@ -333,7 +333,7 @@ impl Component for App {
                     root.set_margin(Edge::Left, x);
                     root.set_margin(Edge::Top, y);
                 }
-                widgets.main.set_opacity(1.0); // Continuation of the Sway hack
+                root.set_opacity(1.0); // Continuation of the Sway hack
                 widgets.entry.grab_focus_without_selecting();
 
                 // If show_results_immediately is enabled, trigger initial search with empty input
