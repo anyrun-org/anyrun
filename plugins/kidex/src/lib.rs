@@ -47,7 +47,7 @@ pub fn handler(selection: Match, state: &mut State) -> HandleResult {
         Some(index_entry) => match selection.id.unwrap().into() {
             IndexAction::Open => {
                 if let Err(why) = Command::new("xdg-open").arg(&index_entry.path).spawn() {
-                    println!("[kidex] Error running xdg-open: {why}");
+                    eprintln!("[kidex] Error running xdg-open: {why}");
                 }
                 HandleResult::Close
             }
@@ -91,7 +91,7 @@ pub fn init(config_dir: RString) -> State {
     let index = match kidex_common::util::get_index(None) {
         Ok(index) => index.into_iter().enumerate().collect(),
         Err(why) => {
-            println!("[kidex] Failed to get kidex index: {why}");
+            eprintln!("[kidex] Failed to get kidex index: {why}");
             Vec::new()
         }
     };

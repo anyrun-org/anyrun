@@ -62,7 +62,7 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
             ))
             .output()
             .unwrap_or_else(|why| {
-                eprintln!("Error running preprocess script: {}", why);
+                eprintln!("[applications] Error running preprocess script: {}", why);
                 std::process::exit(1);
             });
 
@@ -83,7 +83,7 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
                     ))
                     .spawn()
                 {
-                    eprintln!("Error running desktop entry: {}", why);
+                    eprintln!("[applications] Error running desktop entry: {}", why);
                 }
             }
             None => {
@@ -157,17 +157,23 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
 pub fn init(config_dir: RString) -> State {
     let config: Config = match fs::read_to_string(format!("{}/applications.ron", config_dir)) {
         Ok(content) => ron::from_str(&content).unwrap_or_else(|why| {
-            eprintln!("Error parsing applications plugin config: {}", why);
+            eprintln!(
+                "[applications] Error parsing config, using default: {}",
+                why
+            );
             Config::default()
         }),
         Err(why) => {
-            eprintln!("Error reading applications plugin config: {}", why);
+            eprintln!(
+                "[applications] Error reading config, using default: {}",
+                why
+            );
             Config::default()
         }
     };
 
     let entries = scrubber::scrubber(&config).unwrap_or_else(|why| {
-        eprintln!("Failed to load desktop entries: {}", why);
+        eprintln!("[applicatiosn] Failed to load desktop entries: {}", why);
         Vec::new()
     });
 

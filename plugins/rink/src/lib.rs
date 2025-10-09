@@ -36,9 +36,9 @@ fn init(config_dir: RString) -> State {
             Ok(mut live_defs) => {
                 currency_defs.append(&mut live_defs.defs);
             }
-            Err(why) => println!("Error parsing currency json: {}", why),
+            Err(why) => eprintln!("[rink] Error parsing currency json: {why}"),
         },
-        Err(why) => println!("Error fetching up-to-date currency conversions: {}", why),
+        Err(why) => eprintln!("[rink] Error fetching up-to-date currency conversions: {why}",),
     }
 
     currency_defs.append(&mut gnu_units::parse_str(CURRENCY_FILE).defs);
@@ -49,13 +49,13 @@ fn init(config_dir: RString) -> State {
     });
     ctx.load_dates(dates);
 
-    let config = match fs::read_to_string(format!("{}/rink.ron", config_dir)) {
+    let config = match fs::read_to_string(format!("{config_dir}/rink.ron")) {
         Ok(content) => ron::from_str(&content).unwrap_or_else(|why| {
-            eprintln!("[nix-run] Failed to parse config: {}", why);
+            eprintln!("[rink] Failed to parse config: {why}");
             Config::default()
         }),
         Err(why) => {
-            eprintln!("[nix-run] No config file provided, using default: {}", why);
+            eprintln!("[rink] No config file provided, using default: {why}");
             Config::default()
         }
     };
@@ -79,7 +79,7 @@ fn get_matches(input: RString, state: &mut State) -> RVec<Match> {
         return RVec::new();
     };
 
-    match rink_core::one_line(&mut state.ctx, &input) {
+    match rink_core::one_line(&mut state.ctx, input) {
         Ok(result) => {
             let (title, desc) = parse_result(result);
             vec![Match {

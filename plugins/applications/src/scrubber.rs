@@ -280,7 +280,7 @@ pub fn scrubber(config: &Config) -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std
                         paths.extend(dir);
                     }
                     Err(why) => {
-                        eprintln!("Error reading directory {}: {}", dir, why);
+                        eprintln!("[applications] Error reading directory {}: {}", dir, why);
                     }
                 }
             }
@@ -329,7 +329,10 @@ pub fn scrubber(config: &Config) -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std
                 })
                 .flatten(),
         ),
-        Err(why) => eprintln!("Error reading directory {}: {}", user_path, why),
+        Err(why) => eprintln!(
+            "[applications] Error reading directory {}: {}",
+            user_path, why
+        ),
     }
 
     Ok(entries

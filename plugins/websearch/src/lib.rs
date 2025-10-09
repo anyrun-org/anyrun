@@ -102,7 +102,7 @@ fn handler(selection: Match, config: &Config) -> HandleResult {
         ))
         .spawn()
     {
-        println!("Failed to perform websearch: {}", why);
+        eprintln!("[websearch] Failed to perform websearch: {}", why);
     }
 
     HandleResult::Close

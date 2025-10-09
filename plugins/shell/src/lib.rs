@@ -73,7 +73,7 @@ fn handler(selection: Match) -> HandleResult {
         .arg(selection.title.as_str())
         .spawn()
     {
-        println!("Failed to run command: {}", why);
+        eprintln!("[shell] Failed to run command: {}", why);
     }
 
     HandleResult::Close
