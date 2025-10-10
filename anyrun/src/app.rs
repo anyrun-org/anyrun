@@ -430,8 +430,16 @@ impl Component for App {
                 let _ = self.tx.blocking_send(ipc::Request::Query { text });
             }
             AppMsg::PluginOutput(PluginBoxOutput::MatchesLoaded) => {
+                let matches = self.combined_matches();
                 if let Some((plugin, plugin_match)) = self.combined_matches().first() {
                     plugin.matches.widget().select_row(Some(&plugin_match.row));
+                }
+
+                if let Some(max_entries) = self.config.max_entries {
+                    for (_plugin, plugin_match) in matches.iter().skip(max_entries as usize) {
+                        plugin_match.row.set_visible(false);
+                    }
+                    self.plugins.broadcast(PluginBoxInput::MaybeHide);
                 }
             }
             // Handle clicked selections

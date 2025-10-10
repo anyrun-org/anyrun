@@ -130,6 +130,9 @@ pub struct PluginBox {
 pub enum PluginBoxInput {
     Matches(RVec<Match>),
     Enable(bool),
+    /// Sent when there is a possibility that the plugin may need to hide, aka
+    /// all its matches have already been hidden
+    MaybeHide,
 }
 
 #[derive(Debug)]
@@ -254,6 +257,18 @@ impl FactoryComponent for PluginBox {
                 if !enable {
                     self.matches.guard().clear();
                 }
+            }
+            PluginBoxInput::MaybeHide => {
+                let mut hide = true;
+
+                for plugin_match in self.matches.iter() {
+                    if plugin_match.row.get_visible() {
+                        hide = false;
+                        break;
+                    }
+                }
+
+                self.visible = !hide;
             }
         }
 
