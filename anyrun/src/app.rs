@@ -54,6 +54,7 @@ pub struct App {
     plugins: FactoryVecDeque<PluginBox>,
     post_run_action: PostRunAction,
     tx: mpsc::Sender<anyrun_provider_ipc::Request>,
+    css_provider: gtk::CssProvider,
 }
 
 impl App {
@@ -225,17 +226,16 @@ impl Component for App {
                 }
             });
 
+        let css_provider = gtk::CssProvider::new();
+
         let mut config = if let Some(config_dir) = &config_dir {
             match fs::read_to_string(format!("{config_dir}/style.css")) {
                 Ok(style) => {
-                    relm4::set_global_css_with_priority(&style, gtk::STYLE_PROVIDER_PRIORITY_USER)
+                    css_provider.load_from_string(&style);
                 }
                 Err(why) => {
                     eprintln!("[anyrun] Failed to load CSS: {why}");
-                    relm4::set_global_css_with_priority(
-                        DEFAULT_CSS,
-                        gtk::STYLE_PROVIDER_PRIORITY_USER,
-                    );
+                    css_provider.load_from_string(DEFAULT_CSS);
                 }
             }
             match fs::read(format!("{config_dir}/config.ron")) {
@@ -250,9 +250,15 @@ impl Component for App {
             }
         } else {
             eprintln!("[anyrun] No config found in any searched paths");
-            relm4::set_global_css_with_priority(DEFAULT_CSS, gtk::STYLE_PROVIDER_PRIORITY_USER);
+            css_provider.load_from_string(DEFAULT_CSS);
             Config::default()
         };
+
+        gtk::style_context_add_provider_for_display(
+            &WidgetExt::display(&root),
+            &css_provider,
+            gtk::STYLE_PROVIDER_PRIORITY_USER,
+        );
 
         config.merge_opt(app_init.args.config.clone());
 
@@ -289,6 +295,7 @@ impl Component for App {
             plugins: plugins_factory,
             post_run_action: PostRunAction::None,
             tx,
+            css_provider,
         };
 
         ComponentParts { model, widgets }
@@ -368,6 +375,11 @@ impl Component for App {
                         }
                         root.application().unwrap().quit();
                     }
+                    // Unload the style so a new one can be loaded on next show
+                    gtk::style_context_remove_provider_for_display(
+                        &WidgetExt::display(root),
+                        &self.css_provider,
+                    );
                     root.close();
                     // FIXME: Make sure the worker has actually correctly shut down before
                     // exiting
