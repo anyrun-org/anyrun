@@ -18,6 +18,8 @@ Config(
 
   max_entries: 5,
 
+  hide_description: true,
+
   // A command to preprocess the command from the desktop file. The commands should take arguments in this order:
   // command_name <term|no-term> <command>
   preprocess_exec_script: Some("/home/user/.local/share/anyrun/preprocess_application_command.sh")
