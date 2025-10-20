@@ -30,6 +30,7 @@
           self',
           config,
           pkgs,
+          system,
           ...
         }:
         let
@@ -51,13 +52,16 @@
                 };
             in
             {
-              default = self'.packages.anyrun;
+              anyrun-provider = inputs.anyrun-provider.packages.${system}.default;
 
               # By default the anyrun package is built without any plugins
               # as per the `dontBuildPlugins` arg.
-              anyrun = callPackage ./nix/packages/anyrun.nix { inherit inputs lockFile; };
-              anyrun-with-all-plugins = callPackage ./nix/packages/anyrun.nix {
+              anyrun = callPackage ./nix/packages/anyrun.nix {
                 inherit inputs lockFile;
+                inherit (self.packages.${system}) anyrun-provider;
+              };
+
+              anyrun-with-all-plugins = self.packages.${system}.anyrun.override {
                 dontBuildPlugins = false;
               };
 
@@ -77,7 +81,7 @@
               websearch = mkPlugin "websearch";
               niri-focus = mkPlugin "niri-focus";
 
-              anyrun-provider = inputs.anyrun-provider.packages.${pkgs.system}.default;
+              default = self'.packages.anyrun;
             };
 
           # Set up an overlay from packages exposed by this flake
@@ -88,10 +92,11 @@
               inputsFrom = builtins.attrValues self'.packages;
               packages = with pkgs; [
                 rustc
-                gcc
                 cargo
+
                 clippy
                 rustfmt
+                taplo
               ];
             };
 
@@ -104,8 +109,38 @@
             };
           };
 
-          # provide the formatter for nix fmt
-          formatter = pkgs.alejandra;
+          # Provides the default formatter for 'nix fmt', which will format the
+          # entire tree with Alejandra. The wrapper script is necessary due to
+          # changes to the behaviour of Nix, which now encourages wrappers for
+          # tree-wide formatting.
+          formatter = pkgs.writeShellApplication {
+            name = "nix3-fmt-wrapper";
+
+            runtimeInputs = [
+              pkgs.nixfmt
+              pkgs.fd
+              pkgs.taplo
+            ];
+
+            text = ''
+              # Find Nix files in the tree and format them with Alejandra
+              fd "$@" -t f -e nix -x nixfmt -q '{}'
+
+              # Same for TOML files, but with Taplo
+              fd "$@" -t f -e toml -x taplo fmt '{}'
+            '';
+          };
+
+          # Provides checks to be built an ran on 'nix flake check'. They can also
+          # be built individually with 'nix build' as described below.
+          checks = {
+            # Check if codebase is properly formatted.
+            # This can be initiated with `nix build .#checks.<system>.nix-fmt`
+            # or with `nix flake check`
+            nix-fmt = pkgs.runCommand "nix-fmt-check" { nativeBuildInputs = [ pkgs.nixfmt ]; } ''
+              nixfmt --check ${self} < /dev/null | tee $out
+            '';
+          };
         };
 
       flake = {
