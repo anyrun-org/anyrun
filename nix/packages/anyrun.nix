@@ -85,6 +85,10 @@ rustPlatform.buildRustPackage {
       --prefix PATH ":" ${lib.makeBinPath [ anyrun-provider ]} --prefix ANYRUN_PLUGINS ":" $out/lib
   '';
 
+  passthru = {
+    inherit anyrun-provider;
+  };
+
   meta = {
     description = "Wayland native, highly customizable runner";
     homepage = "https://github.com/anyrun-org/anyrun";
