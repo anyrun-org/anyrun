@@ -143,6 +143,11 @@ impl Component for App {
             // so this ugly workaround is the only way to make it work
             // FIXME: This is dumb
             set_opacity: 0.005,
+            set_exclusive_zone: if config.ignore_exclusive_zones {
+                -1
+            } else {
+                0
+            },
 
             connect_realize[sender] => move |win| {
                 let surface = win.surface().unwrap();
