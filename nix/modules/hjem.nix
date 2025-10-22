@@ -44,28 +44,23 @@ in {
       ]
       else [];
 
-    systemd.user.services.anyrun = mkIf cfg.daemon.enable {
-      Unit = {
-        Description = "Anyrun daemon";
-        PartOf = "graphical-session.target";
-        After = "graphical-session.target";
-      };
+    systemd.services.anyrun = mkIf cfg.daemon.enable {
+      description = "Anyrun daemon";
+      script = "${lib.getExe cfg.package} daemon";
+      partOf = ["graphical-session.target"];
+      after = ["graphical-session.target"];
+      wantedBy = ["graphical-session.target"];
 
-      Service = {
+      serviceConfig = {
         Type = "simple";
-        ExecStart = "${lib.getExe cfg.package} daemon";
         Restart = "on-failure";
         KillMode = "process";
       };
-
-      Install = {
-        WantedBy = ["graphical-session.target"];
-      };
     };
 
-    home.packages = optional (cfg.package != null) cfg.package;
+    packages = optional (cfg.package != null) cfg.package;
 
-    xdg.configFile = mkMerge [
+    xdg.config.files = mkMerge [
       (mapAttrs' (name: value: nameValuePair ("anyrun/" + name) value) cfg.extraConfigFiles)
 
       {
