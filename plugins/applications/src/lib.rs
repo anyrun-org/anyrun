@@ -213,10 +213,12 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
             let mut score = (name_score * 10 + desc_score + keyword_score) - entry.offset;
 
             // Apply priority
-            score *= match (&state.config.entry_priority, entry.is_action) {
-                (EntryPriority::ActionsFirst, true) => 2,
-                (EntryPriority::ApplicationsFirst, false) => 2,
-                _ => 1,
+            score = match (&state.config.entry_priority, entry.is_action) {
+                // Boost the `desc_score` for actions,
+                // since the description of actions is the application name.
+                (EntryPriority::ActionsFirst, true) => (score + desc_score * 5) * 2,
+                (EntryPriority::ApplicationsFirst, false) => score * 2,
+                _ => score,
             };
 
             // Score cutoff
