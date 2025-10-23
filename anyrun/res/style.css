@@ -1,3 +1,8 @@
+@define-color accent #5599d2;
+@define-color bg-color #161616;
+@define-color fg-color #eeeeee;
+@define-color desc-color #cccccc;
+
 window {
   background: transparent;
 }
@@ -6,8 +11,8 @@ box.main {
   padding: 5px;
   margin: 10px;
   border-radius: 10px;
-  border: 2px solid @theme_selected_bg_color;
-  background-color: @theme_bg_color;
+  border: 2px solid @accent;
+  background-color: @bg-color;
   box-shadow: 0 0 5px black;
 }
 
@@ -16,6 +21,7 @@ text {
   min-height: 30px;
   padding: 5px;
   border-radius: 5px;
+  color: @fg-color;
 }
 
 .matches {
@@ -35,8 +41,13 @@ list.plugin {
   background-color: rgba(0, 0, 0, 0);
 }
 
+label.match {
+  color: @fg-color;
+}
+
 label.match.description {
   font-size: 10px;
+  color: @desc-color;
 }
 
 label.plugin.info {
@@ -48,7 +59,7 @@ label.plugin.info {
 }
 
 .match:selected {
-  border-left: 4px solid @theme_selected_bg_color;
+  border-left: 4px solid @accent;
   background: transparent;
   animation: fade 0.1s linear;
 }
