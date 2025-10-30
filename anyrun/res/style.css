@@ -52,6 +52,7 @@ label.match.description {
 
 label.plugin.info {
   font-size: 14px;
+  color: @fg-color;
 }
 
 .match {
