@@ -5,8 +5,10 @@ A wayland native krunner-like runner, made with customizability in mind.
 <img width="950" height="702" alt="image" src="https://github.com/user-attachments/assets/0a53b435-58f5-4a7c-90f7-b3f39266f2f4" />
 
 > [!NOTE]
-> If you use Nvidia and Anyrun refuses to close for you, you need to set `GSK_RENDERER=ngl` for Anyrun.
-> As in, running it with `GSK_RENDERER=ngl anyrun`. This is a [known issue](https://forums.developer.nvidia.com/t/580-65-06-gtk-4-apps-hang-when-attempting-to-exit-close/341308/6)
+> If you use Nvidia and Anyrun refuses to close for you, you need to set
+> `GSK_RENDERER=ngl` for Anyrun. As in, running it with
+> `GSK_RENDERER=ngl anyrun`. This is a
+> [known issue](https://forums.developer.nvidia.com/t/580-65-06-gtk-4-apps-hang-when-attempting-to-exit-close/341308/6)
 > and is quite driver version dependent.
 
 ## Features
@@ -30,8 +32,8 @@ A wayland native krunner-like runner, made with customizability in mind.
 
 ### Dependencies
 
-Anyrun mainly depends various GTK4 libraries, and rust of course for building the
-project. Rust you can get with [rustup](https://rustup.rs). The rest are
+Anyrun mainly depends various GTK4 libraries, and rust of course for building
+the project. Rust you can get with [rustup](https://rustup.rs). The rest are
 statically linked in the binary. Here are the libraries you need to have to
 build & run it:
 
@@ -48,11 +50,13 @@ build & run it:
 
 ### Nix
 
-An Anyrun package that contains all the official plugins is available in [nixpkgs](https://search.nixos.org/packages?channel=unstable&show=anyrun&from=0&size=50&sort=relevance&type=packages&query=anyrun).
+An Anyrun package that contains all the official plugins is available in
+[nixpkgs](https://search.nixos.org/packages?channel=unstable&show=anyrun&from=0&size=50&sort=relevance&type=packages&query=anyrun).
 
 #### Home-Manager module
 
-The preferred way to use Home-Manager with Anyrun is by using the upstream module.
+The preferred way to use Home-Manager with Anyrun is by using the upstream
+module.
 
 You may use it in your system like this:
 
@@ -145,8 +149,39 @@ nix.settings = {
 
 > [!WARNING]
 > While using the Anyrun flake, overriding the `nixpkgs` input for Anyrun will
-> cause cache misses, i.e., you will have to build from source every time. To use
-> the cache, do _not_ override the Nixpkgs input.
+> cause cache misses, i.e., you will have to build from source every time. To
+> use the cache, do _not_ override the Nixpkgs input.
+
+### Hjem module
+
+We also provide a Hjem module, which comes with the exact same API as the
+Home-Manager one. You may import it in your configuration like so:
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
+    hjem.url = "github:feel-co/hjem";
+    anyrun.url = "github:anyrun-org/anyrun";
+  };
+  outputs = {self, ...}@inputs: {
+    nixosConfigurations.hostname = inputs.nixpkgs.lib.nixosSystem {
+      modules = [
+        ({
+          hjem.extraModules = [
+            inputs.anyrun.hjemModules.default         
+          ];
+        })
+        {
+          programs.anyrun = {
+            # ...
+          };
+        }
+      ];
+    };
+  }
+}
+```
 
 ### Manual installation
 
@@ -224,8 +259,8 @@ use them.
 
 ## Styling
 
-Anyrun supports [GTK4 CSS](https://docs.gtk.org/gtk4/css-properties.html) styling.
-The style classes and widgets that use them are as follows:
+Anyrun supports [GTK4 CSS](https://docs.gtk.org/gtk4/css-properties.html)
+styling. The style classes and widgets that use them are as follows:
 
 - No class, unique widget:
   - `GtkText`: The main entry box
@@ -248,8 +283,8 @@ The style classes and widgets that use them are as follows:
   - `.description`
     - `GtkLabel`: The description (if present)
 
-Refer to the [default style](anyrun/res/style.css) for an example, and use `GTK_DEBUG=interactive anyrun`
-to edit styles live.
+Refer to the [default style](anyrun/res/style.css) for an example, and use
+`GTK_DEBUG=interactive anyrun` to edit styles live.
 
 ## Arguments
 
