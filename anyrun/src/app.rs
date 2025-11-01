@@ -323,12 +323,11 @@ impl Component for App {
                 let height = self.config.height.to_val(mon_height);
                 let y = self.config.y.to_val(mon_height) - height / 2;
 
-                // Layer shell parameters are set up here to make sure when the window
-                // appears it appears at the center of the screen, and is then repositioned.
-                // This is maybe still not optimal, but I don't think there is another way
-                // to do this in a reasonable way.
-                root.set_anchor(Edge::Left, true);
+                // ask for only the top anchor so hyprland computes a centered layer box before the slide animation
+                root.set_anchor(Edge::Left, false);
+                root.set_anchor(Edge::Right, false);
                 root.set_anchor(Edge::Top, true);
+                root.set_anchor(Edge::Bottom, false);
 
                 if self.config.close_on_click {
                     root.set_default_size(mon_width as i32, mon_height as i32);
@@ -342,7 +341,6 @@ impl Component for App {
                 } else {
                     root.set_default_size(width, height);
                     root.child().unwrap().set_size_request(width, height);
-                    root.set_margin(Edge::Left, x);
                     root.set_margin(Edge::Top, y);
                 }
                 root.set_opacity(1.0); // Continuation of the Sway hack
