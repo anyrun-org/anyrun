@@ -41,7 +41,7 @@ let
     ;
 
   defaultPackage = self.packages.${pkgs.stdenv.hostplatform.system}.default;
-  defaultProvider = defaultProvider.passthru.anyrun-provider or null;
+  defaultProvider = defaultPackage.passthru.anyrun-provider or null;
   cfg = config.programs.anyrun;
 in
 {
