@@ -41,7 +41,7 @@ let
     ;
 
   defaultPackage = self.packages.${pkgs.stdenv.hostplatform.system}.default;
-  defaultProvider = defaultPackage.passthru.anyrun-provider or null;
+  defaultProvider = defaultPackage.passthru.anyrun-provider or null; # 'or null' is a fallback case to trigger the assertion
   cfg = config.programs.anyrun;
 in
 {
@@ -367,7 +367,7 @@ in
         (assertNumeric cfg.config.y)
 
         {
-          assertion = cfg.package.anyrun-provider != null;
+          assertion = cfg.package.anyrun-provider != null || cfg.config.provider != null;
           message = ''
             Anyrun expects 'anyrun-provider' to be exposed under 'passthru.anyrun-provider'. This is done
             automatically in the Anyrun flake, but may not be the case if you are using the Home Manager
@@ -376,6 +376,7 @@ in
             1. Using the Home Manager module from Home Manager to keep using 'pkgs.anyrun'
             2. Using the Home Manager module from Anyrun, but don't override the package (recommended)
             3. Ensure that your Anyrun package correctly provides 'anyrun-provider' under the passthru attr
+            4. Provide a provider in 'config.programs.anyrun.config.provider'
           '';
         }
       ];
