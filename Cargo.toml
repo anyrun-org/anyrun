@@ -1,5 +1,4 @@
 [workspace]
-resolver = "2"
 members = [
   "anyrun",
   "anyrun-plugin",
@@ -14,5 +13,7 @@ members = [
   "plugins/stdin",
   "plugins/dictionary",
   "plugins/websearch",
-  "plugins/nix-run", "plugins/niri-focus",
+  "plugins/nix-run",
+  "plugins/niri-focus",
 ]
+resolver = "2"

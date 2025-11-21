@@ -1,5 +1,4 @@
 {
-  inputs,
   lib,
   # Dependencies for Anyrun
   makeWrapper,
@@ -9,9 +8,10 @@
   gtk4-layer-shell,
   pkg-config,
   librsvg,
-  rustfmt,
   cargo,
   rustc,
+  # Runtime deps
+  anyrun-provider,
   # Additional configuration arguments for the
   # derivation. By default, we should not build
   # any of the plugins.
@@ -25,12 +25,23 @@ let
   cargoToml = fromTOML (readFile ../../anyrun/Cargo.toml);
   pname = cargoToml.package.name;
   version = cargoToml.package.version;
+
+  fs = lib.fileset;
+  s = ../..;
 in
 rustPlatform.buildRustPackage {
   inherit pname version;
-  src = builtins.path {
-    path = lib.sources.cleanSource inputs.self;
-    name = "${pname}-${version}";
+
+  src = fs.toSource {
+    root = s;
+    fileset = fs.unions [
+      (s + /anyrun)
+      (s + /anyrun-macros)
+      (s + /anyrun-plugin)
+      (s + /plugins)
+      (s + /Cargo.toml)
+      (s + /Cargo.lock)
+    ];
   };
 
   strictDeps = true;
@@ -44,9 +55,6 @@ rustPlatform.buildRustPackage {
   nativeBuildInputs = [
     pkg-config
     makeWrapper
-    rustfmt
-    rustc
-    cargo
   ];
 
   buildInputs = [
@@ -71,14 +79,19 @@ rustPlatform.buildRustPackage {
   CARGO_BUILD_INCREMENTAL = "false";
   RUST_BACKTRACE = "full";
 
-  postInstall = ''
+  postFixup = ''
     wrapProgram $out/bin/anyrun \
       --set GDK_PIXBUF_MODULE_FILE "$(echo ${librsvg.out}/lib/gdk-pixbuf-2.0/*/loaders.cache)" \
-      --prefix ANYRUN_PLUGINS : $out/lib
+      --prefix PATH ":" ${lib.makeBinPath [ anyrun-provider ]} --prefix ANYRUN_PLUGINS ":" $out/lib
   '';
 
+  passthru = {
+    # This is used for detecting whether or not an Anyrun package has the provider
+    inherit anyrun-provider;
+  };
+
   meta = {
-    description = "A wayland native, highly customizable runner.";
+    description = "Wayland native, highly customizable runner";
     homepage = "https://github.com/anyrun-org/anyrun";
     license = [ lib.licenses.gpl3 ];
     mainProgram = "anyrun";

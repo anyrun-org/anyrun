@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # Update Cargo deps
+  - package-ecosystem: cargo
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # Update used workflows
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: daily

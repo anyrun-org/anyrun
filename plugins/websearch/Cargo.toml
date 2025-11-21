@@ -1,16 +1,16 @@
 [package]
-name = "websearch"
+name    = "websearch"
 version = "25.9.3"
 edition = "2021"
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = [ "cdylib" ]
 
 [dependencies]
+abi_stable    = "0.11.1"
 anyrun-plugin = { path = "../../anyrun-plugin" }
-abi_stable = "0.11.1"
-urlencoding = "2.1.3"
-ron = "0.8.0"
-serde = { version = "1.0.152", features = ["derive"] }
-strum = "0.25.0"
-strum_macros = "0.25.1"
+ron           = "0.8.0"
+serde         = { features = [ "derive" ], version = "1.0.152" }
+strum         = "0.25.0"
+strum_macros  = "0.25.1"
+urlencoding   = "2.1.3"

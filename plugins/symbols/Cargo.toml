@@ -1,16 +1,16 @@
 [package]
-name = "symbols"
+name    = "symbols"
 version = "25.9.3"
 edition = "2021"
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = [ "cdylib" ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+abi_stable    = "0.11.1"
 anyrun-plugin = { path = "../../anyrun-plugin" }
-abi_stable = "0.11.1"
-ron = "0.8.0"
-serde = { version = "1.0.152", features = ["derive"] }
 fuzzy-matcher = "0.3.7"
+ron           = "0.8.0"
+serde         = { features = [ "derive" ], version = "1.0.152" }
