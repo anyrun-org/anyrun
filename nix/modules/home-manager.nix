@@ -40,7 +40,7 @@ let
     attrs
     ;
 
-  defaultPackage = self.packages.${pkgs.stdenv.hostplatform.system}.default;
+  defaultPackage = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
   defaultProvider = defaultPackage.passthru.anyrun-provider or null; # 'or null' is a fallback case to trigger the assertion
   cfg = config.programs.anyrun;
 in
