@@ -86,6 +86,7 @@ rustPlatform.buildRustPackage {
   '';
 
   passthru = {
+    # This is used for detecting whether or not an Anyrun package has the provider
     inherit anyrun-provider;
   };
 

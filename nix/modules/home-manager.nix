@@ -122,7 +122,7 @@ in
         };
 
         provider = mkOption {
-          type = package;
+          type = nullOr package;
           default = defaultProvider;
           defaultText = literalExpression "anyrun.packages.${pkgs.stdenv.hostPlatform.sytstem}.default.passthru.anyrun-provider";
           description = ''
@@ -367,7 +367,7 @@ in
         (assertNumeric cfg.config.y)
 
         {
-          assertion = cfg.package.anyrun-provider != null || cfg.config.provider != null;
+          assertion = (builtins.hasAttr "anyrun-provider" cfg.package) || cfg.config.provider != null;
           message = ''
             Anyrun expects 'anyrun-provider' to be exposed under 'passthru.anyrun-provider'. This is done
             automatically in the Anyrun flake, but may not be the case if you are using the Home Manager
@@ -434,7 +434,7 @@ in
                 if cfg.config.maxEntries == null then "None" else "Some(${toString cfg.config.maxEntries})"
               },
               plugins: ${toJSON parsedPlugins},
-              provider: ${if cfg.config.provider == null then "None" else "${lib.getExe cfg.config.provider}"},
+              ${optionalString (cfg.config.provider != null) "provider: \"${lib.getExe cfg.config.provider}\","}
               ${optionalString (cfg.config.extraLines != null) cfg.config.extraLines}
               ${keybinds}
             )
