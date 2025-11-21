@@ -43,7 +43,7 @@ jobs:
           - symbols
           - websearch
     steps:
-      - uses: easimon/maximize-build-space@v8
+      - uses: easimon/maximize-build-space@v10
         with:
           overprovision-lvm: true
           remove-android: true
