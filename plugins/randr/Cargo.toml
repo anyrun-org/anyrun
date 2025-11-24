@@ -14,4 +14,4 @@ anyrun-plugin = { path = "../../anyrun-plugin" }
 fuzzy-matcher = "0.3.7"
 hyprland      = "0.4.0-beta.1"
 ron           = "0.8.0"
-serde         = { features = [ "derive" ], version = "1.0.160" }
+serde         = { features = [ "derive" ], version = "1.0.228" }

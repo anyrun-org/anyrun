@@ -17,4 +17,4 @@ reqwest = { default-features = false, features = [
   "rustls-tls",
 ], version = "0.11.16" }
 ron = "0.8.0"
-serde = { features = [ "derive" ], version = "1.0.160" }
+serde = { features = [ "derive" ], version = "1.0.228" }
