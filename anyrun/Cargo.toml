@@ -18,5 +18,5 @@ relm4            = { branch = "service", git = "https://github.com/anyrun-org/Re
 ron              = "0.8.0"
 serde            = { features = [ "derive" ], version = "1.0.228" }
 serde_json       = "1.0.143"
-tokio            = { features = [ "sync", "rt-multi-thread", "net", "macros" ], version = "1.47.1" }
+tokio            = { features = [ "sync", "rt-multi-thread", "net", "macros" ], version = "1.48.0" }
 tree_magic_mini  = "3.2.0"
