@@ -9,7 +9,7 @@ crate-type = [ "cdylib" ]
 [dependencies]
 abi_stable                = "0.11.1"
 anyrun-plugin             = { path = "../../anyrun-plugin" }
-freedesktop-desktop-entry = "0.7.14"
+freedesktop-desktop-entry = "0.7.19"
 fuzzy-matcher             = "0.3.7"
 niri-ipc                  = "25.5.1"
 ron                       = "0.10.1"
