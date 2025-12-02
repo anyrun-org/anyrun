@@ -42,6 +42,11 @@ build & run it:
 - `gdk-pixbuf2 (libgdk_pixbuf-2.0)`
 - `glib2 (libgobject-2.0 libgio-2.0 libglib-2.0)`
 
+> [!NOTE]
+> Since 25.12.0, Anyrun also depends on [anyrun-provider](https://github.com/anyrun-org/anyrun-provider)
+> to provide search results. Make sure it is installed as well for Anyrun to function. If you don't want to install
+> it into your `$PATH`, you can set the path to it via the `provider` config option.
+
 ## Installation
 
 [![Packaging status](https://repology.org/badge/vertical-allrepos/anyrun.svg)](https://repology.org/project/anyrun/versions)
