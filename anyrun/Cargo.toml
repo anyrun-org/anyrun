@@ -13,7 +13,7 @@ anyrun-provider-ipc = { git = "https://github.com/anyrun-org/anyrun-provider" }
 
 clap             = { features = [ "derive" ], version = "4.2.7" }
 gtk4             = { features = [ "v4_12" ], version = "0.10.2" }
-gtk4-layer-shell = "0.6.3"
+gtk4-layer-shell = "0.7.1"
 relm4            = { branch = "service", git = "https://github.com/anyrun-org/Relm4" }
 ron              = "0.8.0"
 serde            = { features = [ "derive" ], version = "1.0.228" }
