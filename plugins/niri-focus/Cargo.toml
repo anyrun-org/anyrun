@@ -13,4 +13,4 @@ freedesktop-desktop-entry = "0.7.19"
 fuzzy-matcher             = "0.3.7"
 niri-ipc                  = "25.5.1"
 ron                       = "0.10.1"
-serde                     = { features = [ "derive" ], version = "1.0.219" }
+serde                     = { features = [ "derive" ], version = "1.0.228" }

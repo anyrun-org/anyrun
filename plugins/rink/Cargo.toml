@@ -18,4 +18,4 @@ reqwest = { default-features = false, features = [
 ], version = "0.11.13" }
 rink-core = "0.6"
 ron = "0.8.0"
-serde = { features = [ "derive" ], version = "1.0.219" }
+serde = { features = [ "derive" ], version = "1.0.228" }
