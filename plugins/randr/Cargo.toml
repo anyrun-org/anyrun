@@ -1,6 +1,6 @@
 [package]
 name    = "randr"
-version = "25.9.3"
+version = "25.12.0"
 edition = "2021"
 
 [lib]
