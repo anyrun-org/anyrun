@@ -156,8 +156,8 @@ fn main() {
                     app::PostRunAction::None => (),
                 }
             } else {
-                eprintln!("[anyrun] Warning: started in standalone mode, clipboard functionality will be unavailable and startup speed is reduced. \
-                    Consider starting the daemon alongside your compositor by making sure `anyrun daemon` is ran somewhere.");
+                eprintln!("\x1B[1;33m[anyrun] Warning: started in standalone mode, clipboard functionality will be unavailable and startup speed is reduced. \
+                    Consider starting the daemon alongside your compositor by making sure `anyrun daemon` is ran somewhere.\x1B[0m");
 
                 app.connect_activate(move |app| {
                     app::App::launch(
