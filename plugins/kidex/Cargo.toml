@@ -13,6 +13,6 @@ abi_stable    = "0.11.1"
 anyrun-plugin = { path = "../../anyrun-plugin" }
 fuzzy-matcher = "0.3.7"
 kidex-common  = { features = [ "util" ], version = "0.1.0" }
-open          = "3.2.0"
+open          = "5.3.3"
 ron           = "0.8.0"
 serde         = { features = [ "derive" ], version = "1.0.228" }
