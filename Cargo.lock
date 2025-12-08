@@ -145,7 +145,7 @@ dependencies = [
  "gtk4",
  "gtk4-layer-shell",
  "relm4",
- "ron 0.8.1",
+ "ron",
  "serde",
  "serde_json",
  "tokio",
@@ -196,7 +196,7 @@ dependencies = [
  "abi_stable",
  "anyrun-plugin",
  "fuzzy-matcher",
- "ron 0.8.1",
+ "ron",
  "serde",
  "sublime_fuzzy",
 ]
@@ -580,7 +580,7 @@ dependencies = [
  "abi_stable",
  "anyrun-plugin",
  "reqwest 0.11.27",
- "ron 0.8.1",
+ "ron",
  "serde",
 ]
 
@@ -1584,7 +1584,7 @@ dependencies = [
  "fuzzy-matcher",
  "kidex-common",
  "open",
- "ron 0.8.1",
+ "ron",
  "serde",
 ]
 
@@ -1719,7 +1719,7 @@ dependencies = [
  "freedesktop-desktop-entry",
  "fuzzy-matcher",
  "niri-ipc",
- "ron 0.10.1",
+ "ron",
  "serde",
 ]
 
@@ -1741,7 +1741,7 @@ dependencies = [
  "anyrun-plugin",
  "fuzzy-matcher",
  "reqwest 0.12.24",
- "ron 0.10.1",
+ "ron",
  "serde",
  "serde_json",
 ]
@@ -2134,7 +2134,7 @@ dependencies = [
  "anyrun-plugin",
  "fuzzy-matcher",
  "hyprland",
- "ron 0.8.1",
+ "ron",
  "serde",
 ]
 
@@ -2321,7 +2321,7 @@ dependencies = [
  "anyrun-plugin",
  "reqwest 0.11.27",
  "rink-core",
- "ron 0.8.1",
+ "ron",
  "serde",
 ]
 
@@ -2338,18 +2338,6 @@ dependencies = [
  "serde",
  "serde_derive",
  "strsim 0.10.0",
-]
-
-[[package]]
-name = "ron"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b91f7eff05f748767f183df4320a63d6936e9c6107d97c9e6bdd9784f4289c94"
-dependencies = [
- "base64 0.21.7",
- "bitflags 2.10.0",
- "serde",
- "serde_derive",
 ]
 
 [[package]]
@@ -2561,7 +2549,7 @@ version = "25.12.0"
 dependencies = [
  "abi_stable",
  "anyrun-plugin",
- "ron 0.8.1",
+ "ron",
  "serde",
 ]
 
@@ -2625,7 +2613,7 @@ dependencies = [
  "abi_stable",
  "anyrun-plugin",
  "fuzzy-matcher",
- "ron 0.8.1",
+ "ron",
  "serde",
 ]
 
@@ -2679,7 +2667,7 @@ dependencies = [
  "abi_stable",
  "anyrun-plugin",
  "fuzzy-matcher",
- "ron 0.8.1",
+ "ron",
  "serde",
 ]
 
@@ -3026,7 +3014,7 @@ dependencies = [
  "futures",
  "fuzzy-matcher",
  "reqwest 0.11.27",
- "ron 0.8.1",
+ "ron",
  "serde",
  "serde_json",
  "tokio",
@@ -3265,7 +3253,7 @@ version = "25.12.0"
 dependencies = [
  "abi_stable",
  "anyrun-plugin",
- "ron 0.8.1",
+ "ron",
  "serde",
  "strum",
  "strum_macros",
