@@ -33,6 +33,7 @@ jobs:
       matrix:
         package:
           - anyrun
+          - anyrun-with-all-plugins
           - applications
           - dictionary
           - kidex
