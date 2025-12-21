@@ -235,8 +235,8 @@ impl Component for App {
 
         let mut config = if let Some(config_dir) = &config_dir {
             match fs::read_to_string(format!("{config_dir}/style.css")) {
-                Ok(style) => {
-                    css_provider.load_from_string(&style);
+                Ok(_style) => {
+                    css_provider.load_from_path(format!("{config_dir}/style.css"));
                 }
                 Err(why) => {
                     eprintln!("[anyrun] Failed to load CSS: {why}");
