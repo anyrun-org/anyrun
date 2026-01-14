@@ -5,6 +5,23 @@ use scrubber::DesktopEntry;
 use serde::Deserialize;
 use std::{env, fs, path::PathBuf, process::Command};
 
+#[derive(Deserialize, Clone, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum EnvironmentVariables {
+    #[default]
+    None,
+    Inherit,
+    Script(PathBuf),
+}
+
+#[derive(Deserialize, Clone, Default, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum LogLevel {
+    #[default]
+    Error,
+    Debug,
+}
+
 #[derive(Deserialize)]
 pub struct Config {
     desktop_actions: bool,
@@ -13,6 +30,10 @@ pub struct Config {
     hide_description: bool,
     terminal: Option<Terminal>,
     preprocess_exec_script: Option<PathBuf>,
+    #[serde(default)]
+    environment_variables: EnvironmentVariables,
+    #[serde(default)]
+    log_level: LogLevel,
 }
 
 #[derive(Deserialize)]
@@ -29,6 +50,50 @@ impl Default for Config {
             hide_description: false,
             preprocess_exec_script: None,
             terminal: None,
+            environment_variables: EnvironmentVariables::None,
+            log_level: LogLevel::Error,
+        }
+    }
+}
+
+fn get_environment_vars(config: &Config) -> Vec<(String, String)> {
+    match &config.environment_variables {
+        EnvironmentVariables::None => Vec::new(),
+        EnvironmentVariables::Inherit => std::env::vars().collect(),
+        EnvironmentVariables::Script(script_path) => {
+            let expanded_path = shellexpand::tilde(&script_path.to_string_lossy()).to_string();
+            let output = Command::new("sh")
+                .arg("-c")
+                .arg(&expanded_path)
+                .output();
+
+            match output {
+                Ok(out) if out.status.success() => {
+                    String::from_utf8_lossy(&out.stdout)
+                        .lines()
+                        .filter_map(|line| {
+                            let mut parts = line.splitn(2, '=');
+                            match (parts.next(), parts.next()) {
+                                (Some(key), Some(value)) if !key.is_empty() => {
+                                    Some((key.to_string(), value.to_string()))
+                                }
+                                _ => None,
+                            }
+                        })
+                        .collect()
+                }
+                Ok(out) => {
+                    eprintln!(
+                        "[applications] Environment script failed: {}",
+                        String::from_utf8_lossy(&out.stderr)
+                    );
+                    Vec::new()
+                }
+                Err(why) => {
+                    eprintln!("[applications] Error running environment script: {}", why);
+                    Vec::new()
+                }
+            }
         }
     }
 }
@@ -77,13 +142,19 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
     if entry.term {
         match &state.config.terminal {
             Some(term) => {
+                let arg = format!(
+                    "{} {}",
+                    term.command,
+                    term.args.replace("{}", &exec)
+                );
+                let envs = get_environment_vars(&state.config);
+                if state.config.log_level == LogLevel::Debug {
+                    eprintln!("[applications] DEBUG: arg={:?}, envs={:?}", arg, envs);
+                }
                 if let Err(why) = Command::new("sh")
                     .arg("-c")
-                    .arg(format!(
-                        "{} {}",
-                        term.command,
-                        term.args.replace("{}", &exec)
-                    ))
+                    .arg(&arg)
+                    .envs(envs)
                     .spawn()
                 {
                     eprintln!("[applications] Error running desktop entry: {}", why);
@@ -122,13 +193,19 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
                         .output()
                         .is_ok_and(|output| output.status.success())
                     {
+                        let arg = format!(
+                            "{} {}",
+                            term.command,
+                            term.args.replace("{}", &exec)
+                        );
+                        let envs = get_environment_vars(&state.config);
+                        if state.config.log_level == LogLevel::Debug {
+                            eprintln!("[applications] DEBUG: arg={:?}, envs={:?}", arg, envs);
+                        }
                         if let Err(why) = Command::new("sh")
                             .arg("-c")
-                            .arg(format!(
-                                "{} {}",
-                                term.command,
-                                term.args.replace("{}", &exec)
-                            ))
+                            .arg(&arg)
+                            .envs(envs)
                             .spawn()
                         {
                             eprintln!("Error running desktop entry: {}", why);
@@ -138,19 +215,26 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
                 }
             }
         }
-    } else if let Err(why) = {
-        let current_dir = &env::current_dir().unwrap();
-
-        Command::new("sh")
+    } else {
+        let current_dir = env::current_dir().unwrap();
+        let cwd = match &entry.path {
+            Some(path) if path.exists() => path.clone(),
+            _ => current_dir,
+        };
+        let arg = &entry.exec;
+        let envs = get_environment_vars(&state.config);
+        if state.config.log_level == LogLevel::Debug {
+            eprintln!("[applications] DEBUG: cwd={:?}, arg={:?}, envs={:?}", cwd, arg, envs);
+        }
+        if let Err(why) = Command::new("sh")
             .arg("-c")
-            .arg(&entry.exec)
-            .current_dir(match &entry.path {
-                Some(path) if path.exists() => path,
-                _ => current_dir,
-            })
+            .arg(arg)
+            .current_dir(&cwd)
+            .envs(envs)
             .spawn()
-    } {
-        eprintln!("Error running desktop entry: {}", why);
+        {
+            eprintln!("Error running desktop entry: {}", why);
+        }
     }
 
     HandleResult::Close
