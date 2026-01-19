@@ -234,8 +234,9 @@ impl Component for App {
         let css_provider = gtk::CssProvider::new();
 
         let mut config = if let Some(config_dir) = &config_dir {
-            if Path::new(&format!("{config_dir}/style.css")).exists() {
-                css_provider.load_from_path(format!("{config_dir}/style.css"));
+            let css_path = Path::new(&config_dir).join("style.css");
+            if css_path.exists() {
+                css_provider.load_from_path(css_path);
             } else {
                 eprintln!("[anyrun] {config_dir}/style.css does not exist");
                 css_provider.load_from_string(DEFAULT_CSS);
