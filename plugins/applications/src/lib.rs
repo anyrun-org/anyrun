@@ -4,6 +4,7 @@ use fuzzy_matcher::FuzzyMatcher;
 use scrubber::{DesktopEntry, lower_exec};
 use serde::Deserialize;
 use std::{env, fs, path::PathBuf, process::Command};
+use shell_words;
 
 #[derive(Deserialize)]
 pub struct Config {
@@ -53,28 +54,46 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
             }
         })
         .unwrap();
-    let (command, argv) = lower_exec(&entry.exec).unwrap_or_else(
-        |e| panic!("Unable to parse the exec key `{}`: {}", &entry.exec, e.0)
-    );
 
-    let exec = if let Some(script) = &state.config.preprocess_exec_script {
-        let output = Command::new("sh")
-            .arg("-c")
-            .arg(format!(
-                "{} {} {}",
-                script.display(),
-                if entry.term { "term" } else { "no-term" },
-                &entry.exec
-            ))
+    let (command, argv) = match lower_exec(&entry.exec) {
+        Ok((command, argv)) => (command, argv),
+        Err(error) => {
+            eprintln!("[applications] Unable to parse the exec key `{}`: {}", &entry.exec, error.0);
+            return HandleResult::Close
+        }
+    };
+
+    let (command, argv) = if let Some(script) = &state.config.preprocess_exec_script {
+        let output = match Command::new(script.as_os_str())
+            .arg(if entry.term { "term" } else { "no-term" })
+            .arg(command)
+            .args(argv)
             .output()
-            .unwrap_or_else(|why| {
+        {
+            Ok(output) => output,
+            Err(why) => {
                 eprintln!("[applications] Error running preprocess script: {}", why);
-                std::process::exit(1);
-            });
+                return HandleResult::Close
+            }
+        };
 
-        String::from_utf8_lossy(&output.stdout).trim().to_string()
+        let args = match shell_words::split(String::from_utf8_lossy(&output.stdout).trim()) {
+            Ok(args) => args,
+            Err(error) => {
+                eprintln!("[applications] Unable to parse the output of the preprocessing script: {}", error);
+                return HandleResult::Close
+            }
+        };
+
+        let mut it = args.into_iter();
+        let Some(command) = it.next() else {
+                eprintln!("[applications] Empty output of preprocessing script.");
+                return HandleResult::Close
+        };
+        let argv = it.collect();
+        (command, argv)
     } else {
-        entry.exec.clone()
+        (command, argv)
     };
 
     if entry.term {
