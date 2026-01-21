@@ -8,6 +8,7 @@ members = [
   "plugins/rink",
   "plugins/shell",
   "plugins/kidex",
+  "plugins/powermenu",
   "plugins/translate",
   "plugins/randr",
   "plugins/stdin",
