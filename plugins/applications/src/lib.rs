@@ -143,7 +143,7 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
 
         Command::new("sh")
             .arg("-c")
-            .arg(&entry.exec)
+            .arg(&exec)
             .current_dir(match &entry.path {
                 Some(path) if path.exists() => path,
                 _ => current_dir,
