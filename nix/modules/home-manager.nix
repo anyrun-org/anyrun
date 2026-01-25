@@ -158,7 +158,7 @@ in
         };
 
         height = mkNumericOption {
-          default.absolute = 0;
+          default.absolute = 1;
           description = ''
             The minimum height of the runner, the runner will expand to fit all the entries.
 
