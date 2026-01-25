@@ -124,7 +124,7 @@ in
         provider = mkOption {
           type = nullOr package;
           default = defaultProvider;
-          defaultText = literalExpression "anyrun.packages.${pkgs.stdenv.hostPlatform.sytstem}.default.passthru.anyrun-provider";
+          defaultText = literalExpression "anyrun.packages.${pkgs.stdenv.hostPlatform.system}.default.passthru.anyrun-provider";
           description = ''
             The program that is used for loading the plugins, and for the communcation with them.
           '';
