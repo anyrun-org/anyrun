@@ -17,8 +17,14 @@ pub struct DesktopEntry {
     pub is_action: bool,
 }
 
-const FIELD_CODE_LIST: &[&str] = &[
-    "%f", "%F", "%u", "%U", "%d", "%D", "%n", "%N", "%i", "%c", "%k", "%v", "%m",
+const SUPPORTED_FIELD_CODES: &[char] = &[ 'i', 'c' ];
+
+const VALID_FIELD_CODES: &[char] = &[
+    'f', 'F', 'u', 'U', 'd', 'D', 'n', 'N', 'i', 'c', 'k', 'v', 'm',
+];
+
+const DEPRECATED_FIELD_CODES: &[char] = &[
+  'd', 'D', 'n', 'N'
 ];
 
 // See https://specifications.freedesktop.org/desktop-entry-spec/latest/exec-variables.html
@@ -187,29 +193,100 @@ fn unescape_exec(s: &str) -> Result<Vec<String>, ExecKeyError> {
     Ok(out)
 }
 
+#[derive(Debug, Clone)]
+enum FieldCodeState {
+    Reading,
+    Percent
+}
+
+fn get_fieldcode(code: char, entry: &DesktopEntry, arg: &str) -> Result<String, ExecKeyError> {
+    let result = match code {
+        'c' => entry.localized_name(),
+        'i' => {
+            if arg.len() > 2 {
+                return Err(
+                    ExecKeyError(
+                        format!(
+                            "Encountered field code %i in argument {} with other other contents, %i must stand alone.", arg)
+                    ))
+            }
+            format!("--icon {}", entry.icon.clone())
+        },
+        c => panic!("Function called with unimplemented field code {}!", c)
+    };
+    Ok(result)
+}
+
+fn expand_exec_fieldcodes(entry: &DesktopEntry, arg: String) -> Result<String, ExecKeyError> {
+    use FieldCodeState::*;
+
+    let mut out = String::new();
+    let mut state = Reading;
+
+    for c in arg.chars() {
+        match state {
+            Reading => {
+                if c == '%' {
+                    state = Percent;
+                } else {
+                    out.push(c);
+                }
+            }
+            Percent => {
+                match c {
+                    '%' => out.push('%'),
+                    c if SUPPORTED_FIELD_CODES.contains(&c) => {
+                       let field_code_content = get_fieldcode(c, &entry, &arg)?;
+                       out.push_str(&field_code_content);
+                    },
+                    c if VALID_FIELD_CODES.contains(&c) => {
+                        eprintln!(
+                            "Argument {} contains field code %{} which is valid but not implemented and will be stripped.",
+                            &arg,
+                            c
+                        )
+                    },
+                    c if DEPRECATED_FIELD_CODES.contains(&c) => {
+                        eprintln!(
+                            "Argument {} contains deprecated field code %{} which will be stripped.",
+                            &arg,
+                            c
+                        )
+                    },
+                    _ => {
+                        return Err(ExecKeyError(format!("Argument {} contains unknown field code %{}.", &arg, c)))
+                    }
+                }
+                state = Reading;
+            }
+        }
+    }
+    if matches!(state, Percent) {
+        return Err(ExecKeyError(format!("Argument {} ends in % which is interpreted as unfinished field code.", &arg)))
+    };
+    return Ok(out)
+}
+
 /*
 1. Substitute general desktop string escapes
 2. Unescape EXEC_ESCAPE_CHARS in exec key quoted strings
-3. Strip field codes and throw away empty args
+3. Process field codes
+4. Throw away empty args
 */
-pub(crate) fn lower_exec(s: &str) -> Result<(String, Vec<String>), ExecKeyError> {
-    let subst = substitute_escapes(s)?;
+pub(crate) fn lower_exec(entry: &DesktopEntry) -> Result<(String, Vec<String>), ExecKeyError> {
+    let subst = substitute_escapes(&entry.exec)?;
     let argvec = unescape_exec(&subst)?;
     if let Some((command, argv)) = argvec.split_first() {
-        let argv_without_fieldcodes = argv
-            .to_vec()
+        if command.contains('=') {
+            return Err(ExecKeyError("Executable program must not contain '=' character.".to_string()))
+        };
+
+        let argv_fieldcodes = argv
             .into_iter()
-            .map(|mut c| {
-                for field_code in FIELD_CODE_LIST.iter() {
-                    c = c.replace(field_code, "");
-                }
-                c
-            })
-            .filter(|c| {
-                !c.is_empty()
-            })
-            .collect();
-        return Ok((command.clone(), argv_without_fieldcodes));
+            .map(|arg| expand_exec_fieldcodes(&entry, arg.clone()))
+            .collect::<Result<Vec<_>,_>>()?;
+        let argv_stripped = argv_fieldcodes.into_iter().filter(|arg| arg.is_empty()).collect();
+        return Ok((command.clone(), argv_stripped));
     } else {
         return Err(ExecKeyError("Empty exec key!".to_string()));
     }
@@ -341,12 +418,7 @@ impl DesktopEntry {
                         ret.push(DesktopEntry {
                             exec: match map.get("Exec") {
                                 Some(exec) => {
-                                    let mut exec = exec.to_string();
-
-                                    for field_code in FIELD_CODE_LIST {
-                                        exec = exec.replace(field_code, "");
-                                    }
-                                    exec
+                                    exec.to_string()
                                 }
                                 None => continue,
                             },

@@ -55,7 +55,7 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
         })
         .unwrap();
 
-    let (command, argv) = match lower_exec(&entry.exec) {
+    let (command, argv) = match lower_exec(&entry) {
         Ok((command, argv)) => (command, argv),
         Err(error) => {
             eprintln!("[applications] Unable to parse the exec key `{}`: {}", &entry.exec, error.0);
