@@ -1,9 +1,10 @@
 use abi_stable::std_types::{ROption, RString, RVec};
 use anyrun_plugin::{anyrun_interface::HandleResult, *};
 use fuzzy_matcher::FuzzyMatcher;
-use scrubber::DesktopEntry;
+use scrubber::{DesktopEntry, lower_exec};
 use serde::Deserialize;
 use std::{env, fs, path::PathBuf, process::Command};
+use shell_words;
 
 #[derive(Deserialize)]
 pub struct Config {
@@ -54,36 +55,54 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
         })
         .unwrap();
 
-    let exec = if let Some(script) = &state.config.preprocess_exec_script {
-        let output = Command::new("sh")
-            .arg("-c")
-            .arg(format!(
-                "{} {} {}",
-                script.display(),
-                if entry.term { "term" } else { "no-term" },
-                &entry.exec
-            ))
-            .output()
-            .unwrap_or_else(|why| {
-                eprintln!("[applications] Error running preprocess script: {}", why);
-                std::process::exit(1);
-            });
+    let (command, argv) = match lower_exec(&entry) {
+        Ok((command, argv)) => (command, argv),
+        Err(error) => {
+            eprintln!("[applications] Unable to parse the exec key `{}`: {}", &entry.exec, error.0);
+            return HandleResult::Close
+        }
+    };
 
-        String::from_utf8_lossy(&output.stdout).trim().to_string()
+    let (command, argv) = if let Some(script) = &state.config.preprocess_exec_script {
+        let output = match Command::new(script.as_os_str())
+            .arg(if entry.term { "term" } else { "no-term" })
+            .arg(command)
+            .args(argv)
+            .output()
+        {
+            Ok(output) => output,
+            Err(why) => {
+                eprintln!("[applications] Error running preprocess script: {}", why);
+                return HandleResult::Close
+            }
+        };
+
+        let args = match shell_words::split(String::from_utf8_lossy(&output.stdout).trim()) {
+            Ok(args) => args,
+            Err(error) => {
+                eprintln!("[applications] Unable to parse the output of the preprocessing script: {}", error);
+                return HandleResult::Close
+            }
+        };
+
+        let mut it = args.into_iter();
+        let Some(command) = it.next() else {
+                eprintln!("[applications] Empty output of preprocessing script.");
+                return HandleResult::Close
+        };
+        let argv = it.collect();
+        (command, argv)
     } else {
-        entry.exec.clone()
+        (command, argv)
     };
 
     if entry.term {
         match &state.config.terminal {
             Some(term) => {
-                if let Err(why) = Command::new("sh")
-                    .arg("-c")
-                    .arg(format!(
-                        "{} {}",
-                        term.command,
-                        term.args.replace("{}", &exec)
-                    ))
+                if let Err(why) = Command::new(&term.command)
+                    .arg(&term.args)
+                    .arg(command)
+                    .args(argv)
                     .spawn()
                 {
                     eprintln!("[applications] Error running desktop entry: {}", why);
@@ -93,23 +112,23 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
                 let sensible_terminals = &[
                     Terminal {
                         command: "alacritty".to_string(),
-                        args: "-e {}".to_string(),
+                        args: "-e".to_string(),
                     },
                     Terminal {
                         command: "foot".to_string(),
-                        args: "-e \"{}\"".to_string(),
+                        args: "-e".to_string(),
                     },
                     Terminal {
                         command: "kitty".to_string(),
-                        args: "-e \"{}\"".to_string(),
+                        args: "-e".to_string(),
                     },
                     Terminal {
                         command: "wezterm".to_string(),
-                        args: "-e \"{}\"".to_string(),
+                        args: "-e".to_string(),
                     },
                     Terminal {
                         command: "wterm".to_string(),
-                        args: "-e \"{}\"".to_string(),
+                        args: "-e".to_string(),
                     },
                     Terminal {
                         command: "ghostty".to_string(),
@@ -122,13 +141,10 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
                         .output()
                         .is_ok_and(|output| output.status.success())
                     {
-                        if let Err(why) = Command::new("sh")
-                            .arg("-c")
-                            .arg(format!(
-                                "{} {}",
-                                term.command,
-                                term.args.replace("{}", &exec)
-                            ))
+                        if let Err(why) = Command::new(&term.command)
+                            .arg(&term.args)
+                            .arg(command)
+                            .args(argv)
                             .spawn()
                         {
                             eprintln!("Error running desktop entry: {}", why);
@@ -141,9 +157,8 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
     } else if let Err(why) = {
         let current_dir = &env::current_dir().unwrap();
 
-        Command::new("sh")
-            .arg("-c")
-            .arg(&exec)
+        Command::new(command)
+            .args(argv)
             .current_dir(match &entry.path {
                 Some(path) if path.exists() => path,
                 _ => current_dir,
