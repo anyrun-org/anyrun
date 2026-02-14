@@ -15,5 +15,6 @@ members = [
   "plugins/websearch",
   "plugins/nix-run",
   "plugins/niri-focus",
+  "plugins/clipboard",
 ]
 resolver = "2"
