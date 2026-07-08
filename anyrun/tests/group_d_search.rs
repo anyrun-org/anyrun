@@ -19,17 +19,14 @@ async fn it_27_search_immediate_on_startup() {
 /// IT-28: Debounce behavior -- only last query sent to provider.
 #[tokio::test]
 #[ignore = "Requires GTK text input simulation"]
-async fn it_28_search_debounce() {
-}
+async fn it_28_search_debounce() {}
 
 /// IT-29: Query cancellation -- new query replaces pending one.
 #[tokio::test]
 #[ignore = "Requires slow mock plugin + input simulation"]
-async fn it_29_search_query_cancellation() {
-}
+async fn it_29_search_query_cancellation() {}
 
 /// IT-30: Large query (10000 chars) handling.
 #[tokio::test]
 #[ignore = "Requires GTK text input or IPC text injection"]
-async fn it_30_search_large_query() {
-}
+async fn it_30_search_large_query() {}

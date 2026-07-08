@@ -40,7 +40,10 @@ async fn it_11_daemon_duplicate_prevention() {
     impl Drop for ProcGuard {
         fn drop(&mut self) {
             for c in [&mut self.0, &mut self.1] {
-                if let Some(ref mut c) = c { let _ = c.kill(); let _ = c.wait(); }
+                if let Some(ref mut c) = c {
+                    let _ = c.kill();
+                    let _ = c.wait();
+                }
             }
         }
     }
@@ -146,5 +149,4 @@ async fn it_16_daemon_stale_socket_cleanup() {
 /// IT-17: Provider crash recovery — daemon survives provider SIGKILL.
 #[tokio::test]
 #[ignore = "Requires provider PID tracking"]
-async fn it_17_daemon_provider_crash_recovery() {
-}
+async fn it_17_daemon_provider_crash_recovery() {}

@@ -3,10 +3,10 @@ mod helpers;
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
+use helpers::anyrun_bin;
 use helpers::config::ConfigBuilder;
 use helpers::mock::MockPluginType;
 use helpers::temp::TestDir;
-use helpers::anyrun_bin;
 
 struct ChildGuard(Option<Child>);
 
@@ -159,8 +159,7 @@ async fn it_07_standalone_missing_plugin_recovery() {
 /// IT-08: Match selection output integrity — requires GTK event simulation.
 #[tokio::test]
 #[ignore = "Requires GTK event simulation"]
-async fn it_08_standalone_match_output_integrity() {
-}
+async fn it_08_standalone_match_output_integrity() {}
 
 /// IT-09: Plugin panic in init doesn't crash the app.
 #[tokio::test]

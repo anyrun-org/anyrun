@@ -5,8 +5,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyrun_provider_ipc::{PLUGIN_PATHS, Request, Response};
-use engine::{FrecencyData, State, load_plugins, rebuild_plugin_map, spawn_file_watcher, worker};
-use tokio::net::UnixStream;
+use engine::{FrecencyData, State, load_plugins, rebuild_plugin_map, spawn_file_watcher, worker_inner};
 use tokio::sync::{broadcast, mpsc};
 
 pub struct ProviderConfig {
@@ -41,7 +40,7 @@ pub fn spawn_provider_thread(
 
 async fn run_engine(
     config: ProviderConfig,
-    mut request_rx: mpsc::Receiver<Request>,
+    request_rx: mpsc::Receiver<Request>,
     response_tx: mpsc::UnboundedSender<Response>,
 ) {
     use std::env;
@@ -89,36 +88,7 @@ async fn run_engine(
     let (reload_tx, reload_rx) = broadcast::channel::<()>(4);
     spawn_file_watcher(reload_tx.clone(), &plugin_dirs, &config_dir);
 
-    // Bridge via in-process socket pair
-    let (engine_stream, client_stream) =
-        UnixStream::pair().expect("[provider] failed to create socket pair");
-
-    // Spawn relay to forward requests to client_stream and read responses back to response_tx
-    tokio::spawn(async move {
-        let mut socket = anyrun_provider_ipc::Socket::new(client_stream);
-        loop {
-            tokio::select! {
-                req = request_rx.recv() => {
-                    let Some(req) = req else { break; };
-                    let is_quit = matches!(req, Request::Quit);
-                    if socket.send(&req).await.is_err() { break; }
-                    if is_quit { break; }
-                }
-                res = socket.recv::<Response>() => {
-                    match res {
-                        Ok(resp) => {
-                            if response_tx.send(resp).is_err() {
-                                break;
-                            }
-                        }
-                        Err(_) => break,
-                    }
-                }
-            }
-        }
-    });
-
-    if let Err(e) = worker(engine_stream, &mut state, reload_rx).await {
+    if let Err(e) = worker_inner(request_rx, response_tx, &mut state, reload_rx).await {
         eprintln!("[provider] engine worker error: {e}");
     }
 }

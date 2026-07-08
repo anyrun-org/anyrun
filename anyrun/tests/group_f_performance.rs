@@ -19,14 +19,12 @@ async fn it_35_perf_client_startup_latency() {
 /// IT-36: IPC round-trip latency (P95 < 20ms).
 #[tokio::test]
 #[ignore = "Performance benchmark -- run with --release -- --ignored"]
-async fn it_36_perf_ipc_roundtrip() {
-}
+async fn it_36_perf_ipc_roundtrip() {}
 
 /// IT-37: CSS reload throttle.
 #[tokio::test]
 #[ignore = "Performance benchmark -- run with --release -- --ignored"]
-async fn it_37_perf_css_reload_throttle() {
-}
+async fn it_37_perf_css_reload_throttle() {}
 
 /// IT-38: Burst request stress test (100 requests).
 #[tokio::test]

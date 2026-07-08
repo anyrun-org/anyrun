@@ -21,12 +21,28 @@ impl TestDir {
         std::fs::create_dir_all(&runtime_dir).unwrap();
         std::fs::create_dir_all(&logs_dir).unwrap();
 
-        TestDir { inner, config_dir, plugins_dir, runtime_dir, logs_dir }
+        TestDir {
+            inner,
+            config_dir,
+            plugins_dir,
+            runtime_dir,
+            logs_dir,
+        }
     }
 
-    pub fn config_dir(&self) -> &Path { &self.config_dir }
-    pub fn plugins_dir(&self) -> &Path { &self.plugins_dir }
-    pub fn runtime_dir(&self) -> &Path { &self.runtime_dir }
-    pub fn logs_dir(&self) -> &Path { &self.logs_dir }
-    pub fn path(&self) -> &Path { self.inner.path() }
+    pub fn config_dir(&self) -> &Path {
+        &self.config_dir
+    }
+    pub fn plugins_dir(&self) -> &Path {
+        &self.plugins_dir
+    }
+    pub fn runtime_dir(&self) -> &Path {
+        &self.runtime_dir
+    }
+    pub fn logs_dir(&self) -> &Path {
+        &self.logs_dir
+    }
+    pub fn path(&self) -> &Path {
+        self.inner.path()
+    }
 }

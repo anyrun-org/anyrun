@@ -7,8 +7,7 @@ use helpers::temp::TestDir;
 /// IT-31: D-Bus restart -- daemon handles session bus restart gracefully.
 #[tokio::test]
 #[ignore = "Complex D-Bus lifecycle management"]
-async fn it_31_reliability_dbus_restart() {
-}
+async fn it_31_reliability_dbus_restart() {}
 
 /// IT-32: Provider timeout -- hang-query plugin triggers timeout.
 #[tokio::test]
@@ -35,5 +34,4 @@ async fn it_33_reliability_shutdown_during_query() {
 /// IT-34: Repeated open/close stability (500 cycles).
 #[tokio::test]
 #[ignore = "Requires D-Bus IPC loop"]
-async fn it_34_reliability_repeated_open_close() {
-}
+async fn it_34_reliability_repeated_open_close() {}

@@ -16,7 +16,11 @@ impl MockPluginType {
     }
 
     pub fn so_path(&self) -> PathBuf {
-        let profile = if cfg!(debug_assertions) { "debug" } else { "release" };
+        let profile = if cfg!(debug_assertions) {
+            "debug"
+        } else {
+            "release"
+        };
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .parent()
             .unwrap()

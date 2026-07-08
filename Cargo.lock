@@ -327,6 +327,7 @@ version = "25.12.0"
 dependencies = [
  "anyrun-interface",
  "anyrun-provider-ipc",
+ "bincode",
  "chrono",
  "clap",
  "futures",

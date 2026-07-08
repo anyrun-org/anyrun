@@ -61,7 +61,9 @@ impl ConfigBuilder {
         let plugin_list = if self.plugins.is_empty() {
             "[]".to_string()
         } else {
-            let items: Vec<String> = self.plugins.iter()
+            let items: Vec<String> = self
+                .plugins
+                .iter()
                 .map(|p| format!("    \"{}\"", p))
                 .collect();
             format!("[\n{}\n]", items.join(",\n"))

@@ -52,17 +52,19 @@ pub fn run_client(args: Args) {
     if !static_load {
         if let Ok(conn) = gio::bus_get_sync(gio::BusType::Session, None::<&gio::Cancellable>) {
             let params = ("org.anyrun.anyrun",).to_variant();
-            let has_owner = conn.call_sync(
-                Some("org.freedesktop.DBus"),
-                "/org/freedesktop/DBus",
-                "org.freedesktop.DBus",
-                "GetNameOwner",
-                Some(&params),
-                None,
-                gio::DBusCallFlags::NO_AUTO_START,
-                1000,
-                None::<&gio::Cancellable>,
-            ).is_ok();
+            let has_owner = conn
+                .call_sync(
+                    Some("org.freedesktop.DBus"),
+                    "/org/freedesktop/DBus",
+                    "org.freedesktop.DBus",
+                    "GetNameOwner",
+                    Some(&params),
+                    None,
+                    gio::DBusCallFlags::NO_AUTO_START,
+                    1000,
+                    None::<&gio::Cancellable>,
+                )
+                .is_ok();
 
             if has_owner {
                 let payload = read_init_data(args.clone());
@@ -71,7 +73,10 @@ pub fn run_client(args: Args) {
                 let msg = glib::Variant::from_bytes::<(Vec<u8>,)>(&bytes);
 
                 let dbus_connect_duration = time.elapsed();
-                println!("[D-Bus connection established at {:?}]", dbus_connect_duration);
+                println!(
+                    "[D-Bus connection established at {:?}]",
+                    dbus_connect_duration
+                );
 
                 match conn.call_sync(
                     Some("org.anyrun.anyrun"),

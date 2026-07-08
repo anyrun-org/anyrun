@@ -17,10 +17,7 @@ impl DaemonProcess {
         Self::spawn_with_dbus_args(test_dir, dbus_child, addr, Vec::new()).await
     }
 
-    pub async fn spawn_with_env(
-        test_dir: TestDir,
-        extra_env: Vec<(&str, &str)>,
-    ) -> Self {
+    pub async fn spawn_with_env(test_dir: TestDir, extra_env: Vec<(&str, &str)>) -> Self {
         let (dbus_child, addr) = dbus::start_private_dbus();
         Self::spawn_with_dbus_args(test_dir, dbus_child, addr, extra_env).await
     }
@@ -46,8 +43,7 @@ impl DaemonProcess {
             cmd.env(k, v);
         }
 
-        let child = cmd.spawn()
-            .expect("Failed to spawn anyrun daemon");
+        let child = cmd.spawn().expect("Failed to spawn anyrun daemon");
 
         dbus::wait_for_bus_name(&dbus_address, BUS_NAME).await;
 

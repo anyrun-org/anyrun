@@ -8,6 +8,7 @@ use clap::{Parser, Subcommand};
 use notify::RecommendedWatcher;
 use notify_debouncer_mini::{Debouncer, new_debouncer};
 use serde::{Deserialize, Serialize};
+use bincode;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
@@ -477,15 +478,14 @@ fn plugin_health_state(result: &PluginQueryResult) -> Option<PluginHealthState> 
     })
 }
 
-pub(crate) async fn worker(
-    stream: UnixStream,
+pub(crate) async fn worker_inner(
+    mut request_rx: mpsc::Receiver<Request>,
+    response_tx: mpsc::UnboundedSender<Response>,
     state: &mut State,
     mut reload_rx: broadcast::Receiver<()>,
 ) -> io::Result<WorkerResult> {
-    let mut socket = Socket::new(stream);
-
     let plugin_infos: Vec<PluginInfo> = state.plugins.iter().map(|p| p.info.clone()).collect();
-    socket.send(&Response::Ready { info: plugin_infos }).await?;
+    let _ = response_tx.send(Response::Ready { info: plugin_infos });
 
     let (result_tx, mut result_rx) = mpsc::unbounded_channel::<PluginQueryResult>();
     let mut search_workers = start_search_workers(state, result_tx);
@@ -504,20 +504,20 @@ pub(crate) async fn worker(
                 if let Some(p_state) = state.plugins.get(result.plugin_idx) {
                     let plugin_name = p_state.info.name.as_str();
                     if let Some(health_state) = plugin_health_state(&result) {
-                        socket.send(&Response::Health {
+                        let _ = response_tx.send(Response::Health {
                             statuses: vec![PluginHealth {
                                 plugin: plugin_name.to_string(),
                                 state: health_state,
                                 elapsed_ms: result.elapsed_ms,
                             }],
-                        }).await?;
+                        });
                     }
 
                     if result.timed_out {
-                        socket.send(&Response::Matches {
+                        let _ = response_tx.send(Response::Matches {
                             plugin: p_state.info.clone(),
                             matches: Vec::new().into(),
-                        }).await?;
+                        });
                         continue;
                     }
 
@@ -526,19 +526,15 @@ pub(crate) async fn worker(
                         rank_matches(plugin_name, &result.query_text, result.matches, &frecency)
                     };
 
-                    socket.send(&Response::Matches {
+                    let _ = response_tx.send(Response::Matches {
                         plugin: p_state.info.clone(),
                         matches,
-                    }).await?;
+                    });
                 }
             }
 
-            req_result = socket.recv() => {
-                let request = match req_result {
-                    Ok(req) => req,
-                    Err(e) if is_ipc_disconnect(&e) => break,
-                    Err(e) => return Err(e),
-                };
+            req_opt = request_rx.recv() => {
+                let Some(request) = req_opt else { break; };
 
                 match request {
                 Request::Query { text, plugins, timeout_ms, slow_ms, .. } => {
@@ -587,12 +583,12 @@ pub(crate) async fn worker(
                             })
                             .await
                             .unwrap_or(HandleResult::Close);
-                            socket.send(&Response::Handled { plugin, result }).await?;
+                            let _ = response_tx.send(Response::Handled { plugin, result });
                         }
                     }
                     Request::Recent { limit } => {
                         let matches = state.frecency.lock().await.recent_matches(limit);
-                        socket.send(&Response::Recent { matches }).await?;
+                        let _ = response_tx.send(Response::Recent { matches });
                     }
                     Request::Reset => {
                         stop_search_workers(&mut search_workers);
@@ -629,7 +625,7 @@ pub(crate) async fn worker(
 
                         let plugin_infos: Vec<PluginInfo> =
                             state.plugins.iter().map(|p| p.info.clone()).collect();
-                        socket.send(&Response::Ready { info: plugin_infos }).await?;
+                        let _ = response_tx.send(Response::Ready { info: plugin_infos });
                     }
                     Request::ReloadPlugin { name } => {
                         if let Some(&idx) = state.plugin_map.get(&name) {
@@ -652,7 +648,7 @@ pub(crate) async fn worker(
                             } else {
                                 let plugin_infos: Vec<PluginInfo> =
                                     state.plugins.iter().map(|p| p.info.clone()).collect();
-                                socket.send(&Response::Ready { info: plugin_infos }).await?;
+                                let _ = response_tx.send(Response::Ready { info: plugin_infos });
                             }
                         }
                     }
@@ -694,11 +690,61 @@ pub(crate) async fn worker(
                 let (new_result_tx, new_result_rx) = mpsc::unbounded_channel::<PluginQueryResult>();
                 search_workers = start_search_workers(state, new_result_tx);
                 result_rx = new_result_rx;
-                socket.send(&Response::Ready { info: plugin_infos }).await?;
+                let _ = response_tx.send(Response::Ready { info: plugin_infos });
             }
         }
     }
     Ok(WorkerResult::Continue)
+}
+
+pub(crate) async fn worker(
+    stream: UnixStream,
+    state: &mut State,
+    reload_rx: broadcast::Receiver<()>,
+) -> io::Result<WorkerResult> {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
+    use std::sync::Arc;
+
+    let (read_half, write_half) = stream.into_split();
+    let mut reader = BufReader::new(read_half);
+    let write_arc = Arc::new(tokio::sync::Mutex::new(write_half));
+
+    let (req_tx, req_rx) = mpsc::channel::<Request>(64);
+    let (resp_tx, mut resp_rx) = mpsc::unbounded_channel::<Response>();
+
+    // Task A: socket read -> req_tx
+    tokio::spawn(async move {
+        let mut recv_buf = Vec::<u8>::with_capacity(4096);
+        loop {
+            let mut len_buf = [0u8; 4];
+            if reader.read_exact(&mut len_buf).await.is_err() { break; }
+            let len = u32::from_le_bytes(len_buf) as usize;
+            if len > 64 * 1024 * 1024 { break; }
+            recv_buf.resize(len, 0);
+            if reader.read_exact(&mut recv_buf[..len]).await.is_err() { break; }
+            let Ok(req) = bincode::deserialize::<Request>(&recv_buf[..len]) else { break; };
+            let is_quit = matches!(req, Request::Quit);
+            if req_tx.send(req).await.is_err() { break; }
+            if is_quit { break; }
+        }
+    });
+
+    // Task B: resp_rx -> socket write
+    let write_arc2 = Arc::clone(&write_arc);
+    tokio::spawn(async move {
+        let mut send_buf = Vec::<u8>::with_capacity(4096);
+        while let Some(resp) = resp_rx.recv().await {
+            send_buf.clear();
+            if bincode::serialize_into(&mut send_buf, &resp).is_err() { break; }
+            let len = send_buf.len() as u32;
+            let mut w = write_arc2.lock().await;
+            if w.write_all(&len.to_le_bytes()).await.is_err() { break; }
+            if w.write_all(&send_buf).await.is_err() { break; }
+            if w.flush().await.is_err() { break; }
+        }
+    });
+
+    worker_inner(req_rx, resp_tx, state, reload_rx).await
 }
 
 pub(crate) fn find_plugin(

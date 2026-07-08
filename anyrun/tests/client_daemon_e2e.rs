@@ -123,33 +123,41 @@ fn start_private_dbus() -> (Child, String) {
 fn wait_for_dbus_registration(dbus_address: &str, timeout: Duration, daemon: &mut DaemonProcess) {
     let dbus_conn = gio::DBusConnection::for_address_sync(
         dbus_address,
-        gio::DBusConnectionFlags::AUTHENTICATION_CLIENT | gio::DBusConnectionFlags::MESSAGE_BUS_CONNECTION,
+        gio::DBusConnectionFlags::AUTHENTICATION_CLIENT
+            | gio::DBusConnectionFlags::MESSAGE_BUS_CONNECTION,
         None,
         None::<&gio::Cancellable>,
-    ).expect("failed to connect to private dbus-daemon");
+    )
+    .expect("failed to connect to private dbus-daemon");
 
     let mut registered = false;
     let start_time = std::time::Instant::now();
     while start_time.elapsed() < timeout {
         let params = ("org.anyrun.anyrun",).to_variant();
-        if dbus_conn.call_sync(
-            Some("org.freedesktop.DBus"),
-            "/org/freedesktop/DBus",
-            "org.freedesktop.DBus",
-            "GetNameOwner",
-            Some(&params),
-            None,
-            gio::DBusCallFlags::NO_AUTO_START,
-            100,
-            None::<&gio::Cancellable>,
-        ).is_ok() {
+        if dbus_conn
+            .call_sync(
+                Some("org.freedesktop.DBus"),
+                "/org/freedesktop/DBus",
+                "org.freedesktop.DBus",
+                "GetNameOwner",
+                Some(&params),
+                None,
+                gio::DBusCallFlags::NO_AUTO_START,
+                100,
+                None::<&gio::Cancellable>,
+            )
+            .is_ok()
+        {
             registered = true;
             break;
         }
 
         if let Ok(Some(status)) = daemon.child.try_wait() {
             daemon.print_logs();
-            panic!("Daemon exited early with status: {} while waiting to register on D-Bus", status);
+            panic!(
+                "Daemon exited early with status: {} while waiting to register on D-Bus",
+                status
+            );
         }
         std::thread::sleep(Duration::from_millis(100));
     }
@@ -165,7 +173,10 @@ async fn test_client_daemon_e2e_communication() {
 
     // 1. Spawn a private dbus-daemon
     let (mut dbus_child, dbus_address) = start_private_dbus();
-    assert!(!dbus_address.is_empty(), "Failed to get D-Bus session address");
+    assert!(
+        !dbus_address.is_empty(),
+        "Failed to get D-Bus session address"
+    );
 
     // 2. Set up config directories
     let config_dir = temp_dir();
@@ -213,7 +224,9 @@ async fn test_client_daemon_e2e_communication() {
         .spawn()
         .expect("Failed to run anyrun quit");
 
-    let quit_status = quit_child.wait_with_output().expect("Failed to wait for quit command");
+    let quit_status = quit_child
+        .wait_with_output()
+        .expect("Failed to wait for quit command");
 
     if !quit_status.status.success() {
         daemon.print_logs();
@@ -225,10 +238,11 @@ async fn test_client_daemon_e2e_communication() {
     }
 
     // 6. Verify daemon exits cleanly
-    let daemon_status = daemon.child
+    let daemon_status = daemon
+        .child
         .wait_with_timeout(Duration::from_secs(5))
         .expect("Daemon failed to exit in time");
-    
+
     if daemon_status.is_none() {
         daemon.print_logs();
         panic!("Daemon timed out after quit signal");
@@ -293,7 +307,10 @@ async fn test_daemon_collision() {
         }
         panic!("Daemon 2 should exit quickly due to name conflict");
     }
-    assert!(!status2.unwrap().success(), "Daemon 2 should return exit error code");
+    assert!(
+        !status2.unwrap().success(),
+        "Daemon 2 should return exit error code"
+    );
 
     // Clean up daemon 1
     let _ = Command::new(&bin)
@@ -323,7 +340,10 @@ async fn test_client_standalone_fallback() {
     let mut client = Command::new(&bin)
         .arg("--config-dir")
         .arg(&config_dir)
-        .env("DBUS_SESSION_BUS_ADDRESS", "unix:path=/tmp/nonexistent-dbus.sock")
+        .env(
+            "DBUS_SESSION_BUS_ADDRESS",
+            "unix:path=/tmp/nonexistent-dbus.sock",
+        )
         .env("XDG_RUNTIME_DIR", &config_dir)
         .env("GSK_RENDERER", "cairo")
         .env("NO_AT_BRIDGE", "1")
@@ -335,7 +355,10 @@ async fn test_client_standalone_fallback() {
 
     // Client should start standalone.
     std::thread::sleep(Duration::from_millis(1500));
-    assert!(client.try_wait().unwrap().is_none(), "Client should still be running standalone");
+    assert!(
+        client.try_wait().unwrap().is_none(),
+        "Client should still be running standalone"
+    );
 
     // Terminate the client
     let _ = client.kill();
@@ -390,7 +413,10 @@ async fn test_client_startup_speed_benchmark() {
     // Assert that the client connected to D-Bus and log contains connection time
     if !stdout_str.contains("D-Bus connection established at") {
         daemon.print_logs();
-        panic!("Client should establish D-Bus connection. Stdout was: {}", stdout_str);
+        panic!(
+            "Client should establish D-Bus connection. Stdout was: {}",
+            stdout_str
+        );
     }
 
     // Assert it contains valid latency unit
@@ -398,13 +424,18 @@ async fn test_client_startup_speed_benchmark() {
         if line.contains("D-Bus connection established at") {
             if let Some(pos) = line.find("established at ") {
                 let duration_str = &line[pos + 15..line.len() - 1];
-                return duration_str.ends_with("ms") || duration_str.ends_with("µs") || duration_str.ends_with("ns");
+                return duration_str.ends_with("ms")
+                    || duration_str.ends_with("µs")
+                    || duration_str.ends_with("ns");
             }
         }
         false
     });
 
-    assert!(has_valid_time, "D-Bus connection established log should contain valid latency unit");
+    assert!(
+        has_valid_time,
+        "D-Bus connection established log should contain valid latency unit"
+    );
 
     // Terminate daemon
     let _ = Command::new(&bin)
@@ -423,11 +454,17 @@ async fn test_client_startup_speed_benchmark() {
 }
 
 trait WaitTimeout {
-    fn wait_with_timeout(&mut self, timeout: Duration) -> std::io::Result<Option<std::process::ExitStatus>>;
+    fn wait_with_timeout(
+        &mut self,
+        timeout: Duration,
+    ) -> std::io::Result<Option<std::process::ExitStatus>>;
 }
 
 impl WaitTimeout for Child {
-    fn wait_with_timeout(&mut self, timeout: Duration) -> std::io::Result<Option<std::process::ExitStatus>> {
+    fn wait_with_timeout(
+        &mut self,
+        timeout: Duration,
+    ) -> std::io::Result<Option<std::process::ExitStatus>> {
         let start = std::time::Instant::now();
         loop {
             if let Some(status) = self.try_wait()? {
