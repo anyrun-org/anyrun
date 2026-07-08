@@ -1,14 +1,12 @@
 use anyrun_interface::{HandleResult, Match, PluginInfo, PluginRef, abi_stable};
 use anyrun_provider_ipc::{
-    CONFIG_DIRS, PLUGIN_PATHS, PluginHealth, PluginHealthState, RecentMatch, Request, Response,
-    Socket, is_ipc_disconnect,
+    PluginHealth, PluginHealthState, RecentMatch, Request, Response,
 };
-use bincode;
 use chrono::{DateTime, Utc};
-use clap::{Parser, Subcommand};
 use notify::RecommendedWatcher;
 use notify_debouncer_mini::{Debouncer, new_debouncer};
 use serde::{Deserialize, Serialize};
+use bincode;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
@@ -18,7 +16,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use std::time::Instant;
-use tokio::net::{UnixListener, UnixStream};
+use tokio::net::UnixStream;
 use tokio::sync::{Mutex, broadcast, mpsc, watch};
 use tokio::task::JoinHandle;
 
@@ -697,6 +695,7 @@ pub(crate) async fn worker_inner(
     Ok(WorkerResult::Continue)
 }
 
+#[allow(dead_code)]
 pub(crate) async fn worker(
     stream: UnixStream,
     state: &mut State,
