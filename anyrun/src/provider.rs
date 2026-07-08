@@ -7,6 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use anyrun_provider::{spawn_provider_thread, ProviderConfig};
 use anyrun_provider_ipc as ipc;
 use relm4::Sender;
 use tokio::{net::UnixListener, sync::mpsc::Receiver};
@@ -211,6 +212,65 @@ async fn relay_loop(
             }
         }
     }
+    Ok(())
+}
+
+pub fn worker_inproc(
+    config: Arc<Config>,
+    config_dir: Option<String>,
+    mut rx: Receiver<anyrun_provider_ipc::Request>,
+    sender: Sender<anyrun_provider_ipc::Response>,
+) -> io::Result<()> {
+    let config_dir_str = config_dir.unwrap_or_else(|| ipc::CONFIG_DIRS[0].to_string());
+
+    let plugin_specs: Vec<PathBuf> = config
+        .plugins
+        .iter()
+        .map(|p| {
+            let p = expand_tilde(p);
+            if p.is_relative() {
+                std::env::current_dir()
+                    .ok()
+                    .map(|cwd| cwd.join(&p))
+                    .unwrap_or(p)
+            } else {
+                p
+            }
+        })
+        .collect();
+
+    let provider_config = ProviderConfig {
+        config_dir: config_dir_str,
+        plugin_specs,
+    };
+
+    let (resp_tx, mut resp_rx) =
+        tokio::sync::mpsc::unbounded_channel::<anyrun_provider_ipc::Response>();
+    let handle = spawn_provider_thread(provider_config, resp_tx);
+
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async move {
+            let sender_clone = sender.clone();
+            tokio::spawn(async move {
+                while let Some(resp) = resp_rx.recv().await {
+                    sender_clone.emit(resp);
+                }
+            });
+
+            while let Some(req) = rx.recv().await {
+                let is_quit = matches!(req, ipc::Request::Quit);
+                if handle.request_tx.send(req).await.is_err() {
+                    break;
+                }
+                if is_quit {
+                    break;
+                }
+            }
+        });
+
     Ok(())
 }
 

@@ -124,19 +124,13 @@ impl App {
             config,
             #[strong]
             config_dir,
-            #[strong(rename_to = stdin)]
-            app_init.stdin,
-            #[strong(rename_to = env)]
-            app_init.env,
             move |sender| {
                 if let Some(socket_path) = socket_path {
                     if let Err(why) = provider::worker_connect(socket_path, rx, sender) {
                         eprintln!("[anyrun] IPC worker failed to connect: {why}");
                     }
-                } else if let Err(why) =
-                    provider::worker_spawn(config, config_dir, rx, sender, stdin, env)
-                {
-                    eprintln!("[anyrun] IPC worker returned an error: {why}");
+                } else if let Err(why) = provider::worker_inproc(config, config_dir, rx, sender) {
+                    eprintln!("[anyrun] provider worker error: {why}");
                 }
             }
         ));

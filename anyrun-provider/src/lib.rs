@@ -5,7 +5,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyrun_provider_ipc::{PLUGIN_PATHS, Request, Response};
-use engine::{FrecencyData, State, load_plugins, rebuild_plugin_map, spawn_file_watcher, worker_inner};
+use engine::{
+    FrecencyData, State, load_plugins, rebuild_plugin_map, spawn_file_watcher, worker_inner,
+};
 use tokio::sync::{broadcast, mpsc};
 
 pub struct ProviderConfig {

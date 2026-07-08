@@ -176,6 +176,7 @@ dependencies = [
  "abi_stable",
  "anyrun-interface",
  "anyrun-macros",
+ "anyrun-provider",
  "anyrun-provider-ipc",
  "chrono",
  "clap",

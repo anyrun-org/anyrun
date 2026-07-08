@@ -3,12 +3,12 @@ use anyrun_provider_ipc::{
     CONFIG_DIRS, PLUGIN_PATHS, PluginHealth, PluginHealthState, RecentMatch, Request, Response,
     Socket, is_ipc_disconnect,
 };
+use bincode;
 use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand};
 use notify::RecommendedWatcher;
 use notify_debouncer_mini::{Debouncer, new_debouncer};
 use serde::{Deserialize, Serialize};
-use bincode;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
@@ -702,8 +702,8 @@ pub(crate) async fn worker(
     state: &mut State,
     reload_rx: broadcast::Receiver<()>,
 ) -> io::Result<WorkerResult> {
-    use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
     use std::sync::Arc;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
 
     let (read_half, write_half) = stream.into_split();
     let mut reader = BufReader::new(read_half);
@@ -717,15 +717,27 @@ pub(crate) async fn worker(
         let mut recv_buf = Vec::<u8>::with_capacity(4096);
         loop {
             let mut len_buf = [0u8; 4];
-            if reader.read_exact(&mut len_buf).await.is_err() { break; }
+            if reader.read_exact(&mut len_buf).await.is_err() {
+                break;
+            }
             let len = u32::from_le_bytes(len_buf) as usize;
-            if len > 64 * 1024 * 1024 { break; }
+            if len > 64 * 1024 * 1024 {
+                break;
+            }
             recv_buf.resize(len, 0);
-            if reader.read_exact(&mut recv_buf[..len]).await.is_err() { break; }
-            let Ok(req) = bincode::deserialize::<Request>(&recv_buf[..len]) else { break; };
+            if reader.read_exact(&mut recv_buf[..len]).await.is_err() {
+                break;
+            }
+            let Ok(req) = bincode::deserialize::<Request>(&recv_buf[..len]) else {
+                break;
+            };
             let is_quit = matches!(req, Request::Quit);
-            if req_tx.send(req).await.is_err() { break; }
-            if is_quit { break; }
+            if req_tx.send(req).await.is_err() {
+                break;
+            }
+            if is_quit {
+                break;
+            }
         }
     });
 
@@ -735,12 +747,20 @@ pub(crate) async fn worker(
         let mut send_buf = Vec::<u8>::with_capacity(4096);
         while let Some(resp) = resp_rx.recv().await {
             send_buf.clear();
-            if bincode::serialize_into(&mut send_buf, &resp).is_err() { break; }
+            if bincode::serialize_into(&mut send_buf, &resp).is_err() {
+                break;
+            }
             let len = send_buf.len() as u32;
             let mut w = write_arc2.lock().await;
-            if w.write_all(&len.to_le_bytes()).await.is_err() { break; }
-            if w.write_all(&send_buf).await.is_err() { break; }
-            if w.flush().await.is_err() { break; }
+            if w.write_all(&len.to_le_bytes()).await.is_err() {
+                break;
+            }
+            if w.write_all(&send_buf).await.is_err() {
+                break;
+            }
+            if w.flush().await.is_err() {
+                break;
+            }
         }
     });
 

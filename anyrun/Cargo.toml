@@ -10,6 +10,7 @@ abi_stable          = "0.11.1"
 anyrun-interface    = { git = "https://github.com/anyrun-org/anyrun-interface" }
 anyrun-macros       = { path = "../anyrun-macros" }
 anyrun-provider-ipc = { path = "../anyrun-provider/anyrun-provider-ipc" }
+anyrun-provider     = { path = "../anyrun-provider" }
 chrono              = "0.4.42"
 
 clap             = { features = [ "derive" ], version = "4.2.7" }
