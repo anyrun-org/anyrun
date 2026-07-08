@@ -37,7 +37,7 @@ pub fn worker_inproc(
         .iter()
         .map(|p| {
             let p = expand_tilde(p);
-            if p.is_relative() {
+            if p.is_relative() && p.components().count() > 1 {
                 std::env::current_dir()
                     .ok()
                     .map(|cwd| cwd.join(&p))
