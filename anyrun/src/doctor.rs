@@ -66,17 +66,9 @@ fn inspect_config_dir(config_dir: &Path) -> DoctorReport {
         }
     };
 
-    let provider = expand_tilde(&config.provider);
-    if resolve_executable(&provider).is_some() {
-        report
-            .lines
-            .push(format!("provider ok: {}", config.provider.display()));
-    } else {
-        report.required_failures += 1;
-        report
-            .lines
-            .push(format!("provider missing: {}", config.provider.display()));
-    }
+    report
+        .lines
+        .push("provider ok: built-in (single-binary mode)".to_string());
 
     let plugin_dirs = plugin_dirs(config_dir);
     for plugin in &config.plugins {
@@ -154,6 +146,7 @@ fn find_plugin(name: &Path, dirs: &[PathBuf]) -> Option<PathBuf> {
     None
 }
 
+#[allow(dead_code)]
 fn resolve_executable(path: &Path) -> Option<PathBuf> {
     if path.components().count() > 1 {
         return path.exists().then(|| path.to_path_buf());
@@ -249,22 +242,13 @@ mod tests {
     }
 
     #[test]
-    fn doctor_reports_missing_provider() {
-        let root = temp_config("/definitely/missing/anyrun-provider", &[]);
-        let report = inspect_config_dir(&root);
-        assert!(report.required_failures > 0);
-        assert!(report.lines.iter().any(|l| l.contains("provider missing")));
-        let _ = fs::remove_dir_all(root);
-    }
-
-    #[test]
     fn doctor_accepts_empty_valid_config() {
         let provider = std::env::current_exe().unwrap();
         let root = temp_config(provider.to_str().unwrap(), &[]);
         let report = inspect_config_dir(&root);
         assert_eq!(report.required_failures, 0);
         assert!(report.lines.iter().any(|l| l.contains("config ok")));
-        assert!(report.lines.iter().any(|l| l.contains("provider ok")));
+        assert!(report.lines.iter().any(|l| l.contains("provider ok: built-in")));
         let _ = fs::remove_dir_all(root);
     }
 
@@ -293,32 +277,12 @@ mod tests {
         fs::create_dir_all(root.join("plugins")).unwrap();
         fs::write(
             root.join("config.ron"),
-            r#"(provider: "/missing/provider", plugins: ["p1", "p2"])"#,
+            r#"(plugins: ["p1", "p2"])"#,
         )
         .unwrap();
         let report = inspect_config_dir(&root);
-        // provider missing + p1 missing + p2 missing = 3
-        assert_eq!(report.required_failures, 3);
-        let _ = fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn doctor_provider_resolved_via_path() {
-        // Use a binary that's definitely in PATH
-        let root = temp_config("sh", &[]);
-        let report = inspect_config_dir(&root);
-        assert_eq!(report.required_failures, 0);
-        assert!(report.lines.iter().any(|l| l.contains("provider ok")));
-        let _ = fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn doctor_expands_tilde_in_provider_path() {
-        let root = temp_config("~/nonexistent-provider", &[]);
-        let report = inspect_config_dir(&root);
-        // Should expand tilde but then fail to find it
-        assert!(report.required_failures > 0);
-        assert!(report.lines.iter().any(|l| l.contains("provider missing")));
+        // p1 missing + p2 missing = 2
+        assert_eq!(report.required_failures, 2);
         let _ = fs::remove_dir_all(root);
     }
 
@@ -386,7 +350,8 @@ mod tests {
 
     #[test]
     fn doctor_run_exit_code_one_on_failure() {
-        let root = temp_config("/missing/provider", &[]);
+        let provider = std::env::current_exe().unwrap();
+        let root = temp_config(provider.to_str().unwrap(), &["nonexistent_plugin"]);
         let exit_code = run(Some(root.to_str().unwrap()));
         assert_eq!(exit_code, 1);
         let _ = fs::remove_dir_all(root);

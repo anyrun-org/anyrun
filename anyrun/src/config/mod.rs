@@ -26,7 +26,9 @@ pub struct Config {
     #[serde(default = "Config::default_plugins")]
     pub plugins: Vec<PathBuf>,
 
+    #[config_args(skip)]
     #[serde(default = "Config::default_provider")]
+    #[allow(dead_code)]
     pub provider: PathBuf,
 
     #[serde(default)]
@@ -225,7 +227,6 @@ impl Default for ConfigArgs {
             y: None,
             width: None,
             height: None,
-            provider: None,
             hide_icons: None,
             hide_plugin_info: None,
             ignore_exclusive_zones: None,
