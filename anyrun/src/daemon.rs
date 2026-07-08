@@ -4,7 +4,6 @@ use crate::dbus::{setup_dbus, DaemonState};
 use gtk4::{gio, prelude::*};
 use relm4::ComponentController;
 use std::cell::RefCell;
-use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -55,37 +54,10 @@ pub fn run_daemon(args: Args) {
     };
     config.merge_opt(args.config.clone());
 
-    let socket_path = PathBuf::from(format!(
-        "{}/anyrun-daemon.sock",
-        std::env::var("XDG_RUNTIME_DIR").unwrap_or("/tmp".to_string())
-    ));
-
-    let _ = std::fs::remove_file(&socket_path);
-    let provider_path = expand_tilde(&config.provider);
-
-    let provider_child = std::process::Command::new(&provider_path)
-        .arg("--config-dir")
-        .arg(
-            config_dir
-                .as_deref()
-                .unwrap_or(anyrun_provider_ipc::CONFIG_DIRS[0]),
-        )
-        .args(
-            config
-                .plugins
-                .iter()
-                .flat_map(|plugin| [PathBuf::from("-p"), expand_tilde(plugin)]),
-        )
-        .arg("socket")
-        .arg(&socket_path)
-        .spawn()
-        .expect("Failed to spawn anyrun-provider");
-
     let context = Rc::new(app::DaemonContext {
         config: Arc::new(config),
         config_dir,
         css_provider,
-        socket_path,
     });
 
     // Launch the persistent UI component
@@ -110,21 +82,10 @@ pub fn run_daemon(args: Args) {
     let _hold = app.hold();
     let state = Rc::new(RefCell::new(DaemonState {
         sender: controller.sender().clone(),
-        provider_child: Some(provider_child),
+        provider_child: None,
     }));
 
     setup_dbus(&app, state);
 
     app.run_with_args(&Vec::<String>::new());
-}
-
-fn expand_tilde(path: &std::path::Path) -> PathBuf {
-    if let Some(path_str) = path.to_str() {
-        if path_str.starts_with("~/") {
-            if let Ok(home) = std::env::var("HOME") {
-                return PathBuf::from(path_str.replacen('~', &home, 1));
-            }
-        }
-    }
-    path.to_path_buf()
 }

@@ -8,7 +8,6 @@ use gtk4 as gtk;
 use relm4::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
@@ -93,5 +92,4 @@ pub struct DaemonContext {
     pub config: Arc<Config>,
     pub config_dir: Option<String>,
     pub css_provider: gtk::CssProvider,
-    pub socket_path: PathBuf,
 }

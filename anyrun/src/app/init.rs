@@ -117,19 +117,13 @@ impl App {
 
         let (tx, rx) = mpsc::channel(64);
 
-        let socket_path = daemon_context.as_ref().map(|ctx| ctx.socket_path.clone());
-
         sender.spawn_command(glib::clone!(
             #[strong]
             config,
             #[strong]
             config_dir,
             move |sender| {
-                if let Some(socket_path) = socket_path {
-                    if let Err(why) = provider::worker_connect(socket_path, rx, sender) {
-                        eprintln!("[anyrun] IPC worker failed to connect: {why}");
-                    }
-                } else if let Err(why) = provider::worker_inproc(config, config_dir, rx, sender) {
+                if let Err(why) = provider::worker_inproc(config, config_dir, rx, sender) {
                     eprintln!("[anyrun] provider worker error: {why}");
                 }
             }
