@@ -17,3 +17,11 @@ notify-debouncer-mini = "0.6"
 
 [dev-dependencies]
 tempfile = "3"
+
+[[bin]]
+name = "anyrun-provider"
+path = "src/main.rs"
+
+[lib]
+name = "anyrun_provider"
+path = "src/lib.rs"
