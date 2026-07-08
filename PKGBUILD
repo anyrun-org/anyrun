@@ -36,7 +36,6 @@ package() {
 
     # Binaries
     install -Dm755 target/release/anyrun -t "$pkgdir/usr/bin"
-    install -Dm755 target/release/anyrun-provider -t "$pkgdir/usr/bin"
 
     # Plugins
     install -Dm755 target/release/*.so -t "$pkgdir/usr/lib/anyrun"

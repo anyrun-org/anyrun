@@ -1,6 +1,6 @@
 set shell := ["bash", "-c"]
 
-core_pkgs := "-p anyrun -p anyrun-provider"
+core_pkgs := "-p anyrun"
 
 build target="all":
     @{{ if target == "all" {
@@ -39,16 +39,15 @@ test target="all":
 
 run:
     just build bin
-    ./target/release/anyrun --provider ./target/release/anyrun-provider daemon &
+    ./target/release/anyrun daemon &
     ./target/release/anyrun
 
 daemon:
     just build all
-    ./target/release/anyrun --provider ./target/release/anyrun-provider daemon
+    ./target/release/anyrun daemon
 
 install:
     sudo cp ./target/release/anyrun /usr/bin
-    sudo cp ./target/release/anyrun-provider /usr/bin
 
 install-plugin:
     cp ./target/release/*.so ~/.config/anyrun/plugins

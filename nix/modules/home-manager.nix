@@ -41,7 +41,6 @@ let
     ;
 
   defaultPackage = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
-  defaultProvider = defaultPackage.passthru.anyrun-provider or null; # 'or null' is a fallback case to trigger the assertion
   cfg = config.programs.anyrun;
 in
 {
@@ -120,16 +119,6 @@ in
             List of anyrun plugins to use. Can either be packages, absolute plugin paths, or strings.
           '';
         };
-
-        provider = mkOption {
-          type = nullOr package;
-          default = defaultProvider;
-          defaultText = literalExpression "anyrun.packages.${pkgs.stdenv.hostPlatform.sytstem}.default.passthru.anyrun-provider";
-          description = ''
-            The program that is used for loading the plugins, and for the communcation with them.
-          '';
-        };
-
         x = mkNumericOption {
           default.fraction = 0.5;
           description = ''
@@ -365,20 +354,6 @@ in
         (assertNumeric cfg.config.height)
         (assertNumeric cfg.config.x)
         (assertNumeric cfg.config.y)
-
-        {
-          assertion = (builtins.hasAttr "anyrun-provider" cfg.package) || cfg.config.provider != null;
-          message = ''
-            Anyrun expects 'anyrun-provider' to be exposed under 'passthru.anyrun-provider'. This is done
-            automatically in the Anyrun flake, but may not be the case if you are using the Home Manager
-            module from the Anyrun flake with 'pkgs.anyrun'. You may consider:
-
-            1. Using the Home Manager module from Home Manager to keep using 'pkgs.anyrun'
-            2. Using the Home Manager module from Anyrun, but don't override the package (recommended)
-            3. Ensure that your Anyrun package correctly provides 'anyrun-provider' under the passthru attr
-            4. Provide a provider in 'config.programs.anyrun.config.provider'
-          '';
-        }
       ];
 
       warnings =
@@ -434,7 +409,6 @@ in
                 if cfg.config.maxEntries == null then "None" else "Some(${toString cfg.config.maxEntries})"
               },
               plugins: ${toJSON parsedPlugins},
-              ${optionalString (cfg.config.provider != null) "provider: \"${lib.getExe cfg.config.provider}\","}
               ${optionalString (cfg.config.extraLines != null) cfg.config.extraLines}
               ${keybinds}
             )

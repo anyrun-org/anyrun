@@ -10,8 +10,6 @@
   librsvg,
   cargo,
   rustc,
-  # Runtime deps
-  anyrun-provider,
   # Additional configuration arguments for the
   # derivation. By default, we should not build
   # any of the plugins.
@@ -83,13 +81,8 @@ rustPlatform.buildRustPackage {
   postFixup = ''
     wrapProgram $out/bin/anyrun \
       --set GDK_PIXBUF_MODULE_FILE "$(echo ${librsvg.out}/lib/gdk-pixbuf-2.0/*/loaders.cache)" \
-      --prefix PATH ":" ${lib.makeBinPath [ anyrun-provider ]} --prefix ANYRUN_PLUGINS ":" $out/lib
+      --prefix ANYRUN_PLUGINS ":" $out/lib
   '';
-
-  passthru = {
-    # This is used for detecting whether or not an Anyrun package has the provider
-    inherit anyrun-provider;
-  };
 
   meta = {
     description = "Wayland native, highly customizable runner";
