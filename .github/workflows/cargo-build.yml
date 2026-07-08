@@ -13,6 +13,7 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -40,4 +41,8 @@ jobs:
 
       - run: cargo build --verbose
 
-      - run: cargo test --verbose
+      - name: Run unit tests
+        run: cargo test --workspace --bins --lib --verbose
+
+      - name: Run non-GUI integration tests
+        run: cargo test -p anyrun-provider --test ipc_e2e --verbose
