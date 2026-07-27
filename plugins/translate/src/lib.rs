@@ -115,7 +115,7 @@ fn init(config_dir: RString) -> State {
             ("fa", "Persian"),
             ("pl", "Polish"),
             ("pt", "Portuguese"),
-            ("ma", "Punjabi"),
+            ("pa", "Punjabi"),
             ("ro", "Romanian"),
             ("ru", "Russian"),
             ("sm", "Samoan"),
