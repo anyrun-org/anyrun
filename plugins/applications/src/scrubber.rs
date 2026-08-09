@@ -1,4 +1,10 @@
-use std::{collections::HashMap, env, ffi::OsStr, fs, path::PathBuf};
+use std::{
+    collections::HashMap,
+    env,
+    ffi::OsStr,
+    fs,
+    path::{Path, PathBuf},
+};
 
 use crate::Config;
 
@@ -28,13 +34,9 @@ impl DesktopEntry {
             .unwrap_or_else(|| self.name.clone())
     }
 
-    fn from_dir_entry(
-        entry: &fs::DirEntry,
-        config: &Config,
-        lang_choices: &LangChoices,
-    ) -> Vec<Self> {
-        if entry.path().extension() == Some(OsStr::new("desktop")) {
-            let content = match fs::read_to_string(entry.path()) {
+    fn from_path(path: &Path, config: &Config, lang_choices: &LangChoices) -> Vec<Self> {
+        if path.extension() == Some(OsStr::new("desktop")) {
+            let content = match fs::read_to_string(path) {
                 Ok(content) => content,
                 Err(_) => return Vec::new(),
             };
@@ -300,7 +302,7 @@ pub fn scrubber(config: &Config) -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std
             Ok(entry) => entry,
             Err(_why) => return None,
         };
-        let entries = DesktopEntry::from_dir_entry(&entry, config, &lang_choices);
+        let entries = DesktopEntry::from_path(&entry.path(), config, &lang_choices);
         Some(
             entries
                 .into_iter()
@@ -320,7 +322,7 @@ pub fn scrubber(config: &Config) -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std
                         Ok(entry) => entry,
                         Err(_why) => return None,
                     };
-                    let entries = DesktopEntry::from_dir_entry(&entry, config, &lang_choices);
+                    let entries = DesktopEntry::from_path(&entry.path(), config, &lang_choices);
                     Some(
                         entries
                             .into_iter()
