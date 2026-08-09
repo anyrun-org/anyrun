@@ -41,7 +41,11 @@ impl DesktopEntry {
                 Err(_) => return Vec::new(),
             };
 
-            let lines = content.lines().collect::<Vec<_>>();
+            let lines = content
+                .lines()
+                // Ignore comments
+                .filter(|line| !line.starts_with('#') && !line.is_empty())
+                .collect::<Vec<_>>();
 
             let sections = lines
                 .split_inclusive(|line| line.starts_with('['))
