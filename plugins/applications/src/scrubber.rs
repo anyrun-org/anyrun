@@ -48,29 +48,15 @@ impl DesktopEntry {
                 .collect::<Vec<_>>();
 
             let sections = lines
-                .split_inclusive(|line| line.starts_with('['))
+                .chunk_by(|_, line| !line.starts_with('['))
+                // Remove the potential lines before the first section
+                // `section` is at least 1 element long so `section[0]` cannot panic
+                .skip_while(|section| !section[0].starts_with('['))
                 .collect::<Vec<_>>();
-
-            let mut line = None;
-            let mut new_sections = Vec::new();
-
-            for (i, section) in sections.iter().enumerate() {
-                if let Some(line) = line {
-                    let mut section = section.to_vec();
-                    section.insert(0, line);
-
-                    // Only pop the last redundant entry if it isn't the last item
-                    if i < sections.len() - 1 {
-                        section.pop();
-                    }
-                    new_sections.push(section);
-                }
-                line = Some(section.last().unwrap_or(&""));
-            }
 
             let mut ret = Vec::new();
 
-            let entry = match new_sections.iter().find_map(|section| {
+            let entry = match sections.iter().find_map(|section| {
                 if section[0].starts_with("[Desktop Entry]") {
                     let mut map = HashMap::new();
 
@@ -147,7 +133,7 @@ impl DesktopEntry {
             };
 
             if config.desktop_actions {
-                for (i, section) in new_sections.iter().enumerate() {
+                for (i, section) in sections.iter().enumerate() {
                     let mut map = HashMap::new();
 
                     for line in section.iter().skip(1) {
