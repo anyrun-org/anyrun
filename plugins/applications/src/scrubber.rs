@@ -35,171 +35,139 @@ impl DesktopEntry {
     }
 
     fn from_path(path: &Path, config: &Config, lang_choices: &LangChoices) -> Vec<Self> {
-        if path.extension() == Some(OsStr::new("desktop")) {
-            let content = match fs::read_to_string(path) {
-                Ok(content) => content,
-                Err(_) => return Vec::new(),
-            };
+        if path.extension() != Some(OsStr::new("desktop")) {
+            return Vec::new();
+        }
 
-            let lines = content
-                .lines()
-                // Ignore comments
-                .filter(|line| !line.starts_with('#') && !line.is_empty())
-                .collect::<Vec<_>>();
+        let content = match fs::read_to_string(path) {
+            Ok(content) => content,
+            Err(_) => return Vec::new(),
+        };
 
-            let sections = lines
-                .chunk_by(|_, line| !line.starts_with('['))
-                // Remove the potential lines before the first section
-                // `section` is at least 1 element long so `section[0]` cannot panic
-                .skip_while(|section| !section[0].starts_with('['))
-                .collect::<Vec<_>>();
+        let lines = content
+            .lines()
+            // Ignore comments
+            .filter(|line| !line.starts_with('#') && !line.is_empty())
+            .collect::<Vec<_>>();
 
-            let mut ret = Vec::new();
+        let sections = lines
+            .chunk_by(|_, line| !line.starts_with('['))
+            // Remove the potential lines before the first section
+            // `section` is at least 1 element long so `section[0]` cannot panic
+            .skip_while(|section| !section[0].starts_with('['))
+            .collect::<Vec<_>>();
 
-            let entry = match sections.iter().find_map(|section| {
-                if section[0].starts_with("[Desktop Entry]") {
-                    let mut map = HashMap::new();
+        let mut ret = Vec::new();
 
-                    for line in section.iter().skip(1) {
-                        if let Some((key, val)) = line.split_once('=') {
-                            map.insert(key, val);
-                        }
-                    }
+        let Some(entry) = sections.iter().find_map(|section| {
+            if !section[0].starts_with("[Desktop Entry]") {
+                return None;
+            }
 
-                    if map.get("Type")? == &"Application"
-                        && match map.get("NoDisplay") {
-                            Some(no_display) => !no_display.parse::<bool>().unwrap_or(true),
-                            None => true,
-                        }
-                    {
-                        Some(DesktopEntry {
-                            exec: {
-                                let mut exec = map.get("Exec")?.to_string();
+            // Let's call them properties as specs call them entries but
+            // it is confusing with DesktopEntry.
+            // (see https://specifications.freedesktop.org/desktop-entry/latest/basic-format.html#entries)
+            let mut props = HashMap::new();
 
-                                for field_code in FIELD_CODE_LIST {
-                                    exec = exec.replace(field_code, "");
-                                }
-                                exec
-                            },
-                            path: map.get("Path").map(PathBuf::from),
-                            name: map.get("Name")?.to_string(),
-                            localized_name: lang_choices
-                                .localized_keys("Name")
-                                .find_map(|key| map.get(&*key))
-                                .map(ToString::to_string),
-                            keywords: map
-                                .get("Keywords")
-                                .map(|keywords| {
-                                    keywords
-                                        .split(';')
-                                        .map(|s| s.to_owned())
-                                        .collect::<Vec<_>>()
-                                })
-                                .unwrap_or_default(),
-                            localized_keywords: lang_choices
-                                .localized_keys("Keywords")
-                                .find_map(|key| map.get(&*key))
-                                .map(|keywords| {
-                                    keywords
-                                        .split(';')
-                                        .map(|s| s.to_owned())
-                                        .collect::<Vec<_>>()
-                                }),
-                            desc: lang_choices
-                                .localized_keys("Comment")
-                                .find_map(|key| map.get(&*key))
-                                .or_else(|| map.get("Comment"))
-                                .map(ToString::to_string),
-                            icon: map
-                                .get("Icon")
-                                .unwrap_or(&"application-x-executable")
-                                .to_string(),
-                            term: map
-                                .get("Terminal")
-                                .map(|val| val.to_lowercase() == "true")
-                                .unwrap_or(false),
-                            offset: 0,
-                            is_action: false,
-                        })
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            }) {
-                Some(entry) => entry,
-                None => return Vec::new(),
-            };
-
-            if config.desktop_actions {
-                for (i, section) in sections.iter().enumerate() {
-                    let mut map = HashMap::new();
-
-                    for line in section.iter().skip(1) {
-                        if let Some((key, val)) = line.split_once('=') {
-                            map.insert(key, val);
-                        }
-                    }
-
-                    if section[0].starts_with("[Desktop Action") {
-                        ret.push(DesktopEntry {
-                            exec: match map.get("Exec") {
-                                Some(exec) => {
-                                    let mut exec = exec.to_string();
-
-                                    for field_code in FIELD_CODE_LIST {
-                                        exec = exec.replace(field_code, "");
-                                    }
-                                    exec
-                                }
-                                None => continue,
-                            },
-                            path: entry.path.clone(),
-                            name: match map.get("Name") {
-                                Some(name) => name.to_string(),
-                                None => continue,
-                            },
-                            localized_name: lang_choices
-                                .localized_keys("Name")
-                                .find_map(|key| map.get(&*key))
-                                .map(ToString::to_string),
-                            keywords: map
-                                .get("Keywords")
-                                .map(|keywords| {
-                                    keywords
-                                        .split(';')
-                                        .map(|s| s.to_owned())
-                                        .collect::<Vec<_>>()
-                                })
-                                .unwrap_or_default(),
-                            localized_keywords: lang_choices
-                                .localized_keys("Keywords")
-                                .find_map(|key| map.get(&*key))
-                                .map(|keywords| {
-                                    keywords
-                                        .split(';')
-                                        .map(|s| s.to_owned())
-                                        .collect::<Vec<_>>()
-                                }),
-                            desc: Some(entry.localized_name()),
-                            icon: entry.icon.clone(),
-                            term: map
-                                .get("Terminal")
-                                .map(|val| val.to_lowercase() == "true")
-                                .unwrap_or(false),
-                            offset: i as i64,
-                            is_action: true,
-                        })
-                    }
+            for line in section.iter().skip(1) {
+                if let Some((key, val)) = line.split_once('=') {
+                    props.insert(key, val);
                 }
             }
 
-            ret.push(entry);
-            ret
-        } else {
-            Vec::new()
+            if *props.get("Type")? != "Application" {
+                return None;
+            }
+
+            if props
+                .get("NoDisplay")
+                .map(|x| x.to_lowercase() == "true")
+                .unwrap_or(false)
+            {
+                return None;
+            }
+
+            DesktopEntry::from_props(&props, lang_choices, 0, false)
+        }) else {
+            // If no appropriate [Desktop Entry] section is found
+            return Vec::new();
+        };
+
+        if config.desktop_actions {
+            for (i, section) in sections.iter().enumerate() {
+                let mut action_props = HashMap::new();
+
+                for line in section.iter().skip(1) {
+                    if let Some((key, val)) = line.split_once('=') {
+                        action_props.insert(key, val);
+                    }
+                }
+
+                if section[0].starts_with("[Desktop Action") {
+                    if let Some(action_entry) =
+                        DesktopEntry::from_props(&action_props, lang_choices, i as i64, true)
+                    {
+                        ret.push(action_entry);
+                    }
+                }
+            }
         }
+
+        ret.push(entry);
+        ret
+    }
+
+    fn from_props(
+        props: &HashMap<&str, &str>,
+        lang_choices: &LangChoices,
+        offset: i64,
+        is_action: bool,
+    ) -> Option<DesktopEntry> {
+        Some(DesktopEntry {
+            exec: {
+                let mut exec = props.get("Exec")?.to_string();
+                for field_code in FIELD_CODE_LIST {
+                    exec = exec.replace(field_code, "");
+                }
+                exec
+            },
+            path: props.get("Path").map(PathBuf::from),
+            name: props.get("Name")?.to_string(),
+            localized_name: lang_choices
+                .get_localized(&props, "Name")
+                .map(ToString::to_string),
+            keywords: props
+                .get("Keywords")
+                .map(|keywords| {
+                    keywords
+                        .split(';')
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default(),
+            localized_keywords: lang_choices
+                .get_localized(&props, "Keywords")
+                .map(|keywords| {
+                    keywords
+                        .split(';')
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                }),
+            desc: lang_choices
+                .get_localized(&props, "Comment")
+                .or_else(|| props.get("Comment"))
+                .map(ToString::to_string),
+            icon: props
+                .get("Icon")
+                .unwrap_or(&"application-x-executable")
+                .to_string(),
+            term: props
+                .get("Terminal")
+                .map(|val| val.to_lowercase() == "true")
+                .unwrap_or(false),
+            offset: offset,
+            is_action: is_action,
+        })
     }
 }
 
@@ -240,6 +208,14 @@ impl<'a> LangChoices<'a> {
             .chain(self.prefix)
             .chain(self.short);
         choices.map(move |choice| format!("{key}[{choice}]"))
+    }
+
+    fn get_localized<'b>(
+        &self,
+        map: &'b HashMap<&'b str, &'b str>,
+        key: &'b str,
+    ) -> Option<&'b &'b str> {
+        self.localized_keys(key).find_map(|key| map.get(&*key))
     }
 }
 
