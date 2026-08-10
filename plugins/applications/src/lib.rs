@@ -101,20 +101,20 @@ fn run_command(command: &str, path: Option<&Path>) -> io::Result<std::process::C
 
 const TERMINAL_COMMAND_FORMATS: &[&str] = &[
     "alacritty -e {}",
-    "foot -e \"{}\"",
-    "kitty -e \"{}\"",
-    "wezterm -e \"{}\"",
-    "wterm -e \"{}\"",
-    "ghostty -e \"{}\"",
+    "foot -- {}",
+    "kitty -- {}",
+    "wezterm start -- {}",
+    "wterm -e {}",
+    "ghostty -e {}",
+    "terminator -x {}",
+    "gnome-terminal -- {}",
+    "konsole -e {}",
+    "xterm -e {}",
 ];
 
 fn get_terminal_command_format(config: &Config) -> Option<String> {
     if let Some(term) = &config.terminal {
-        return Some(format!(
-            "{} {}",
-            term.command,
-            term.args
-        ));
+        return Some(format!("{} {}", term.command, term.args));
     }
 
     for cmd_fmt in TERMINAL_COMMAND_FORMATS {
