@@ -124,7 +124,7 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
                             ))
                             .spawn()
                         {
-                            eprintln!("Error running desktop entry: {}", why);
+                            eprintln!("[applications] Error running desktop entry: {}", why);
                         }
                         break;
                     }
@@ -143,7 +143,7 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
             })
             .spawn()
     } {
-        eprintln!("Error running desktop entry: {}", why);
+        eprintln!("[applications] Error running desktop entry: {}", why);
     }
 
     HandleResult::Close
