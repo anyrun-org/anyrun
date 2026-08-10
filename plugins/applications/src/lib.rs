@@ -54,7 +54,7 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
                 "{} {} {}",
                 script.display(),
                 if entry.term { "term" } else { "no-term" },
-                &entry.exec
+                entry.exec
             ))
             .output()
             .unwrap_or_else(|why| {

@@ -129,7 +129,7 @@ impl DesktopEntry {
             path: props.get("Path").map(PathBuf::from),
             name: props.get("Name")?.to_string(),
             localized_name: lang_choices
-                .get_localized(&props, "Name")
+                .get_localized(props, "Name")
                 .map(ToString::to_string),
             keywords: props
                 .get("Keywords")
@@ -141,7 +141,7 @@ impl DesktopEntry {
                 })
                 .unwrap_or_default(),
             localized_keywords: lang_choices
-                .get_localized(&props, "Keywords")
+                .get_localized(props, "Keywords")
                 .map(|keywords| {
                     keywords
                         .split(';')
@@ -149,7 +149,7 @@ impl DesktopEntry {
                         .collect::<Vec<_>>()
                 }),
             desc: lang_choices
-                .get_localized(&props, "Comment")
+                .get_localized(props, "Comment")
                 .or_else(|| props.get("Comment"))
                 .map(ToString::to_string),
             icon: icon.unwrap_or_else(|| {
@@ -162,8 +162,8 @@ impl DesktopEntry {
                 .get("Terminal")
                 .map(|val| val.to_lowercase() == "true")
                 .unwrap_or(false),
-            offset: offset,
-            is_action: is_action,
+            offset,
+            is_action,
         })
     }
 }
