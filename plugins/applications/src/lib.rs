@@ -69,8 +69,8 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
     };
 
     if entry.term {
-        command = match make_terminal_command(&command, &state.config) {
-            Some(cmd) => cmd,
+        command = match get_terminal_command_format(&state.config) {
+            Some(cmd_fmt) => cmd_fmt.replace("{}", &command),
             None => {
                 eprintln!("[applications] Error running terminal desktop entry: No terminal found");
 
@@ -99,52 +99,33 @@ fn run_command(command: &str, path: Option<&Path>) -> io::Result<std::process::C
         .spawn()
 }
 
-fn make_terminal_command(command: &str, config: &Config) -> Option<String> {
+const TERMINAL_COMMAND_FORMATS: &[&str] = &[
+    "alacritty -e {}",
+    "foot -e \"{}\"",
+    "kitty -e \"{}\"",
+    "wezterm -e \"{}\"",
+    "wterm -e \"{}\"",
+    "ghostty -e \"{}\"",
+];
+
+fn get_terminal_command_format(config: &Config) -> Option<String> {
     if let Some(term) = &config.terminal {
         return Some(format!(
             "{} {}",
             term.command,
-            term.args.replace("{}", command)
+            term.args
         ));
     }
 
-    let sensible_terminals = &[
-        Terminal {
-            command: "alacritty".to_string(),
-            args: "-e {}".to_string(),
-        },
-        Terminal {
-            command: "foot".to_string(),
-            args: "-e \"{}\"".to_string(),
-        },
-        Terminal {
-            command: "kitty".to_string(),
-            args: "-e \"{}\"".to_string(),
-        },
-        Terminal {
-            command: "wezterm".to_string(),
-            args: "-e \"{}\"".to_string(),
-        },
-        Terminal {
-            command: "wterm".to_string(),
-            args: "-e \"{}\"".to_string(),
-        },
-        Terminal {
-            command: "ghostty".to_string(),
-            args: "-e \"{}\"".to_string(),
-        },
-    ];
-    for term in sensible_terminals {
+    for cmd_fmt in TERMINAL_COMMAND_FORMATS {
         if Command::new("which")
-            .arg(&term.command)
+            // The first .next() on Split cannot panic: if the string
+            // is empty, it returns Some("")
+            .arg(cmd_fmt.split(' ').next().unwrap())
             .output()
             .is_ok_and(|output| output.status.success())
         {
-            return Some(format!(
-                "{} {}",
-                term.command,
-                term.args.replace("{}", command)
-            ));
+            return Some(cmd_fmt.to_string());
         }
     }
 
