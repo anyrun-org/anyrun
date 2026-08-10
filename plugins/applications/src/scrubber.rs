@@ -181,11 +181,16 @@ fn parse_exec(props: &HashMap<&str, &str>) -> Option<String> {
             continue;
         }
         match chars.peek() {
-            Some(&'%') | None => new_exec.push('%'),
+            Some(&'%') | None => {
+                new_exec.push('%');
+                chars.next();
+            },
 
-            Some(&next_ch) if FIELD_CODE_CHARS.contains(next_ch) => {} // Remove both `ch` and `next_ch`
-            Some(&next_ch) => {
-                new_exec.extend([ch, next_ch]);
+            Some(&next_ch) if FIELD_CODE_CHARS.contains(next_ch) => {
+                chars.next();
+            }
+            Some(_) => {
+                new_exec.push(ch);
             }
         }
     }
