@@ -23,10 +23,6 @@ pub struct DesktopEntry {
     pub is_action: bool,
 }
 
-const FIELD_CODE_LIST: &[&str] = &[
-    "%f", "%F", "%u", "%U", "%d", "%D", "%n", "%N", "%i", "%c", "%k", "%v", "%m",
-];
-
 impl DesktopEntry {
     pub fn localized_name(&self) -> String {
         self.localized_name
@@ -129,13 +125,7 @@ impl DesktopEntry {
         is_action: bool,
     ) -> Option<DesktopEntry> {
         Some(DesktopEntry {
-            exec: {
-                let mut exec = props.get("Exec")?.to_string();
-                for field_code in FIELD_CODE_LIST {
-                    exec = exec.replace(field_code, "");
-                }
-                exec
-            },
+            exec: parse_exec(props)?,
             path: props.get("Path").map(PathBuf::from),
             name: props.get("Name")?.to_string(),
             localized_name: lang_choices
@@ -176,6 +166,31 @@ impl DesktopEntry {
             is_action: is_action,
         })
     }
+}
+
+const FIELD_CODE_CHARS: &str = "fFuUdDnNickvm";
+
+fn parse_exec(props: &HashMap<&str, &str>) -> Option<String> {
+    let exec = props.get("Exec")?.to_string();
+    let mut chars = exec.chars().peekable();
+    let mut new_exec = String::with_capacity(exec.len());
+
+    while let Some(ch) = chars.next() {
+        if ch != '%' {
+            new_exec.push(ch);
+            continue;
+        }
+        match chars.peek() {
+            Some(&'%') | None => new_exec.push('%'),
+
+            Some(&next_ch) if FIELD_CODE_CHARS.contains(next_ch) => {} // Remove both `ch` and `next_ch`
+            Some(&next_ch) => {
+                new_exec.extend([ch, next_ch]);
+            }
+        }
+    }
+
+    Some(new_exec)
 }
 
 #[derive(Debug, Default)]
