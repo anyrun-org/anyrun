@@ -168,6 +168,7 @@ impl DesktopEntry {
     }
 }
 
+// Field code to remove (%f, %F, %u...) because we run the applications with no argument
 const FIELD_CODE_CHARS: &str = "fFuUdDnNickvm";
 
 fn parse_exec(props: &HashMap<&str, &str>) -> Option<String> {
@@ -184,7 +185,7 @@ fn parse_exec(props: &HashMap<&str, &str>) -> Option<String> {
             Some(&'%') | None => {
                 new_exec.push('%');
                 chars.next();
-            },
+            }
 
             Some(&next_ch) if FIELD_CODE_CHARS.contains(next_ch) => {
                 chars.next();
@@ -249,8 +250,6 @@ impl<'a> LangChoices<'a> {
 pub fn scrubber(config: &Config) -> Vec<DesktopEntry> {
     let xdg_data_dirs = env::var("XDG_DATA_DIRS").unwrap_or("/usr/share".to_owned());
 
-    // Create iterator over all the files in the XDG_DATA_DIRS
-    // XDG compliancy is cool
     let xdg_data_home = env::var("XDG_DATA_HOME").unwrap_or_else(|_why| {
         format!(
             "{}/.local/share",
@@ -261,13 +260,15 @@ pub fn scrubber(config: &Config) -> Vec<DesktopEntry> {
     let lang = env::var("LANG").ok();
     let lang_choices = LangChoices::new(lang.as_deref());
 
-    // Parse the XDG_DATA_DIRS variable and list files of all the paths
+    // Create iterator over all the applications directories in the XDG_DATA_DIRS (and in XDG_DATA_HOME)
+    // XDG compliancy is cool
     let entry_dirs = xdg_data_dirs
         .split(':')
         .chain(Some(xdg_data_home.as_str()))
         .map(|dir| format!("{}/applications/", dir));
 
     let entries = entry_dirs
+        // Iterate over all files in the entry_dirs
         .filter_map(|dir| match fs::read_dir(&dir) {
             Ok(files) => Some(files),
             Err(why) => {
@@ -276,6 +277,7 @@ pub fn scrubber(config: &Config) -> Vec<DesktopEntry> {
             }
         })
         .flatten()
+        // Parse these files with DesktopEntry::from_path(), ignoring errors from ReadDir
         .filter_map(|entry_res| {
             let entry = entry_res.ok()?;
 
