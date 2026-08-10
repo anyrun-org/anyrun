@@ -51,7 +51,7 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
     let entry = state.entries.get(selection.id.unwrap() as usize).unwrap();
 
     let mut command = if let Some(script) = &state.config.preprocess_exec_script {
-        let output = Command::new("sh")
+        let output_res = Command::new("sh")
             .arg("-c")
             .arg(format!(
                 "{} {} {}",
@@ -59,13 +59,15 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
                 if entry.term { "term" } else { "no-term" },
                 entry.exec
             ))
-            .output()
-            .unwrap_or_else(|why| {
-                eprintln!("[applications] Error running preprocess script: {}", why);
-                std::process::exit(1);
-            });
+            .output();
 
-        String::from_utf8_lossy(&output.stdout).trim().to_string()
+        match output_res {
+            Ok(output) => String::from_utf8_lossy(&output.stdout).trim().to_string(),
+            Err(why) => {
+                eprintln!("[applications] Error running preprocess script: {}", why);
+                return HandleResult::Close;
+            }
+        }
     } else {
         entry.exec.clone()
     };
@@ -75,7 +77,6 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
             Some(cmd_fmt) => cmd_fmt.replace("{}", &command),
             None => {
                 eprintln!("[applications] Error running terminal desktop entry: No terminal found");
-
                 return HandleResult::Close;
             }
         };
