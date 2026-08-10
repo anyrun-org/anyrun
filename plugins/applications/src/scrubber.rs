@@ -87,7 +87,7 @@ impl DesktopEntry {
                 return None;
             }
 
-            DesktopEntry::from_props(&props, lang_choices, 0, false)
+            DesktopEntry::from_props(&props, lang_choices, None, 0, false)
         }) else {
             // If no appropriate [Desktop Entry] section is found
             return Vec::new();
@@ -104,9 +104,13 @@ impl DesktopEntry {
                 }
 
                 if section[0].starts_with("[Desktop Action") {
-                    if let Some(action_entry) =
-                        DesktopEntry::from_props(&action_props, lang_choices, i as i64, true)
-                    {
+                    if let Some(action_entry) = DesktopEntry::from_props(
+                        &action_props,
+                        lang_choices,
+                        Some(entry.icon.clone()),
+                        i as i64,
+                        true,
+                    ) {
                         ret.push(action_entry);
                     }
                 }
@@ -120,6 +124,7 @@ impl DesktopEntry {
     fn from_props(
         props: &HashMap<&str, &str>,
         lang_choices: &LangChoices,
+        icon: Option<String>,
         offset: i64,
         is_action: bool,
     ) -> Option<DesktopEntry> {
@@ -157,10 +162,12 @@ impl DesktopEntry {
                 .get_localized(&props, "Comment")
                 .or_else(|| props.get("Comment"))
                 .map(ToString::to_string),
-            icon: props
-                .get("Icon")
-                .unwrap_or(&"application-x-executable")
-                .to_string(),
+            icon: icon.unwrap_or_else(|| {
+                props
+                    .get("Icon")
+                    .unwrap_or(&"application-x-executable")
+                    .to_string()
+            }),
             term: props
                 .get("Terminal")
                 .map(|val| val.to_lowercase() == "true")
