@@ -17,6 +17,7 @@ pub struct Config {
     hide_description: bool,
     terminal: Option<Terminal>,
     preprocess_exec_script: Option<PathBuf>,
+    prioritize_actions: bool,
 }
 
 #[derive(Deserialize)]
@@ -33,6 +34,7 @@ impl Default for Config {
             hide_description: false,
             preprocess_exec_script: None,
             terminal: None,
+            prioritize_actions: true,
         }
     }
 }
@@ -187,8 +189,7 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
 
             let mut score = (name_score * 10 + desc_score + keyword_score) - entry.offset;
 
-            // prioritize actions
-            if entry.is_action {
+            if state.config.prioritize_actions && entry.is_action {
                 score *= 2;
             }
 
