@@ -226,93 +226,49 @@ impl<'a> LangChoices<'a> {
     }
 }
 
-pub fn scrubber(config: &Config) -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std::error::Error>> {
+pub fn scrubber(config: &Config) -> Vec<(DesktopEntry, u64)> {
+    let xdg_data_dirs = env::var("XDG_DATA_DIRS").unwrap_or("/usr/share".to_owned());
+
     // Create iterator over all the files in the XDG_DATA_DIRS
     // XDG compliancy is cool
-    let user_path = match env::var("XDG_DATA_HOME") {
-        Ok(data_home) => {
-            format!("{}/applications/", data_home)
-        }
-        Err(_) => {
-            format!(
-                "{}/.local/share/applications/",
-                env::var("HOME").expect("Unable to determine home directory!")
-            )
-        }
-    };
+    let xdg_data_home = env::var("XDG_DATA_HOME").unwrap_or_else(|_why| {
+        format!(
+            "{}/.local/share",
+            env::var("HOME").expect("Unable to determine home directory!")
+        )
+    });
 
     let lang = env::var("LANG").ok();
     let lang_choices = LangChoices::new(lang.as_deref());
 
-    let mut entries: HashMap<String, DesktopEntry> = match env::var("XDG_DATA_DIRS") {
-        Ok(data_dirs) => {
-            // The vec for all the DirEntry objects
-            let mut paths = Vec::new();
-            // Parse the XDG_DATA_DIRS variable and list files of all the paths
-            for dir in data_dirs.split(':') {
-                match fs::read_dir(format!("{}/applications/", dir)) {
-                    Ok(dir) => {
-                        paths.extend(dir);
-                    }
-                    Err(why) => {
-                        eprintln!("[applications] Error reading directory {}: {}", dir, why);
-                    }
-                }
+    // Parse the XDG_DATA_DIRS variable and list files of all the paths
+    let entry_dirs = xdg_data_dirs
+        .split(':')
+        .chain(Some(xdg_data_home.as_str()))
+        .map(|dir| format!("{}/applications/", dir));
+
+    let entries = entry_dirs
+        .filter_map(|dir| match fs::read_dir(&dir) {
+            Ok(files) => Some(files),
+            Err(why) => {
+                eprintln!("[applications] Error reading directory {}: {}", dir, why);
+                None
             }
-            // Make sure the list of paths isn't empty
-            if paths.is_empty() {
-                return Err("No valid desktop file dirs found!".into());
-            }
+        })
+        .flatten()
+        .filter_map(|entry_res| {
+            let entry = entry_res.ok()?;
 
-            // Return it
-            paths
-        }
-        Err(_) => fs::read_dir("/usr/share/applications")?.collect(),
-    }
-    .into_iter()
-    .filter_map(|entry| {
-        let entry = match entry {
-            Ok(entry) => entry,
-            Err(_why) => return None,
-        };
-        let entries = DesktopEntry::from_path(&entry.path(), config, &lang_choices);
-        Some(
-            entries
-                .into_iter()
-                .map(|entry| (format!("{}{}", entry.name, entry.icon), entry)),
-        )
-    })
-    .flatten()
-    .collect();
+            Some(DesktopEntry::from_path(
+                &entry.path(),
+                config,
+                &lang_choices,
+            ))
+        })
+        .flatten();
 
-    // Go through user directory desktop files for overrides
-    match fs::read_dir(&user_path) {
-        Ok(dir_entries) => entries.extend(
-            dir_entries
-                .into_iter()
-                .filter_map(|entry| {
-                    let entry = match entry {
-                        Ok(entry) => entry,
-                        Err(_why) => return None,
-                    };
-                    let entries = DesktopEntry::from_path(&entry.path(), config, &lang_choices);
-                    Some(
-                        entries
-                            .into_iter()
-                            .map(|entry| (format!("{}{}", entry.name, entry.icon), entry)),
-                    )
-                })
-                .flatten(),
-        ),
-        Err(why) => eprintln!(
-            "[applications] Error reading directory {}: {}",
-            user_path, why
-        ),
-    }
-
-    Ok(entries
-        .into_iter()
+    entries
         .enumerate()
-        .map(|(i, (_, entry))| (entry, i as u64))
-        .collect())
+        .map(|(i, entry)| (entry, i as u64))
+        .collect()
 }

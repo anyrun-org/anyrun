@@ -175,10 +175,11 @@ pub fn init(config_dir: RString) -> State {
         }
     };
 
-    let entries = scrubber::scrubber(&config).unwrap_or_else(|why| {
-        eprintln!("[applicatiosn] Failed to load desktop entries: {}", why);
-        Vec::new()
-    });
+    let entries = scrubber::scrubber(&config);
+
+    if entries.is_empty() {
+        eprintln!("[applications] Warning: no desktop entries found")
+    }
 
     State { config, entries }
 }
