@@ -35,7 +35,7 @@ impl Default for Config {
 
 pub struct State {
     config: Config,
-    entries: Vec<(DesktopEntry, u64)>,
+    entries: Vec<DesktopEntry>,
 }
 
 mod scrubber;
@@ -44,14 +44,7 @@ mod scrubber;
 pub fn handler(selection: Match, state: &State) -> HandleResult {
     let entry = state
         .entries
-        .iter()
-        .find_map(|(entry, id)| {
-            if *id == selection.id.unwrap() {
-                Some(entry)
-            } else {
-                None
-            }
-        })
+        .get(selection.id.unwrap() as usize)
         .unwrap();
 
     let exec = if let Some(script) = &state.config.preprocess_exec_script {
@@ -190,7 +183,8 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
     let mut entries = state
         .entries
         .iter()
-        .filter_map(|(entry, id)| {
+        .enumerate()
+        .filter_map(|(i, entry)| {
             let name_score = matcher.fuzzy_match(&entry.name, &input).unwrap_or(0).max(
                 matcher
                     .fuzzy_match(&entry.localized_name(), &input)
@@ -217,7 +211,7 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
 
             // Score cutoff
             if score > 0 {
-                Some((entry, *id, score))
+                Some((entry, i as u64, score))
             } else {
                 None
             }

@@ -226,7 +226,7 @@ impl<'a> LangChoices<'a> {
     }
 }
 
-pub fn scrubber(config: &Config) -> Vec<(DesktopEntry, u64)> {
+pub fn scrubber(config: &Config) -> Vec<DesktopEntry> {
     let xdg_data_dirs = env::var("XDG_DATA_DIRS").unwrap_or("/usr/share".to_owned());
 
     // Create iterator over all the files in the XDG_DATA_DIRS
@@ -267,8 +267,5 @@ pub fn scrubber(config: &Config) -> Vec<(DesktopEntry, u64)> {
         })
         .flatten();
 
-    entries
-        .enumerate()
-        .map(|(i, entry)| (entry, i as u64))
-        .collect()
+    entries.collect()
 }
