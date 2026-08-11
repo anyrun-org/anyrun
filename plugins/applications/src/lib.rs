@@ -63,7 +63,16 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
 
         match output_res {
             Ok(output) if output.status.success() => {
-                String::from_utf8_lossy(&output.stdout).trim().to_string()
+                let stdout = match String::from_utf8(output.stdout) {
+                    Ok(out) => out,
+                    Err(why) => {
+                        // Stop here instead of using String::from_utf8_lossy(), which may introduce unexpected behaviours
+                        eprintln!("[applications] Preprocess script did output a non-valid UTF-8 string: {}", why);
+
+                        return HandleResult::Close;
+                    }
+                };
+                stdout.trim().to_string()
             }
             Ok(output_failed) => {
                 eprintln!("[applications] Preprocess script failed with status code: {}", output_failed.status);
