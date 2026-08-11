@@ -4,9 +4,7 @@ use fuzzy_matcher::FuzzyMatcher;
 use scrubber::DesktopEntry;
 use serde::Deserialize;
 use std::{
-    env, fs, io,
-    path::{Path, PathBuf},
-    process::Command,
+    env, fs, io, path::{Path, PathBuf}, process::{Command, Stdio},
 };
 
 #[derive(Deserialize)]
@@ -59,10 +57,18 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
                 if entry.term { "term" } else { "no-term" },
                 entry.exec
             ))
-            .output();
+            .stdout(Stdio::piped())
+            .spawn()
+            .and_then(|c| c.wait_with_output());
 
         match output_res {
-            Ok(output) => String::from_utf8_lossy(&output.stdout).trim().to_string(),
+            Ok(output) if output.status.success() => {
+                String::from_utf8_lossy(&output.stdout).trim().to_string()
+            }
+            Ok(output_failed) => {
+                eprintln!("[applications] Preprocess script failed with status code: {}", output_failed.status);
+                return HandleResult::Close;
+            }
             Err(why) => {
                 eprintln!("[applications] Error running preprocess script: {}", why);
                 return HandleResult::Close;
@@ -71,6 +77,10 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
     } else {
         entry.exec.clone()
     };
+
+    if command.is_empty() {
+        return HandleResult::Close;
+    }
 
     if entry.term {
         command = match get_terminal_command_format(&state.config) {
