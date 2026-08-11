@@ -8,10 +8,10 @@ use std::{
 };
 
 #[derive(Deserialize)]
+#[serde(default)]
 pub struct Config {
     desktop_actions: bool,
     max_entries: usize,
-    #[serde(default)]
     hide_description: bool,
     terminal: Option<Terminal>,
     preprocess_exec_script: Option<PathBuf>,
