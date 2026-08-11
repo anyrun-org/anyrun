@@ -132,6 +132,9 @@ const TERMINAL_COMMAND_FORMATS: &[&str] = &[
     "gnome-terminal -- {}",
     "konsole -e {}",
     "xterm -e {}",
+
+    // Check that the terminal handle unquoted commands correctly before adding it here
+    // Also, the order matter, the first ones are tried first
 ];
 
 fn get_terminal_command_format(config: &Config) -> Option<String> {
@@ -141,8 +144,6 @@ fn get_terminal_command_format(config: &Config) -> Option<String> {
 
     for cmd_fmt in TERMINAL_COMMAND_FORMATS {
         if Command::new("which")
-            // The first .next() on Split cannot panic: if the string
-            // is empty, it returns Some("")
             .arg(cmd_fmt.split(' ').next().unwrap())
             .output()
             .is_ok_and(|output| output.status.success())
@@ -185,7 +186,7 @@ pub fn init(config_dir: RString) -> State {
 #[get_matches]
 pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
     let matcher = fuzzy_matcher::skim::SkimMatcherV2::default().ignore_case();
-    let mut entries = state
+    let mut matching_entries = state
         .entries
         .iter()
         .enumerate()
@@ -195,6 +196,7 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
                     .fuzzy_match(&entry.localized_name(), &input)
                     .unwrap_or(0),
             );
+
             let desc_score = entry
                 .desc
                 .as_ref()
@@ -222,10 +224,10 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
         })
         .collect::<Vec<_>>();
 
-    entries.sort_by(|a, b| b.2.cmp(&a.2).then(a.0.name.cmp(&b.0.name)));
+    matching_entries.sort_by(|a, b| b.2.cmp(&a.2).then(a.0.name.cmp(&b.0.name)));
 
-    entries.truncate(state.config.max_entries);
-    entries
+    matching_entries.truncate(state.config.max_entries);
+    matching_entries
         .into_iter()
         .map(|(entry, id, _)| Match {
             title: entry.localized_name().into(),

@@ -8,6 +8,8 @@ use std::{
 
 use crate::Config;
 
+const DEFAULT_APPLICATION_ICON: &'static str = "application-x-executable";
+
 #[derive(Clone, Debug)]
 pub struct DesktopEntry {
     pub exec: String,
@@ -155,7 +157,7 @@ impl DesktopEntry {
             icon: icon.unwrap_or_else(|| {
                 props
                     .get("Icon")
-                    .unwrap_or(&"application-x-executable")
+                    .unwrap_or(&DEFAULT_APPLICATION_ICON)
                     .to_string()
             }),
             term: props
@@ -168,9 +170,13 @@ impl DesktopEntry {
     }
 }
 
-// Field code to remove (%f, %F, %u...) because we run the applications with no argument
+// Field codes to remove (%f, %F, %u...) because we run the applications with no argument
+// Note: %i, %c and %k could be implemented however
+// (see https://specifications.freedesktop.org/desktop-entry/latest/exec-variables.html)
 const FIELD_CODE_CHARS: &str = "fFuUdDnNickvm";
 
+// Only remove field codes, quotes and escapes will be interpreted by `sh`
+// when we run the command
 fn parse_exec(props: &HashMap<&str, &str>) -> Option<String> {
     let exec = props.get("Exec")?.to_string();
     let mut chars = exec.chars().peekable();
