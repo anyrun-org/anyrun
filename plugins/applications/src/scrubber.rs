@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     env,
-    ffi::OsStr,
+    ffi::{OsStr, OsString},
     fs,
     path::{Path, PathBuf},
 };
@@ -269,11 +269,11 @@ pub fn scrubber(config: &Config) -> Vec<DesktopEntry> {
     // Create iterator over all the applications directories in the XDG_DATA_DIRS (and in XDG_DATA_HOME)
     // XDG compliancy is cool
     let entry_dirs = xdg_data_dirs
-        .split(':')
+        .rsplit(':')
         .chain(Some(xdg_data_home.as_str()))
         .map(|dir| format!("{}/applications/", dir));
 
-    let entries = entry_dirs
+    let entries_map: HashMap<OsString, Vec<DesktopEntry>> = entry_dirs
         // Iterate over all files in the entry_dirs
         .filter_map(|dir| match fs::read_dir(&dir) {
             Ok(files) => Some(files),
@@ -287,13 +287,12 @@ pub fn scrubber(config: &Config) -> Vec<DesktopEntry> {
         .filter_map(|entry_res| {
             let entry = entry_res.ok()?;
 
-            Some(DesktopEntry::from_path(
-                &entry.path(),
-                config,
-                &lang_choices,
+            Some((
+                entry.path().file_name()?.to_owned(),
+                DesktopEntry::from_path(&entry.path(), config, &lang_choices),
             ))
         })
-        .flatten();
+        .collect();
 
-    entries.collect()
+    entries_map.into_values().flatten().collect()
 }
