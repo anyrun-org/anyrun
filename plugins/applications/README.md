@@ -20,9 +20,12 @@ Config(
 
   hide_description: true,
 
+  // Prefix the final launch command. This can be used to wrap launches with tools such as `uwsm`.
+  launch_prefix: Some("uwsm app --"),
+
   // A command to preprocess the command from the desktop file. The commands should take arguments in this order:
   // command_name <term|no-term> <command>
-  preprocess_exec_script: Some("/home/user/.local/share/anyrun/preprocess_application_command.sh")
+  preprocess_exec_script: Some("/home/user/.local/share/anyrun/preprocess_application_command.sh"),
 
   // The terminal used for running terminal based desktop entries, if left as `None` a static list of terminals is used
   // to determine what terminal to use.

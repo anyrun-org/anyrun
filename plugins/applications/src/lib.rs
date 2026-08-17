@@ -13,6 +13,7 @@ pub struct Config {
     hide_description: bool,
     terminal: Option<Terminal>,
     preprocess_exec_script: Option<PathBuf>,
+    launch_prefix: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -29,6 +30,7 @@ impl Default for Config {
             hide_description: false,
             preprocess_exec_script: None,
             terminal: None,
+            launch_prefix: None,
         }
     }
 }
@@ -74,21 +76,9 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
         entry.exec.clone()
     };
 
-    if entry.term {
+    let exec = if entry.term {
         match &state.config.terminal {
-            Some(term) => {
-                if let Err(why) = Command::new("sh")
-                    .arg("-c")
-                    .arg(format!(
-                        "{} {}",
-                        term.command,
-                        term.args.replace("{}", &exec)
-                    ))
-                    .spawn()
-                {
-                    eprintln!("[applications] Error running desktop entry: {}", why);
-                }
-            }
+            Some(term) => format!("{} {}", term.command, term.args.replace("{}", &exec)),
             None => {
                 let sensible_terminals = &[
                     Terminal {
@@ -116,29 +106,31 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
                         args: "-e \"{}\"".to_string(),
                     },
                 ];
-                for term in sensible_terminals {
-                    if Command::new("which")
+
+                let Some(term) = sensible_terminals.iter().find(|term| {
+                    Command::new("which")
                         .arg(&term.command)
                         .output()
                         .is_ok_and(|output| output.status.success())
-                    {
-                        if let Err(why) = Command::new("sh")
-                            .arg("-c")
-                            .arg(format!(
-                                "{} {}",
-                                term.command,
-                                term.args.replace("{}", &exec)
-                            ))
-                            .spawn()
-                        {
-                            eprintln!("Error running desktop entry: {}", why);
-                        }
-                        break;
-                    }
-                }
+                }) else {
+                    eprintln!("[applications] No supported terminal found for desktop entry");
+                    return HandleResult::Close;
+                };
+
+                format!("{} {}", term.command, term.args.replace("{}", &exec))
             }
         }
-    } else if let Err(why) = {
+    } else {
+        exec
+    };
+
+    let exec = if let Some(prefix) = &state.config.launch_prefix {
+        format!("{prefix} {exec}")
+    } else {
+        exec
+    };
+
+    if let Err(why) = {
         let current_dir = &env::current_dir().unwrap();
 
         Command::new("sh")
@@ -150,7 +142,7 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
             })
             .spawn()
     } {
-        eprintln!("Error running desktop entry: {}", why);
+        eprintln!("[applications] Error running desktop entry: {}", why);
     }
 
     HandleResult::Close
