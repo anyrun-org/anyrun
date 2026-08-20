@@ -7,15 +7,26 @@ use serde::Deserialize;
 
 #[derive(Deserialize)]
 struct Config {
+    #[serde(default)]
     allow_invalid: bool,
+    #[serde(default = "Config::default_max_entries")]
     max_entries: usize,
+    #[serde(default)]
+    preserve_order: bool,
+}
+
+impl Config {
+    fn default_max_entries() -> usize {
+        5
+    }
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
+            max_entries: Config::default_max_entries(),
             allow_invalid: false,
-            max_entries: 5,
+            preserve_order: false,
         }
     }
 }
@@ -35,7 +46,7 @@ fn init(config_dir: RString) -> State {
 
     State {
         config,
-        lines: stdin().lines().filter_map(|line| line.ok()).collect(),
+        lines: stdin().lines().map_while(Result::ok).collect(),
     }
 }
 
@@ -60,7 +71,9 @@ fn get_matches(input: RString, state: &State) -> RVec<Match> {
         .collect::<Vec<_>>();
 
     if !lines.is_empty() {
-        lines.sort_by(|a, b| b.1.cmp(&a.1));
+        if !state.config.preserve_order {
+            lines.sort_by(|a, b| b.1.cmp(&a.1));
+        }
         lines.truncate(state.config.max_entries);
     } else if state.config.allow_invalid {
         lines.push((input.into(), 0));

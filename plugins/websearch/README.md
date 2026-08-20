@@ -6,6 +6,10 @@ Search with your preferred search-engine. You can configure multiple engines.
 
 Enter your search-term and select the resulting search action you want to perform.
 
+> [!NOTE]
+> 
+> This plugin depends on `xdg-open`. Make sure it is installed and in `$PATH`.
+
 ## Configuration
 
 Default config

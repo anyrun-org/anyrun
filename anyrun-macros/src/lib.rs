@@ -1,6 +1,6 @@
 use proc_macro::{Span, TokenStream};
 use quote::quote;
-use syn::{parse_macro_input, parse_quote, Ident, ReturnType, Type};
+use syn::{parse_macro_input, Ident, ReturnType, Type};
 
 /// The function to handle the selection of an item. Takes a `Match` as its first argument, and the second argument can be one of:
 /// - &T
@@ -16,14 +16,14 @@ pub fn handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let data = if function.sig.inputs.len() == 2 {
         if match function.sig.inputs.last() {
-            Some(syn::FnArg::Typed(pat)) => match &*pat.ty {
+            ::core::option::Option::Some(syn::FnArg::Typed(pat)) => match &*pat.ty {
                 Type::Reference(reference) => {
                     reference.mutability.is_some()
                 }
                 _ => return quote! { compile_error!("Last argument must be either a reference to the shared data or should not be present at all.") }.into(),
             },
-            Some(_) => return quote! { compile_error!("`self` argument, really?") }.into(),
-            None => unreachable!(),
+            ::core::option::Option::Some(_) => return quote! { compile_error!("`self` argument, really?") }.into(),
+            ::core::option::Option::None => unreachable!(),
         } {
             quote! {
                 ANYRUN_INTERNAL_DATA.write().unwrap().as_mut().unwrap(),
@@ -67,14 +67,14 @@ pub fn get_matches(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let fn_call = if function.sig.inputs.len() == 2 {
         let data = if match function.sig.inputs.last() {
-            Some(syn::FnArg::Typed(pat)) => match &*pat.ty {
+            ::core::option::Option::Some(syn::FnArg::Typed(pat)) => match &*pat.ty {
                 Type::Reference(reference) => {
                     reference.mutability.is_some()
                 }
                 _ => return quote! { compile_error!("Last argument must be either a reference to the shared data or should not be present at all.") }.into(),
             },
-            Some(_) => return quote! { compile_error!("`self` argument, really?") }.into(),
-            None => unreachable!(),
+            ::core::option::Option::Some(_) => return quote! { compile_error!("`self` argument, really?") }.into(),
+            ::core::option::Option::None => unreachable!(),
         } {
             quote! {
                 ANYRUN_INTERNAL_DATA.write().unwrap().as_mut()
@@ -85,35 +85,41 @@ pub fn get_matches(_attr: TokenStream, item: TokenStream) -> TokenStream {
             }
         };
         quote! {
-            if let Some(data) = #data {
-                #fn_name(input, data)
-            } else {
-                ::abi_stable::std_types::RVec::new()
+            match ::std::panic::catch_unwind(|| {
+                if let ::core::option::Option::Some(data) = #data {
+                    #fn_name(input, data)
+                } else {
+                    ::abi_stable::std_types::RVec::new()
+                }
+            }
+        ) {
+                ::core::result::Result::Ok(result) => result,
+                ::core::result::Result::Err(_) => {
+                    ::std::eprintln!("Plugin '{}' panicked", anyrun_internal_info().name);
+                    ::abi_stable::std_types::RVec::new()
+                }
             }
         }
     } else {
         quote! {
-            #fn_name(input)
+            match ::std::panic::catch_unwind(|| {
+                #fn_name(input)
+            }) {
+                ::core::result::Result::Ok(result) => result,
+                ::core::result::Result::Err(_) => {
+                    ::std::eprintln!("Plugin '{}' panicked", anyrun_internal_info().name);
+                    ::abi_stable::std_types::RVec::new()
+                }
+            }
         }
     };
 
     quote! {
         #[::abi_stable::sabi_extern_fn]
-        fn anyrun_internal_get_matches(input: ::abi_stable::std_types::RString) -> u64 {
+        fn anyrun_internal_get_matches(input: ::abi_stable::std_types::RString) -> ::abi_stable::std_types::RVec<::anyrun_plugin::anyrun_interface::Match> {
             #function
 
-            let current_id =
-                ANYRUN_INTERNAL_ID_COUNTER.load(::std::sync::atomic::Ordering::Relaxed);
-            ANYRUN_INTERNAL_ID_COUNTER
-                .store(current_id + 1, ::std::sync::atomic::Ordering::Relaxed);
-
-            let handle = ::std::thread::spawn(move || {
-                #fn_call
-            });
-
-            *ANYRUN_INTERNAL_THREAD.lock().unwrap() = Some((handle, current_id));
-
-            current_id
+            #fn_call
         }
     }
     .into()
@@ -148,16 +154,6 @@ pub fn init(_attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     quote! {
-        static ANYRUN_INTERNAL_THREAD: ::std::sync::Mutex<
-            Option<(
-                ::std::thread::JoinHandle<
-                    ::abi_stable::std_types::RVec<::anyrun_plugin::anyrun_interface::Match>,
-                >,
-                u64,
-            )>,
-        > = ::std::sync::Mutex::new(None);
-        static ANYRUN_INTERNAL_ID_COUNTER: ::std::sync::atomic::AtomicU64 =
-            ::std::sync::atomic::AtomicU64::new(0);
         static ANYRUN_INTERNAL_DATA: ::std::sync::RwLock<Option<#data_type>> =
             ::std::sync::RwLock::new(None);
 
@@ -168,32 +164,9 @@ pub fn init(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 init: anyrun_internal_init,
                 info: anyrun_internal_info,
                 get_matches: anyrun_internal_get_matches,
-                poll_matches: anyrun_internal_poll_matches,
                 handle_selection: anyrun_internal_handle_selection,
             }
             .leak_into_prefix()
-        }
-
-        #[::abi_stable::sabi_extern_fn]
-        fn anyrun_internal_poll_matches(id: u64) -> ::anyrun_plugin::anyrun_interface::PollResult {
-            match ANYRUN_INTERNAL_THREAD.try_lock() {
-                Ok(thread) => match thread.as_ref() {
-                    Some((thread, task_id)) => {
-                        if *task_id == id {
-                            if !thread.is_finished() {
-                                return ::anyrun_plugin::anyrun_interface::PollResult::Pending;
-                            }
-                        } else {
-                            return ::anyrun_plugin::anyrun_interface::PollResult::Cancelled;
-                        }
-                    }
-                    None => return ::anyrun_plugin::anyrun_interface::PollResult::Cancelled,
-                },
-                Err(_) => return ::anyrun_plugin::anyrun_interface::PollResult::Pending,
-            }
-
-            let (thread, _) = ANYRUN_INTERNAL_THREAD.lock().unwrap().take().unwrap();
-            ::anyrun_plugin::anyrun_interface::PollResult::Ready(thread.join().unwrap())
         }
 
         #[::abi_stable::sabi_extern_fn]
@@ -202,48 +175,91 @@ pub fn init(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
             ::std::thread::spawn(|| {
                 let mut lock = ANYRUN_INTERNAL_DATA.write().unwrap();
-                *lock = Some(#fn_name(config_dir));
+                *lock = ::core::option::Option::Some(#fn_name(config_dir));
             });
         }
     }
     .into()
 }
 
-#[proc_macro_attribute]
-pub fn config_args(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let item = parse_macro_input!(item as syn::ItemStruct);
+// FIXME: Needs to be split into a separate crate
+#[proc_macro_derive(ConfigArgs, attributes(config_args))]
+pub fn config_args(item: TokenStream) -> TokenStream {
+    let item = parse_macro_input!(item as syn::DeriveInput);
+    let mut public = false;
+    for attr in &item.attrs {
+        if attr.path().is_ident("config_args") {
+            attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("pub") {
+                    public = true;
+                    return Ok(());
+                }
+
+                Err(meta.error("Unrecognized macro input"))
+            })
+            .unwrap();
+        }
+    }
     let ident = &item.ident;
 
-    let mut opt_item = item.clone();
+    let syn::Data::Struct(data) = item.data else {
+        panic!("ConfigArgs only works on structs");
+    };
 
-    opt_item.attrs = vec![parse_quote!(#[derive(::clap::Args)])];
-    opt_item.ident = Ident::new(&format!("{}Args", opt_item.ident), Span::call_site().into());
-
-    let opt_ident = &opt_item.ident;
+    let opt_ident = Ident::new(&format!("{}Args", item.ident), Span::call_site().into());
 
     let mut operations = quote!();
+    let mut fields = quote!();
 
-    for field in opt_item.fields.iter_mut() {
+    for field in data.fields.iter() {
+        let mut skip = false;
+        for attr in &field.attrs {
+            if attr.path().is_ident("config_args") {
+                attr.parse_nested_meta(|meta| {
+                    if meta.path.is_ident("skip") {
+                        skip = true;
+                        return Ok(());
+                    }
+
+                    Err(meta.error("Unrecognized macro input"))
+                })
+                .unwrap();
+            }
+        }
+        if skip {
+            continue;
+        }
         let ty = &field.ty;
-        let ident = &field.ident;
-        field.ty = Type::Verbatim(quote!(Option<#ty>));
-        field.attrs = vec![parse_quote!(#[arg(long)])];
+        let ident = field.ident.as_ref().unwrap();
 
         operations = quote! {
             #operations
-            if let Some(val) = opt.#ident {
+            if let ::core::option::Option::Some(val) = opt.#ident {
                 self.#ident = val;
             }
-        }
+        };
+
+        fields = quote! {
+            #fields
+            #[arg(long)]
+            #ident: Option<#ty>,
+        };
     }
 
-    quote! {
-        #item
+    let (struct_decl, fn_decl) = if public {
+        (quote!(pub struct #opt_ident), quote!(pub fn merge_opt))
+    } else {
+        (quote!(struct #opt_ident), quote!(fn merge_opt))
+    };
 
-        #opt_item
+    quote! {
+        #[derive(::clap::Args, ::std::clone::Clone, ::std::fmt::Debug, ::serde::Serialize, ::serde::Deserialize)]
+        #struct_decl {
+            #fields
+        }
 
         impl #ident {
-            fn merge_opt(&mut self, opt: #opt_ident) {
+            #fn_decl(&mut self, opt: #opt_ident) {
                 #operations
             }
         }

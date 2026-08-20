@@ -1,906 +1,307 @@
 use std::{
     cell::RefCell,
-    env, fs,
-    io::{self, Write},
-    mem,
-    path::PathBuf,
+    io::{self, IsTerminal, Read, Write},
     rc::Rc,
-    sync::Once,
-    time::Duration,
 };
 
-use abi_stable::std_types::{ROption, RVec};
-use anyrun_interface::{HandleResult, Match, PluginInfo, PluginRef, PollResult};
-use clap::{Parser, ValueEnum};
-use gtk::{gdk, gdk_pixbuf, gio, glib, prelude::*};
-use nix::unistd;
-use serde::Deserialize;
-use wl_clipboard_rs::copy;
+use clap::{Parser, Subcommand};
+use gtk::{glib, prelude::*};
+use gtk4::{
+    self as gtk,
+    gio::{self},
+};
+use gtk4_layer_shell::LayerShell;
+use relm4::Sender;
+use serde::{Deserialize, Serialize};
 
-#[anyrun_macros::config_args]
-#[derive(Deserialize)]
-struct Config {
-    #[serde(default = "Config::default_x")]
-    x: RelativeNum,
+use crate::config::{Config, ConfigArgs};
 
-    #[serde(default = "Config::default_y")]
-    y: RelativeNum,
+mod app;
+mod config;
+mod plugin_box;
+mod provider;
 
-    #[serde(default = "Config::default_width")]
-    width: RelativeNum,
+/// The interface through which the daemon
+/// responds to launch requests
+const INTERFACE_XML: &str = r#"
+<node>
+    <interface name="org.anyrun.Anyrun">
+        <method name="Show">
+            <arg type="ay" name="args" direction="in"/>
+            <arg type="ay" name="result" direction="out"/>
+        </method>
+        <method name="Close">
+            <arg type="ay" name="result" direction="out"/>
+        </method>
+        <method name="Quit"></method>
+    </interface>
+</node> 
+"#;
 
-    #[serde(default = "Config::default_height")]
-    height: RelativeNum,
-
-    #[serde(default = "Config::default_plugins")]
-    plugins: Vec<PathBuf>,
-
-    #[serde(default)]
-    hide_icons: bool,
-    #[serde(default)]
-    hide_plugin_info: bool,
-    #[serde(default)]
-    ignore_exclusive_zones: bool,
-    #[serde(default)]
-    close_on_click: bool,
-    #[serde(default)]
-    show_results_immediately: bool,
-    #[serde(default)]
-    max_entries: Option<usize>,
-    #[serde(default = "Config::default_layer")]
-    layer: Layer,
+#[derive(Debug, glib::Variant)]
+struct Show {
+    args: Vec<u8>,
 }
 
-impl Config {
-    fn default_x() -> RelativeNum {
-        RelativeNum::Fraction(0.5)
-    }
-
-    fn default_y() -> RelativeNum {
-        RelativeNum::Absolute(0)
-    }
-
-    fn default_width() -> RelativeNum {
-        RelativeNum::Fraction(0.5)
-    }
-
-    fn default_height() -> RelativeNum {
-        RelativeNum::Absolute(0)
-    }
-
-    fn default_plugins() -> Vec<PathBuf> {
-        vec![
-            "libapplications.so".into(),
-            "libsymbols.so".into(),
-            "libshell.so".into(),
-            "libtranslate.so".into(),
-        ]
-    }
-
-    fn default_layer() -> Layer {
-        Layer::Overlay
-    }
+#[derive(Deserialize, Serialize, Debug)]
+pub enum CloseError {
+    NotShowed,
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            x: Self::default_x(),
-            y: Self::default_y(),
-            width: Self::default_width(),
-            height: Self::default_height(),
-            plugins: Self::default_plugins(),
-            hide_icons: false,
-            hide_plugin_info: false,
-            ignore_exclusive_zones: false,
-            close_on_click: false,
-            show_results_immediately: false,
-            max_entries: None,
-            layer: Self::default_layer(),
+enum InterfaceMethod {
+    Show(Show),
+    Close,
+    Quit,
+}
+
+impl DBusMethodCall for InterfaceMethod {
+    fn parse_call(
+        _obj_path: &str,
+        _interface: Option<&str>,
+        method: &str,
+        params: glib::Variant,
+    ) -> Result<Self, glib::Error> {
+        match method {
+            "Show" => Ok(params.get::<Show>().map(Self::Show)),
+            "Close" => Ok(Some(Self::Close)),
+            "Quit" => Ok(Some(Self::Quit)),
+            _ => Err(glib::Error::new(
+                gio::DBusError::UnknownMethod,
+                "No such method",
+            )),
         }
+        .and_then(|p| {
+            p.ok_or_else(|| glib::Error::new(gio::DBusError::InvalidArgs, "Invalid parameters"))
+        })
     }
 }
 
-#[derive(Deserialize, Clone, ValueEnum)]
-enum Layer {
-    Background,
-    Bottom,
-    Top,
-    Overlay,
-}
-
-// Could have a better name
-#[derive(Deserialize, Clone)]
-enum RelativeNum {
-    Absolute(i32),
-    Fraction(f32),
-}
-
-impl RelativeNum {
-    fn to_val(&self, val: u32) -> i32 {
-        match self {
-            RelativeNum::Absolute(num) => *num,
-            RelativeNum::Fraction(frac) => (frac * val as f32) as i32,
-        }
-    }
-}
-
-impl From<&str> for RelativeNum {
-    fn from(value: &str) -> Self {
-        let (ty, val) = value.split_once(':').expect("Invalid RelativeNum value");
-
-        match ty {
-            "absolute" => Self::Absolute(val.parse().unwrap()),
-            "fraction" => Self::Fraction(val.parse().unwrap()),
-            _ => panic!("Invalid type of value"),
-        }
-    }
-}
-
-/// A "view" of plugin's info and matches
-#[derive(Clone)]
-struct PluginView {
-    plugin: PluginRef,
-    row: gtk::ListBoxRow,
-    list: gtk::ListBox,
-}
-
-#[derive(Parser)]
-struct Args {
+/// A wayland native, highly customizable runner.
+#[derive(Parser, Clone, Debug, Serialize, Deserialize)]
+#[command(version, about)]
+pub struct Args {
     /// Override the path to the config directory
     #[arg(short, long)]
     config_dir: Option<String>,
     #[command(flatten)]
     config: ConfigArgs,
+
+    #[command(subcommand)]
+    command: Option<Command>,
 }
 
-#[derive(Deserialize, Clone, ValueEnum)]
-enum Position {
-    Top,
-    Center,
+#[derive(Subcommand, Debug, Clone, Copy, Deserialize, Serialize)]
+enum Command {
+    Daemon,
+    Close,
+    Quit,
 }
 
-/// Actions to run after GTK has finished
-enum PostRunAction {
-    Copy(Vec<u8>),
-    None,
+/// Refcelled state for the daemon DBus listener
+pub struct DaemonState {
+    sender: Option<Sender<app::AppMsg>>,
 }
-
-/// Some data that needs to be shared between various parts
-struct RuntimeData {
-    /// A plugin may request exclusivity which is set with this
-    exclusive: Option<PluginView>,
-    plugins: Vec<PluginView>,
-    post_run_action: PostRunAction,
-    config: Config,
-    /// Used for displaying errors later on
-    error_label: String,
-    config_dir: String,
-}
-
-/// The naming scheme for CSS styling
-///
-/// Refer to [GTK 3.0 CSS Overview](https://docs.gtk.org/gtk3/css-overview.html)
-/// and [GTK 3.0 CSS Properties](https://docs.gtk.org/gtk3/css-properties.html) for how to style.
-mod style_names {
-    /// The text entry box
-    pub const ENTRY: &str = "entry";
-    /// "Main" widgets (main GtkListBox, main GtkBox)
-    pub const MAIN: &str = "main";
-    /// The window
-    pub const WINDOW: &str = "window";
-    /// Widgets related to the whole plugin. Including the info box
-    pub const PLUGIN: &str = "plugin";
-    /// Widgets for the specific match `MATCH_*` names are for more specific parts.
-    pub const MATCH: &str = "match";
-
-    pub const MATCH_TITLE: &str = "match-title";
-    pub const MATCH_DESC: &str = "match-desc";
-}
-
-/// Default config directory
-pub const DEFAULT_CONFIG_DIR: &str = "/etc/anyrun";
 
 fn main() {
-    let app = gtk::Application::new(Some("com.kirottu.anyrun"), Default::default());
-
-    // Register here so we know if the instance is the primary or a remote
-    app.register(None::<&gio::Cancellable>).unwrap();
-
-    // If another instance is running, quit
-    if app.is_remote() {
-        return;
-    }
-
     let args = Args::parse();
-
-    // Figure out the config dir
-    let user_dir = format!(
-        "{}/.config/anyrun",
-        env::var("HOME").expect("Could not determine home directory! Is $HOME set?")
-    );
-    let config_dir = args.config_dir.unwrap_or_else(|| {
-        if PathBuf::from(&user_dir).exists() {
-            user_dir
-        } else {
-            DEFAULT_CONFIG_DIR.to_string()
-        }
-    });
-
-    // Load config, if unable to then read default config. If an error occurs the message will be displayed.
-    let (mut config, error_label) = match fs::read_to_string(format!("{}/config.ron", config_dir)) {
-        Ok(content) => ron::from_str(&content)
-            .map(|config| (config, String::new()))
-            .unwrap_or_else(|why| {
-                (
-                    Config::default(),
-                    format!(
-                        "Failed to parse Anyrun config file, using default config: {}",
-                        why
-                    ),
-                )
-            }),
-        Err(why) => (
-            Config::default(),
-            format!(
-                "Failed to read Anyrun config file, using default config: {}",
-                why
-            ),
-        ),
+    let flags = if matches!(args.command, Some(Command::Daemon)) {
+        gio::ApplicationFlags::IS_SERVICE
+    } else {
+        Default::default()
     };
+    let app = gtk::Application::new(Some("org.anyrun.anyrun"), flags);
+    app.register(Option::<&gio::Cancellable>::None).unwrap();
 
-    config.merge_opt(args.config);
+    let dbus_conn = app.dbus_connection().unwrap();
 
-    let runtime_data: Rc<RefCell<RuntimeData>> = Rc::new(RefCell::new(RuntimeData {
-        exclusive: None,
-        plugins: Vec::new(),
-        post_run_action: PostRunAction::None,
-        config,
-        error_label,
-        config_dir,
-    }));
+    let interface = gio::DBusNodeInfo::for_xml(INTERFACE_XML)
+        .unwrap()
+        .lookup_interface("org.anyrun.Anyrun")
+        .unwrap();
 
-    let runtime_data_clone = runtime_data.clone();
-    app.connect_activate(move |app| activate(app, runtime_data_clone.clone()));
+    let proxy = gio::DBusProxy::new_sync(
+        &dbus_conn,
+        gio::DBusProxyFlags::empty(),
+        Some(&interface),
+        Some("org.anyrun.anyrun"),
+        "/org/anyrun/anyrun",
+        "org.anyrun.Anyrun",
+        Option::<&gio::Cancellable>::None,
+    )
+    .unwrap();
 
-    // Run with no args to make sure only clap is used
-    app.run_with_args::<String>(&[]);
-
-    let runtime_data = runtime_data.borrow_mut();
-
-    // Perform a post run action if one is set
-    match &runtime_data.post_run_action {
-        PostRunAction::Copy(bytes) => match unsafe { unistd::fork() } {
-            // The parent process just exits and prints that out
-            Ok(unistd::ForkResult::Parent { .. }) => {
-                println!("Child spawned to serve copy requests.");
-            }
-            // Child process starts serving copy requests
-            Ok(unistd::ForkResult::Child) => {
-                let mut opts = copy::Options::new();
-                opts.foreground(true);
-                opts.copy(
-                    copy::Source::Bytes(bytes.clone().into_boxed_slice()),
-                    copy::MimeType::Autodetect,
-                )
-                .expect("Failed to serve copy bytes");
-            }
-            Err(why) => {
-                eprintln!("Failed to fork for copy sharing: {}", why);
-            }
-        },
-        PostRunAction::None => (),
-    }
-}
-
-fn activate(app: &gtk::Application, runtime_data: Rc<RefCell<RuntimeData>>) {
-    // Create the main window
-    let window = gtk::ApplicationWindow::builder()
-        .application(app)
-        .name(style_names::WINDOW)
-        .build();
-
-    // Init GTK layer shell
-    gtk_layer_shell::init_for_window(&window);
-
-    // Make layer-window fullscreen
-    gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Top, true);
-    gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Bottom, true);
-    gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Left, true);
-    gtk_layer_shell::set_anchor(&window, gtk_layer_shell::Edge::Right, true);
-
-    gtk_layer_shell::set_namespace(&window, "anyrun");
-
-    if runtime_data.borrow().config.ignore_exclusive_zones {
-        gtk_layer_shell::set_exclusive_zone(&window, -1);
-    }
-
-    gtk_layer_shell::set_keyboard_mode(&window, gtk_layer_shell::KeyboardMode::Exclusive);
-
-    match runtime_data.borrow().config.layer {
-        Layer::Background => {
-            gtk_layer_shell::set_layer(&window, gtk_layer_shell::Layer::Background)
-        }
-        Layer::Bottom => gtk_layer_shell::set_layer(&window, gtk_layer_shell::Layer::Bottom),
-        Layer::Top => gtk_layer_shell::set_layer(&window, gtk_layer_shell::Layer::Top),
-        Layer::Overlay => gtk_layer_shell::set_layer(&window, gtk_layer_shell::Layer::Overlay),
-    };
-
-    // Try to load custom CSS, if it fails load the default CSS
-    let provider = gtk::CssProvider::new();
-    if let Err(why) =
-        provider.load_from_path(&format!("{}/style.css", runtime_data.borrow().config_dir))
-    {
-        eprintln!("Failed to load custom CSS: {}", why);
-        provider
-            .load_from_data(include_bytes!("../res/style.css"))
-            .unwrap();
-    }
-    gtk::StyleContext::add_provider_for_screen(
-        &gdk::Screen::default().expect("Failed to get GDK screen for CSS provider!"),
-        &provider,
-        gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
-    );
-
-    // Create the main list of plugin views
-    let main_list = gtk::ListBox::builder()
-        .selection_mode(gtk::SelectionMode::None)
-        .name(style_names::MAIN)
-        .build();
-
-    // Prioritise the ANYRUN_PLUGINS env var over other paths
-    let mut plugin_paths = match env::var("ANYRUN_PLUGINS") {
-        Ok(string) => string.split(':').map(PathBuf::from).collect::<Vec<_>>(),
-        Err(_) => Vec::new(),
-    };
-
-    plugin_paths.append(&mut vec![
-        format!("{}/plugins", runtime_data.borrow().config_dir).into(),
-        format!("{}/plugins", DEFAULT_CONFIG_DIR).into(),
-    ]);
-
-    // Load plugins from the paths specified in the config file
-    let plugins = runtime_data
-        .borrow()
-        .config
-        .plugins
-        .iter()
-        .map(|plugin_path| {
-            // Load the plugin's dynamic library.
-            let mut user_path =
-                PathBuf::from(&format!("{}/plugins", runtime_data.borrow().config_dir));
-            let mut global_path = PathBuf::from("/etc/anyrun/plugins");
-            user_path.extend(plugin_path.iter());
-            global_path.extend(plugin_path.iter());
-
-            // Load the plugin's dynamic library.
-
-            let plugin = if plugin_path.is_absolute() {
-                abi_stable::library::lib_header_from_path(plugin_path)
+    match args.command {
+        None => {
+            let stdin = if io::stdin().is_terminal() {
+                Vec::new()
             } else {
-                let path = plugin_paths
-                    .clone()
-                    .into_iter()
-                    .map(|mut path| {
-                        path.push(plugin_path);
-                        path
-                    })
-                    .find(|path| path.exists())
-                    .expect("Invalid plugin path");
+                let mut buf = Vec::new();
+                io::stdin().read_to_end(&mut buf).unwrap();
+                buf
+            };
+            let env = std::env::vars().collect();
 
-                abi_stable::library::lib_header_from_path(&path)
-            }
-            .and_then(|plugin| plugin.init_root_module::<PluginRef>())
-            .expect("Failed to load plugin");
-
-            // Run the plugin's init code to init static resources etc.
-            plugin.init()(runtime_data.borrow().config_dir.clone().into());
-
-            let plugin_box = gtk::Box::builder()
-                .orientation(gtk::Orientation::Horizontal)
-                .spacing(10)
-                .name(style_names::PLUGIN)
-                .build();
-            if !runtime_data.borrow().config.hide_plugin_info {
-                plugin_box.add(&create_info_box(
-                    &plugin.info()(),
-                    runtime_data.borrow().config.hide_icons,
-                ));
-                plugin_box.add(
-                    &gtk::Separator::builder()
-                        .orientation(gtk::Orientation::Horizontal)
-                        .name(style_names::PLUGIN)
-                        .build(),
-                );
-            }
-            let list = gtk::ListBox::builder()
-                .name(style_names::PLUGIN)
-                .hexpand(true)
-                .build();
-
-            plugin_box.add(&list);
-
-            let row = gtk::ListBoxRow::builder().name(style_names::PLUGIN).build();
-            row.add(&plugin_box);
-
-            main_list.add(&row);
-
-            PluginView { plugin, row, list }
-        })
-        .collect::<Vec<PluginView>>();
-
-    // Assign the plugins here to avoid multiple mutable/immutable borrows
-    runtime_data.borrow_mut().plugins = plugins;
-
-    // Connect selection events to avoid completely messing up selection logic
-    for plugin_view in runtime_data.borrow().plugins.iter() {
-        let plugins_clone = runtime_data.borrow().plugins.clone();
-        plugin_view.list.connect_row_selected(move |list, row| {
-            if row.is_some() {
-                let combined_matches = plugins_clone
-                    .iter()
-                    .flat_map(|view| {
-                        view.list.children().into_iter().map(|child| {
-                            (
-                                child.dynamic_cast::<gtk::ListBoxRow>().unwrap(),
-                                view.list.clone(),
-                            )
-                        })
-                    })
-                    .collect::<Vec<(gtk::ListBoxRow, gtk::ListBox)>>();
-
-                // Unselect everything except the new selection
-                for (_, _list) in combined_matches {
-                    if _list != *list {
-                        _list.select_row(None::<&gtk::ListBoxRow>);
-                    }
-                }
-            }
-        });
-    }
-
-    // Text entry box
-    let entry = gtk::Entry::builder()
-        .hexpand(true)
-        .name(style_names::ENTRY)
-        .build();
-
-    // Refresh the matches when text input changes
-    let runtime_data_clone = runtime_data.clone();
-    entry.connect_changed(move |entry| {
-        refresh_matches(entry.text().to_string(), runtime_data_clone.clone())
-    });
-
-    // Handle other key presses for selection control and all other things that may be needed
-    let entry_clone = entry.clone();
-    let runtime_data_clone = runtime_data.clone();
-
-    window.connect_key_press_event(move |window, event| {
-        use gdk::keys::constants;
-        match event.keyval() {
-            // Close window on escape
-            constants::Escape => {
-                window.close();
-                Inhibit(true)
-            }
-            // Handle selections
-            constants::Down | constants::Tab | constants::Up => {
-                // Combine all of the matches into a `Vec` to allow for easier handling of the selection
-                let combined_matches = runtime_data_clone
-                    .borrow()
-                    .plugins
-                    .iter()
-                    .flat_map(|view| {
-                        view.list.children().into_iter().map(|child| {
-                            (
-                                // All children of lists are GtkListBoxRow widgets
-                                child.dynamic_cast::<gtk::ListBoxRow>().unwrap(),
-                                view.list.clone(),
-                            )
-                        })
-                    })
-                    .collect::<Vec<(gtk::ListBoxRow, gtk::ListBox)>>();
-
-                // Get the selected match
-                let (selected_match, selected_list) =
-                    match runtime_data_clone.borrow().plugins.iter().find_map(|view| {
-                        view.list.selected_row().map(|row| (row, view.list.clone()))
-                    }) {
-                        Some(selected) => selected,
-                        None => {
-                            // If nothing is selected select either the top or bottom match based on the input
-                            if !combined_matches.is_empty() {
-                                match event.keyval() {
-                                    constants::Down | constants::Tab => combined_matches[0]
-                                        .1
-                                        .select_row(Some(&combined_matches[0].0)),
-                                    constants::Up => {
-                                        combined_matches[combined_matches.len() - 1].1.select_row(
-                                            Some(&combined_matches[combined_matches.len() - 1].0),
-                                        )
-                                    }
-                                    _ => unreachable!(),
-                                }
-                            }
-                            return Inhibit(true);
-                        }
-                    };
-
-                // Clear the previous selection
-                selected_list.select_row(None::<&gtk::ListBoxRow>);
-
-                // Get the index of the current selection
-                let index = combined_matches
-                    .iter()
-                    .position(|(row, _)| *row == selected_match)
+            if app.is_remote() {
+                let res = proxy
+                    .call_sync(
+                        "Show",
+                        Some(
+                            &(serde_json::to_vec(&app::AppInit { args, stdin, env }).unwrap(),)
+                                .to_variant(),
+                        ),
+                        gio::DBusCallFlags::NONE,
+                        1_000_000_000, // Very long timeout to get results from the daemon
+                        Option::<&gio::Cancellable>::None,
+                    )
                     .unwrap();
 
-                // Move the selection based on the input, loops from top to bottom and vice versa
-                match event.keyval() {
-                    constants::Down | constants::Tab => {
-                        if index < combined_matches.len() - 1 {
-                            combined_matches[index + 1]
-                                .1
-                                .select_row(Some(&combined_matches[index + 1].0));
-                        } else {
-                            combined_matches[0]
-                                .1
-                                .select_row(Some(&combined_matches[0].0));
-                        }
-                    }
-                    constants::Up => {
-                        if index > 0 {
-                            combined_matches[index - 1]
-                                .1
-                                .select_row(Some(&combined_matches[index - 1].0));
-                        } else {
-                            combined_matches[combined_matches.len() - 1]
-                                .1
-                                .select_row(Some(&combined_matches[combined_matches.len() - 1].0));
-                        }
-                    }
-                    _ => unreachable!(),
-                }
+                let (bytes,): (Vec<u8>,) = FromVariant::from_variant(&res).unwrap();
 
-                Inhibit(true)
-            }
-            // Handle when the selected match is "activated"
-            constants::Return => {
-                let mut _runtime_data_clone = runtime_data_clone.borrow_mut();
-
-                let (selected_match, plugin_view) = match _runtime_data_clone
-                    .plugins
-                    .iter()
-                    .find_map(|view| view.list.selected_row().map(|row| (row, view)))
-                {
-                    Some(selected) => selected,
-                    None => {
-                        return Inhibit(false);
+                let res =
+                    serde_json::from_slice::<Result<app::PostRunAction, app::ShowError>>(&bytes)
+                        .unwrap();
+                match res {
+                    Ok(app::PostRunAction::Stdout(stdout)) => {
+                        io::stdout().lock().write_all(&stdout).unwrap()
                     }
-                };
-
-                // Perform actions based on the result of handling the selection
-                match plugin_view.plugin.handle_selection()(unsafe {
-                    (*selected_match.data::<Match>("match").unwrap().as_ptr()).clone()
-                }) {
-                    HandleResult::Close => {
-                        window.close();
-                        Inhibit(true)
-                    }
-                    HandleResult::Refresh(exclusive) => {
-                        if exclusive {
-                            _runtime_data_clone.exclusive = Some(plugin_view.clone());
-                        } else {
-                            _runtime_data_clone.exclusive = None;
-                        }
-                        mem::drop(_runtime_data_clone); // Drop the mutable borrow
-                        refresh_matches(entry_clone.text().into(), runtime_data_clone.clone());
-                        Inhibit(false)
-                    }
-                    HandleResult::Copy(bytes) => {
-                        _runtime_data_clone.post_run_action = PostRunAction::Copy(bytes.into());
-                        window.close();
-                        Inhibit(true)
-                    }
-                    HandleResult::Stdout(bytes) => {
-                        if let Err(why) = io::stdout().lock().write_all(&bytes) {
-                            eprintln!("Error outputting content to stdout: {}", why);
-                        }
-                        window.close();
-                        Inhibit(true)
+                    Ok(app::PostRunAction::None) => (),
+                    Err(app::ShowError::AlreadyShowed) => {
+                        eprintln!("[anyrun] Anyrun is already visible.");
+                        std::process::exit(1);
                     }
                 }
-            }
-            _ => Inhibit(false),
-        }
-    });
-
-    // If the option is enabled, close the window when any click is received
-    // that is outside the bounds of the main box
-    if runtime_data.borrow().config.close_on_click {
-        window.connect_button_press_event(move |window, event| {
-            if event.window() == window.window() {
-                window.close();
-                Inhibit(true)
             } else {
-                Inhibit(false)
-            }
-        });
-    }
+                eprintln!("\x1B[1;33m[anyrun] Warning: started in standalone mode, clipboard functionality will be unavailable and startup speed is reduced. \
+                    Consider starting the daemon alongside your compositor by making sure `anyrun daemon` is ran somewhere.\x1B[0m");
 
-    // Only create the widgets once to avoid issues
-    let configure_once = Once::new();
-
-    // Create widgets here for proper positioning
-    window.connect_configure_event(move |window, event| {
-        let runtime_data = runtime_data.clone();
-        let entry = entry.clone();
-        let main_list = main_list.clone();
-
-        configure_once.call_once(move || {
-            {
-                let runtime_data = runtime_data.borrow();
-
-                let width = runtime_data.config.width.to_val(event.size().0);
-                let x = runtime_data.config.x.to_val(event.size().0) - width / 2;
-                let height = runtime_data.config.height.to_val(event.size().1);
-                let y = runtime_data.config.y.to_val(event.size().1) - height / 2;
-
-                // The GtkFixed widget is used for absolute positioning of the main box
-                let fixed = gtk::Fixed::builder().build();
-                let main_vbox = gtk::Box::builder()
-                    .orientation(gtk::Orientation::Vertical)
-                    .halign(gtk::Align::Center)
-                    .vexpand(false)
-                    .width_request(width)
-                    .height_request(height)
-                    .name(style_names::MAIN)
-                    .build();
-                main_vbox.add(&entry);
-
-                // Display the error message
-                if !runtime_data.error_label.is_empty() {
-                    main_vbox.add(
-                        &gtk::Label::builder()
-                            .label(&format!(
-                                r#"<span foreground="red">{}</span>"#,
-                                runtime_data.error_label
-                            ))
-                            .use_markup(true)
-                            .build(),
+                app.connect_activate(move |app| {
+                    app::App::launch(
+                        app,
+                        app::AppInit {
+                            args: args.clone(),
+                            stdin: stdin.clone(),
+                            env: env.clone(),
+                        },
+                        None,
                     );
+                });
+            }
+            app.run_with_args(&Vec::<String>::new());
+        }
+        Some(Command::Close) => {
+            if !app.is_remote() {
+                eprintln!("[anyrun] Can't close the launcher if no daemon exists");
+                std::process::exit(1);
+            }
+
+            let res = proxy
+                .call_sync(
+                    "Close",
+                    None,
+                    gio::DBusCallFlags::NONE,
+                    100,
+                    Option::<&gio::Cancellable>::None,
+                )
+                .unwrap();
+
+            let (bytes,): (Vec<u8>,) = FromVariant::from_variant(&res).unwrap();
+            let res = serde_json::from_slice(&bytes).unwrap();
+            match res {
+                Ok(()) => {}
+                Err(CloseError::NotShowed) => {
+                    eprintln!("[anyrun] Anyrun isn't currently visible");
+                    std::process::exit(1);
                 }
-
-                fixed.put(&main_vbox, x, y);
-                window.add(&fixed);
-                window.show_all();
-
-                // Add and show the list later, to avoid showing empty plugin categories on launch
-                main_vbox.add(&main_list);
-                main_list.show();
-                entry.grab_focus(); // Grab the focus so typing is immediately accepted by the entry box
             }
 
-            if runtime_data.borrow().config.show_results_immediately {
-                // Get initial matches
-                refresh_matches(String::new(), runtime_data);
+            app.run_with_args(&Vec::<String>::new());
+        }
+        Some(Command::Quit) => {
+            if !app.is_remote() {
+                eprintln!("[anyrun] Can't quit the daemon if it isn't running.");
+                std::process::exit(1);
             }
-        });
 
-        false
-    });
+            proxy
+                .call_sync(
+                    "Quit",
+                    None,
+                    gio::DBusCallFlags::NONE,
+                    100,
+                    Option::<&gio::Cancellable>::None,
+                )
+                .unwrap();
+            app.run_with_args(&Vec::<String>::new());
+        }
+        Some(Command::Daemon) => {
+            let _hold_guard = app.hold();
 
-    // Show the window initially, so it gets allocated and configured
-    window.show_all();
-}
+            let state = Rc::new(RefCell::new(DaemonState { sender: None }));
 
-fn handle_matches(plugin_view: PluginView, runtime_data: &RuntimeData, matches: RVec<Match>) {
-    // Clear out the old matches from the list
-    for widget in plugin_view.list.children() {
-        plugin_view.list.remove(&widget);
-    }
+            // Create an empty window on launch and show it to make sure GPU resources are initialized
+            // This should help with first launch speed
+            let window = gtk::Window::new();
+            window.init_layer_shell();
+            window.set_visible(true);
+            window.close();
 
-    // If there are no matches, hide the plugin's results
-    if matches.is_empty() {
-        plugin_view.row.hide();
-        return;
-    }
-
-    for _match in matches {
-        let hbox = gtk::Box::builder()
-            .orientation(gtk::Orientation::Horizontal)
-            .spacing(10)
-            .name(style_names::MATCH)
-            .hexpand(true)
-            .build();
-        if !runtime_data.config.hide_icons {
-            if let ROption::RSome(icon) = &_match.icon {
-                let mut builder = gtk::Image::builder()
-                    .name(style_names::MATCH)
-                    .pixel_size(32);
-
-                let path = PathBuf::from(icon.as_str());
-
-                // If the icon path is absolute, load that file
-                if path.is_absolute() {
-                    match gdk_pixbuf::Pixbuf::from_file_at_size(icon.as_str(), 32, 32) {
-                        Ok(pixbuf) => builder = builder.pixbuf(&pixbuf),
-                        Err(why) => {
-                            println!("Failed to load icon file: {}", why);
-                            builder = builder.icon_name("image-missing"); // Set "broken" icon
+            dbus_conn
+                .register_object("/org/anyrun/anyrun", &interface)
+                .typed_method_call::<InterfaceMethod>()
+                .invoke(glib::clone!(
+                    #[weak_allow_none]
+                    app,
+                    #[strong]
+                    state,
+                    move |_conn, _sender, method, invocation| {
+                        let app = app.unwrap();
+                        match method {
+                            InterfaceMethod::Show(show) => {
+                                // Only launch an instance if another one doesn't exist
+                                if state.borrow().sender.is_none() {
+                                    state.borrow_mut().sender = Some(app::App::launch(
+                                        &app,
+                                        serde_json::from_slice(&show.args).unwrap(),
+                                        Some((state.clone(), invocation)),
+                                    ));
+                                } else {
+                                    invocation.return_value(Some(
+                                        &(serde_json::to_vec(&Err::<app::PostRunAction, _>(
+                                            app::ShowError::AlreadyShowed,
+                                        ))
+                                        .unwrap(),)
+                                            .to_variant(),
+                                    ));
+                                }
+                            }
+                            InterfaceMethod::Close => {
+                                // If launcher is open, return an ok value. If launcher is closed, return an err to
+                                // facilitate a non zero exit code
+                                if let Some(sender) = state.borrow().sender.clone() {
+                                    sender.emit(app::AppMsg::Action(config::Action::Close));
+                                    invocation.return_value(Some(
+                                        &(serde_json::to_vec(&Ok::<(), CloseError>(())).unwrap(),)
+                                            .to_variant(),
+                                    ));
+                                } else {
+                                    invocation.return_value(Some(
+                                        &(serde_json::to_vec(&Err::<(), _>(CloseError::NotShowed))
+                                            .unwrap(),)
+                                            .to_variant(),
+                                    ))
+                                }
+                            }
+                            InterfaceMethod::Quit => {
+                                invocation.return_value(None);
+                                app.quit();
+                            }
                         }
                     }
-                } else {
-                    builder = builder.icon_name(icon);
-                }
+                ))
+                .build()
+                .unwrap();
 
-                hbox.add(&builder.build());
-            }
+            app.run_with_args(&Vec::<String>::new());
         }
-        let title = gtk::Label::builder()
-            .name(style_names::MATCH_TITLE)
-            .wrap(true)
-            .xalign(0.0)
-            .use_markup(_match.use_pango)
-            .halign(gtk::Align::Start)
-            .valign(gtk::Align::Center)
-            .vexpand(true)
-            .label(&_match.title)
-            .build();
-
-        // If a description is present, make a box with it and the title
-        match &_match.description {
-            ROption::RSome(desc) => {
-                let title_desc_box = gtk::Box::builder()
-                    .orientation(gtk::Orientation::Vertical)
-                    .name(style_names::MATCH)
-                    .hexpand(true)
-                    .vexpand(true)
-                    .build();
-                title_desc_box.add(&title);
-                title_desc_box.add(
-                    &gtk::Label::builder()
-                        .name(style_names::MATCH_DESC)
-                        .wrap(true)
-                        .xalign(0.0)
-                        .use_markup(_match.use_pango)
-                        .halign(gtk::Align::Start)
-                        .valign(gtk::Align::Center)
-                        .label(desc)
-                        .build(),
-                );
-                hbox.add(&title_desc_box);
-            }
-            ROption::RNone => {
-                hbox.add(&title);
-            }
-        }
-        let row = gtk::ListBoxRow::builder()
-            .name(style_names::MATCH)
-            .height_request(32)
-            .build();
-        row.add(&hbox);
-        // GTK data setting is not type checked, so it is unsafe.
-        // Only `Match` objects are stored though.
-        unsafe {
-            row.set_data("match", _match);
-        }
-        plugin_view.list.add(&row);
-    }
-
-    // Refresh the items in the view
-    plugin_view.row.show_all();
-
-    let combined_matches = runtime_data
-        .plugins
-        .iter()
-        .flat_map(|view| {
-            view.list
-                .children()
-                .into_iter()
-                .map(move |child| (child.dynamic_cast::<gtk::ListBoxRow>().unwrap(), view))
-        })
-        .collect::<Vec<(gtk::ListBoxRow, &PluginView)>>();
-
-    // If `max_entries` is set, truncate the amount of entries
-    if let Some(max_matches) = runtime_data.config.max_entries {
-        for (row, view) in combined_matches.iter().skip(max_matches) {
-            view.list.remove(row);
-        }
-    }
-
-    // Hide the plugins that no longer have any entries
-    for (_, view) in &combined_matches {
-        if view.list.children().is_empty() {
-            view.row.hide();
-        }
-    }
-
-    if let Some((row, view)) = combined_matches.get(0) {
-        view.list.select_row(Some(row));
-    }
-}
-
-/// Create the info box for the plugin
-fn create_info_box(info: &PluginInfo, hide_icons: bool) -> gtk::Box {
-    let info_box = gtk::Box::builder()
-        .orientation(gtk::Orientation::Horizontal)
-        .name(style_names::PLUGIN)
-        .width_request(200)
-        .height_request(32)
-        .expand(false)
-        .spacing(10)
-        .build();
-    if !hide_icons {
-        info_box.add(
-            &gtk::Image::builder()
-                .icon_name(&info.icon)
-                .name(style_names::PLUGIN)
-                .pixel_size(32)
-                .halign(gtk::Align::Start)
-                .valign(gtk::Align::Start)
-                .build(),
-        );
-    }
-    info_box.add(
-        &gtk::Label::builder()
-            .label(&info.name)
-            .name(style_names::PLUGIN)
-            .halign(gtk::Align::End)
-            .valign(gtk::Align::Center)
-            .hexpand(true)
-            .build(),
-    );
-    // This is so that we can align the plugin name with the icon. GTK would not let it be properly aligned otherwise.
-    let main_box = gtk::Box::builder()
-        .orientation(gtk::Orientation::Vertical)
-        .name(style_names::PLUGIN)
-        .build();
-    main_box.add(&info_box);
-    main_box.add(
-        &gtk::Box::builder()
-            .orientation(gtk::Orientation::Horizontal)
-            .name(style_names::PLUGIN)
-            .build(),
-    );
-    main_box
-}
-
-/// Refresh the matches from the plugins
-fn refresh_matches(input: String, runtime_data: Rc<RefCell<RuntimeData>>) {
-    for plugin_view in runtime_data.borrow().plugins.iter() {
-        let id = plugin_view.plugin.get_matches()(input.clone().into());
-        let plugin_view = plugin_view.clone();
-        let runtime_data_clone = runtime_data.clone();
-        // If a plugin has requested exclusivity, respect it
-        if let Some(exclusive) = &runtime_data.borrow().exclusive {
-            if plugin_view.plugin.info() == exclusive.plugin.info() {
-                glib::timeout_add_local(Duration::from_micros(1000), move || {
-                    async_match(plugin_view.clone(), runtime_data_clone.clone(), id)
-                });
-            } else {
-                handle_matches(plugin_view.clone(), &runtime_data.borrow(), RVec::new());
-            }
-        } else {
-            glib::timeout_add_local(Duration::from_micros(1000), move || {
-                async_match(plugin_view.clone(), runtime_data_clone.clone(), id)
-            });
-        }
-    }
-}
-
-/// Handle the asynchronously running match task
-fn async_match(
-    plugin_view: PluginView,
-    runtime_data: Rc<RefCell<RuntimeData>>,
-    id: u64,
-) -> glib::Continue {
-    match plugin_view.plugin.poll_matches()(id) {
-        PollResult::Ready(matches) => {
-            handle_matches(plugin_view, &runtime_data.borrow(), matches);
-            glib::Continue(false)
-        }
-        PollResult::Pending => glib::Continue(true),
-        PollResult::Cancelled => glib::Continue(false),
     }
 }

@@ -95,14 +95,14 @@ fn handler(selection: Match, config: &Config) -> HandleResult {
     if let Err(why) = Command::new("sh")
         .arg("-c")
         .arg(format!(
-            "xdg-open https://{}",
+            "xdg-open \"https://{}\"",
             engine
                 .value()
                 .replace("{}", &encode(&selection.title.to_string()))
         ))
         .spawn()
     {
-        println!("Failed to perform websearch: {}", why);
+        eprintln!("[websearch] Failed to perform websearch: {}", why);
     }
 
     HandleResult::Close

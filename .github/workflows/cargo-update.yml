@@ -1,0 +1,43 @@
+name: "Update repository dependencies"
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 1 * *"
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Bump nix
+        run: nix flake update
+
+      - name: Install dependencies
+        run: nix profile install --inputs-from . nixpkgs#cargo-bump nixpkgs#cargo
+
+      - name: Bump rust
+        run: |
+          cargo bump patch
+          cargo update
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v4
+        with:
+          token: "${{ secrets.github_token }}"
+          title: "chore: update all inputs"
+          author: GitHub <noreply@github.com>
+          branch: automated-dep-updates
+          branch-suffix: timestamp
+          delete-branch: true
+          commit-message: |
+            chore: update all inputs
+
+            Co-authored-by: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>

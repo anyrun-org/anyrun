@@ -3,116 +3,151 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    systems.url = "github:nix-systems/default-linux";
+    anyrun-provider = {
+      url = "github:anyrun-org/anyrun-provider";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     flake-parts = {
       url = "github:hercules-ci/flake-parts";
       inputs.nixpkgs-lib.follows = "nixpkgs";
     };
   };
 
-  outputs = inputs @ {flake-parts, ...}:
-    flake-parts.lib.mkFlake {inherit inputs;} {
-      systems = ["x86_64-linux" "aarch64-linux"];
+  outputs =
+    {
+      self,
+      flake-parts,
+      systems,
+      ...
+    }@inputs:
+    flake-parts.lib.mkFlake { inherit inputs; } {
+      imports = [ flake-parts.flakeModules.easyOverlay ];
+      systems = import systems;
 
-      perSystem = {
-        config,
-        self',
-        inputs',
-        pkgs,
-        system,
-        ...
-      }: let
-        inherit (inputs.nixpkgs) lib;
-        inherit (lib) getExe;
-      in {
-        # provide the formatter for nix fmt
-        formatter = pkgs.alejandra;
+      perSystem =
+        {
+          self',
+          config,
+          pkgs,
+          system,
+          ...
+        }:
+        let
+          inherit (pkgs) callPackage;
+        in
+        {
+          packages =
+            let
+              lockFile = ./Cargo.lock;
 
-        devShells.default = pkgs.mkShell {
-          inputsFrom = builtins.attrValues self'.packages;
+              # Since all plugin derivations are called with the exact same arguments
+              # it is possible to streamline calling packages with a single function
+              # that takes name as an argument, and handles default inherits.
+              mkPlugin =
+                name:
+                callPackage ./nix/packages/plugin.nix {
+                  inherit inputs lockFile;
+                  inherit name;
+                };
+            in
+            {
+              anyrun-provider = inputs.anyrun-provider.packages.${system}.default;
 
-          packages = with pkgs; [
-            alejandra # nix formatter
-            rustfmt # rust formatter
-            statix # lints and suggestions
-            deadnix # clean up unused nix code
-            rustc # rust compiler
-            gcc
-            cargo # rust package manager
-            clippy # opinionated rust formatter
-          ];
+              # By default the anyrun package is built without any plugins
+              # as per the `dontBuildPlugins` arg.
+              anyrun = callPackage ./nix/packages/anyrun.nix {
+                inherit inputs lockFile;
+                inherit (self.packages.${system}) anyrun-provider;
+              };
+
+              anyrun-with-all-plugins = self.packages.${system}.anyrun.override {
+                dontBuildPlugins = false;
+              };
+
+              # Expose each plugin as a separate package. This uses the mkPlugin function
+              # to call the same derivation with same default inherits and the name of the
+              # plugin every time.
+              applications = mkPlugin "applications";
+              dictionary = mkPlugin "dictionary";
+              kidex = mkPlugin "kidex";
+              nix-run = mkPlugin "nix-run";
+              actions = mkPlugin "actions";
+              randr = mkPlugin "randr";
+              rink = mkPlugin "rink";
+              shell = mkPlugin "shell";
+              stdin = mkPlugin "stdin";
+              symbols = mkPlugin "symbols";
+              translate = mkPlugin "translate";
+              websearch = mkPlugin "websearch";
+              niri-focus = mkPlugin "niri-focus";
+
+              default = self'.packages.anyrun;
+            };
+
+          # Set up an overlay from packages exposed by this flake
+          overlayAttrs = config.packages;
+
+          devShells = {
+            default = pkgs.mkShell {
+              inputsFrom = builtins.attrValues self'.packages;
+              packages = with pkgs; [
+                rustc
+                cargo
+
+                clippy
+                rustfmt
+                taplo
+              ];
+            };
+
+            nix = pkgs.mkShellNoCC {
+              packages = with pkgs; [
+                alejandra # formatter
+                statix # linter
+                deadnix # dead-code finder
+              ];
+            };
+          };
+
+          # Provides the default formatter for 'nix fmt', which will format the
+          # entire tree with Alejandra. The wrapper script is necessary due to
+          # changes to the behaviour of Nix, which now encourages wrappers for
+          # tree-wide formatting.
+          formatter = pkgs.writeShellApplication {
+            name = "nix3-fmt-wrapper";
+
+            runtimeInputs = [
+              pkgs.nixfmt
+              pkgs.fd
+              pkgs.taplo
+            ];
+
+            text = ''
+              # Find Nix files in the tree and format them with Alejandra
+              fd "$@" -t f -e nix -x nixfmt -q '{}'
+
+              # Same for TOML files, but with Taplo
+              fd "$@" -t f -e toml -x taplo fmt '{}'
+            '';
+          };
+
+          # Provides checks to be built an ran on 'nix flake check'. They can also
+          # be built individually with 'nix build' as described below.
+          checks = {
+            # Check if codebase is properly formatted.
+            # This can be initiated with `nix build .#checks.<system>.nix-fmt`
+            # or with `nix flake check`
+            nix-fmt = pkgs.runCommand "nix-fmt-check" { nativeBuildInputs = [ pkgs.nixfmt ]; } ''
+              nixfmt --check ${self} < /dev/null | tee $out
+            '';
+          };
         };
 
-        packages = let
-          lockFile = ./Cargo.lock;
-        in rec {
-          anyrun = pkgs.callPackage ./nix/default.nix {inherit inputs lockFile;};
-          # alias nix build .# to anyrun
-          default = anyrun;
-
-          anyrun-with-all-plugins = pkgs.callPackage ./nix/default.nix {
-            inherit inputs lockFile;
-            dontBuildPlugins = false;
-          };
-
-          # expose each plugin as a package
-          applications = pkgs.callPackage ./nix/plugins/default.nix {
-            inherit inputs lockFile;
-            name = "applications";
-          };
-
-          dictionary = pkgs.callPackage ./nix/plugins/default.nix {
-            inherit inputs lockFile;
-            name = "dictionary";
-          };
-
-          kidex = pkgs.callPackage ./nix/plugins/default.nix {
-            inherit inputs lockFile;
-            name = "kidex";
-          };
-
-          randr = pkgs.callPackage ./nix/plugins/default.nix {
-            inherit inputs lockFile;
-            name = "randr";
-          };
-
-          rink = pkgs.callPackage ./nix/plugins/default.nix {
-            inherit inputs lockFile;
-            name = "rink";
-          };
-
-          shell = pkgs.callPackage ./nix/plugins/default.nix {
-            inherit inputs lockFile;
-            name = "shell";
-          };
-
-          stdin = pkgs.callPackage ./nix/plugins/default.nix {
-            inherit inputs lockFile;
-            name = "stdin";
-          };
-
-          symbols = pkgs.callPackage ./nix/plugins/default.nix {
-            inherit inputs lockFile;
-            name = "symbols";
-          };
-
-          translate = pkgs.callPackage ./nix/plugins/default.nix {
-            inherit inputs lockFile;
-            name = "translate";
-          };
-
-          websearch = pkgs.callPackage ./nix/plugins/default.nix {
-            inherit inputs lockFile;
-            name = "websearch";
-          };
-        };
-      };
-
-      flake = _: rec {
-        nixosModules.home-manager = homeManagerModules.default;
-
-        homeManagerModules = rec {
-          anyrun = import ./nix/hm-module.nix inputs.self;
-          default = anyrun;
+      flake = {
+        homeManagerModules = {
+          anyrun = import ./nix/modules/home-manager.nix self;
+          default = self.homeManagerModules.anyrun;
         };
       };
     };

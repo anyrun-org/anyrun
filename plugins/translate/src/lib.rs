@@ -211,7 +211,12 @@ fn get_matches(input: RString, state: &State) -> RVec<Match> {
 
             let mut matches = src_matches
                 .into_iter()
-                .flat_map(|src| dest_matches.clone().into_iter().map(move |dest| (Some(src), dest)))
+                .flat_map(|src| {
+                    dest_matches
+                        .clone()
+                        .into_iter()
+                        .map(move |dest| (Some(src), dest))
+                })
                 .collect::<Vec<_>>();
 
             matches.sort_by(|a, b| (b.1 .2 + b.0.unwrap().2).cmp(&(a.1 .2 + a.0.unwrap().2)));

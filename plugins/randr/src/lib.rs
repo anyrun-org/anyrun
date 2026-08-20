@@ -146,7 +146,7 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
                             ]
                             .iter()
                             .map(|configure| Match {
-                                title: format!("{} {}", configure.to_string(), _mon.name).into(),
+                                title: format!("{} {}", configure, _mon.name).into(),
                                 description: ROption::RNone,
                                 use_pango: false,
                                 icon: ROption::RSome(configure.icon().into()),
