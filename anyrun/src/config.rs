@@ -16,6 +16,14 @@ pub struct Config {
     pub width: RelativeNum,
     #[serde(default = "Config::default_height")]
     pub height: RelativeNum,
+    
+    #[serde(default = "Config::default_min_results_height")]
+    pub min_results_height: i32,
+    #[serde(default = "Config::default_max_results_height")]
+    pub max_results_height: i32,
+
+    #[serde(default = "Config::default_scroll")]
+    pub scroll: bool,
 
     #[serde(default = "Config::default_plugins")]
     pub plugins: Vec<PathBuf>,
@@ -60,6 +68,17 @@ impl Config {
 
     fn default_height() -> RelativeNum {
         RelativeNum::Absolute(1)
+    }
+
+    fn default_min_results_height() -> i32 {
+        0
+    }
+    fn default_max_results_height() -> i32 {
+        400
+    }
+
+    fn default_scroll() -> bool {
+        false
     }
 
     fn default_plugins() -> Vec<PathBuf> {
@@ -137,6 +156,9 @@ impl Default for Config {
             y: Self::default_y(),
             width: Self::default_width(),
             height: Self::default_height(),
+            min_results_height: Self::default_min_results_height(),
+            max_results_height: Self::default_max_results_height(),
+            scroll: Self::default_scroll(),
             plugins: Self::default_plugins(),
             provider: Self::default_provider(),
             hide_icons: false,
