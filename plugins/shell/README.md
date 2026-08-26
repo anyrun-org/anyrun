@@ -14,5 +14,11 @@ Config(
   prefix: ":sh",
   // Override the shell used to launch the command
   shell: None,
+  max_entries: 10,
+  // to enable history: 
+  // Some((
+  //  capacity: 100,
+  //  )),
+  history: None,
 )
 ```

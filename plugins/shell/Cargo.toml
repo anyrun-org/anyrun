@@ -11,5 +11,9 @@ crate-type = [ "cdylib" ]
 [dependencies]
 abi_stable    = "0.11.1"
 anyrun-plugin = { path = "../../anyrun-plugin" }
+dirs          = "6.0.0"
+fuzzy-matcher = "0.3.7"
+indexmap      = { features = [ "serde" ], version = "2.12.1" }
 ron           = "0.8.0"
 serde         = { features = [ "derive" ], version = "1.0.228" }
+serde_json    = "1.0.149"
