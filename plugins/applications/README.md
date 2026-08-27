@@ -33,5 +33,9 @@ Config(
     // {} is replaced with the command in the desktop entry
     args: "-e {}",
   )),
+
+  // Whether to prioritize actions or applications
+  // Could be ActionsFirst (default), ApplicationsFirst, or NoPriority
+  entry_priority: ActionsFirst,
 )
 ```
