@@ -6,6 +6,7 @@ use serde::Deserialize;
 use std::{env, fs, path::PathBuf, process::Command};
 
 #[derive(Deserialize)]
+#[serde(default)]
 pub struct Config {
     desktop_actions: bool,
     max_entries: usize,
@@ -36,9 +37,25 @@ impl Default for Config {
 pub struct State {
     config: Config,
     entries: Vec<(DesktopEntry, u64)>,
+    mru: std::collections::HashMap<String, u64>,
 }
 
 mod scrubber;
+
+fn mru_path() -> PathBuf {
+    let cache_dir = env::var("XDG_CACHE_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            let mut path = PathBuf::from(env::var("HOME").expect("HOME directory not set"));
+            path.push(".cache");
+            path
+        });
+    let anyrun_cache = cache_dir.join("anyrun");
+    if !anyrun_cache.exists() {
+        let _ = fs::create_dir_all(&anyrun_cache);
+    }
+    anyrun_cache.join("applications_mru.ron")
+}
 
 #[handler]
 pub fn handler(selection: Match, state: &State) -> HandleResult {
@@ -53,6 +70,16 @@ pub fn handler(selection: Match, state: &State) -> HandleResult {
             }
         })
         .unwrap();
+
+    let mut mru = state.mru.clone();
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    mru.insert(entry.name.clone(), timestamp);
+    if let Ok(mru_str) = ron::ser::to_string_pretty(&mru, ron::ser::PrettyConfig::default()) {
+        let _ = fs::write(mru_path(), mru_str);
+    }
 
     let exec = if let Some(script) = &state.config.preprocess_exec_script {
         let output = Command::new("sh")
@@ -180,7 +207,12 @@ pub fn init(config_dir: RString) -> State {
         Vec::new()
     });
 
-    State { config, entries }
+    let mru = fs::read_to_string(mru_path())
+        .ok()
+        .and_then(|content| ron::from_str(&content).ok())
+        .unwrap_or_default();
+
+    State { config, entries, mru }
 }
 
 #[get_matches]
@@ -207,7 +239,43 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
                 .max()
                 .unwrap_or(0);
 
-            let mut score = (name_score * 10 + desc_score + keyword_score) - entry.offset;
+            let base_score = (name_score * 100 + desc_score + keyword_score) - entry.offset;
+            let mut score = base_score;
+
+            let input_lower = input.to_lowercase();
+            let entry_name_lower = entry.name.to_lowercase();
+            let entry_local_name_lower = entry.localized_name().to_lowercase();
+
+            let is_exact = input_lower == entry_name_lower || input_lower == entry_local_name_lower;
+            let is_substring = entry_name_lower.contains(&input_lower)
+                || entry_local_name_lower.contains(&input_lower);
+
+            // Only apply boosts if the app actually matches the query in some way
+            if base_score > 0 || is_exact || is_substring {
+                // Priority 1: Exact Match Boost
+                if is_exact {
+                    score += 100_000_000_000;
+                } 
+                
+                // Priority 2: Substring Match Boost
+                if is_substring {
+                    score += 10_000_000_000;
+                }
+
+                // Priority 3: MRU Boost (Natural Reciprocal Decay)
+                if let Some(&timestamp) = state.mru.get(&entry.name) {
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs();
+                    let age = now.saturating_sub(timestamp);
+
+                    // Boost = 1,000,000,000 / (1 + age / 3600)
+                    // Halves every hour, stays as a small tie-breaker long-term.
+                    let boost = 1_000_000_000 / (1 + (age / 3600) as i64);
+                    score += boost;
+                }
+            }
 
             // prioritize actions
             if entry.is_action {
@@ -223,7 +291,17 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
         })
         .collect::<Vec<_>>();
 
-    entries.sort_by(|a, b| b.2.cmp(&a.2).then(a.0.name.cmp(&b.0.name)));
+    entries.sort_by(|a, b| {
+        let ord = b.2.cmp(&a.2);
+        if ord == std::cmp::Ordering::Equal {
+            let mru_a = state.mru.get(&a.0.name).copied().unwrap_or(0);
+            let mru_b = state.mru.get(&b.0.name).copied().unwrap_or(0);
+            mru_b.cmp(&mru_a) // higher timestamp is better
+        } else {
+            ord
+        }
+        .then_with(|| a.0.name.cmp(&b.0.name))
+    });
 
     entries.truncate(state.config.max_entries);
     entries
