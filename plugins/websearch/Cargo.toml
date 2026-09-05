@@ -12,5 +12,5 @@ anyrun-plugin = { path = "../../anyrun-plugin" }
 ron           = "0.8.0"
 serde         = { features = [ "derive" ], version = "1.0.228" }
 strum         = "0.25.0"
-strum_macros  = "0.25.1"
+strum_macros  = "0.27.2"
 urlencoding   = "2.1.3"
