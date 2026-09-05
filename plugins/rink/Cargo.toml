@@ -17,5 +17,5 @@ reqwest = { default-features = false, features = [
   "rustls-tls",
 ], version = "0.11.13" }
 rink-core = "0.6"
-ron = "0.8.0"
+ron = "0.10.1"
 serde = { features = [ "derive" ], version = "1.0.228" }
