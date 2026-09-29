@@ -242,10 +242,21 @@ impl FactoryComponent for PluginBox {
                 {
                     let mut guard = self.matches.guard();
 
-                    guard.clear();
+                    let len_new_matches = matches.len();
+                    let len_old_matches = guard.len();
+                    let mut skipped = 0;
 
-                    for _match in matches {
-                        guard.push_back((_match, self.config.clone()));
+                    while skipped < len_new_matches && skipped < len_old_matches {
+                        if guard[skipped].content != matches[skipped] {
+                            break;
+                        }
+                        skipped += 1;
+                    }
+                    while guard.len() > skipped {
+                        guard.pop_back();
+                    }
+                    for _match in matches.iter().skip(skipped) {
+                        guard.push_back((_match.clone(), self.config.clone()));
                     }
                 }
                 sender.output(PluginBoxOutput::MatchesLoaded).unwrap();
