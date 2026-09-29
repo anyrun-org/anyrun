@@ -10,7 +10,12 @@ enum Engine {
     Ecosia,
     Bing,
     DuckDuckGo,
-    Custom { name: String, url: String },
+    Custom {
+        name: String,
+        url: String,
+        #[serde(default)]
+        icon: Option<String>,
+    },
 }
 
 impl Engine {
@@ -81,7 +86,10 @@ fn get_matches(input: RString, config: &Config) -> RVec<Match> {
                 title: input.trim_start_matches(&config.prefix).into(),
                 description: ROption::RSome(format!("Search with {}", engine).into()),
                 use_pango: false,
-                icon: ROption::RNone,
+                icon: match engine {
+                    Engine::Custom { icon: Some(i), .. } => ROption::RSome(i.clone().into()),
+                    _ => ROption::RNone,
+                },
                 id: ROption::RSome(i as u64),
             })
             .collect()
