@@ -17,9 +17,430 @@ pub struct DesktopEntry {
     pub is_action: bool,
 }
 
-const FIELD_CODE_LIST: &[&str] = &[
-    "%f", "%F", "%u", "%U", "%d", "%D", "%n", "%N", "%i", "%c", "%k", "%v", "%m",
+const SUPPORTED_FIELD_CODES: &[char] = &[ 'i', 'c' ];
+
+const VALID_FIELD_CODES: &[char] = &[
+    'f', 'F', 'u', 'U', 'd', 'D', 'n', 'N', 'i', 'c', 'k', 'v', 'm',
 ];
+
+const DEPRECATED_FIELD_CODES: &[char] = &[
+  'd', 'D', 'n', 'N'
+];
+
+// See https://specifications.freedesktop.org/desktop-entry-spec/latest/exec-variables.html
+const EXEC_ESCAPE_CHARS: &[char] = &['"', '`', '$', '\\'];
+
+/*
+Reserved characters are space (" "), tab, newline, double quote,
+single quote ("'"), backslash character ("\"), greater-than sign
+(">"), less-than sign ("<"), tilde ("~"), vertical bar ("|"),
+ampersand ("&"), semicolon (";"), dollar sign ("$"), asterisk ("*"),
+question mark ("?"), hash mark ("#"), parenthesis ("(") and (")") and
+backtick character ("`").
+*/
+const EXEC_RESERVED_CHARS: &[char] = &[
+    ' ', '\t', '\n', '"', '\'', '\\', '>', '<', '~', '|', '&', ';', '$', '*', '?', '#', '(', ')',
+    '`',
+];
+
+// \s, \n, \t, \r, and \\ are valid escapes in Desktop strings
+const DESKTOP_STRING_ESCAPES: &[(char, char)] = &[
+    ('s', ' '),
+    ('n', '\n'),
+    ('t', '\t'),
+    ('r', '\r'),
+    ('\\', '\\'),
+];
+
+fn get_desktop_string_escapes() -> HashMap<char, char> {
+    HashMap::from_iter(DESKTOP_STRING_ESCAPES.iter().cloned())
+}
+
+#[derive(Debug, Clone)]
+pub struct ExecKeyError(pub String);
+
+#[derive(Debug, Clone)]
+enum StringEscapeState {
+    Waiting,
+    Escape,
+}
+
+fn substitute_escapes(s: &str) -> Result<String, ExecKeyError> {
+    use StringEscapeState::*;
+
+    let escapes = get_desktop_string_escapes();
+    let mut state = Waiting;
+    let mut out = Vec::<char>::new();
+    for (i, c) in s.chars().enumerate() {
+        match state {
+            Waiting => match c {
+                '\\' => {
+                    state = Escape;
+                }
+                _ => {
+                    out.push(c);
+                }
+            },
+            Escape => match c {
+                c if escapes.contains_key(&c) => {
+                    out.push(*escapes.get(&c).unwrap());
+                    state = Waiting;
+                }
+                _ => {
+                    return Err(ExecKeyError(format!(
+                        "Escaping invalid character {} at position {}",
+                        c, i
+                    )))
+                }
+            },
+        }
+    }
+    if let Escape = state {
+        return Err(ExecKeyError("Dangling escape".to_string()));
+    }
+    Ok(out.into_iter().collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn substitute_some_escapes() {
+        match substitute_escapes(
+            "Testing: space (\\s), newline (\\n), tab (\\t), carriage return (\\r) and backslash (\\\\)"
+        ) {
+            Ok(result) => assert_eq!(
+                result,
+                "Testing: space ( ), newline (\n), tab (\t), carriage return (\r) and backslash (\\)"
+            ),
+            Err(reason) => panic!("Substitution of valid string failed! {}", reason.0)
+        }
+    }
+
+    #[test]
+    fn substitute_invalid_escape() {
+        match substitute_escapes("Testing invalid escape \\q") {
+            Err(reason) => assert_eq!("Escaping invalid character q at position 24", reason.0),
+            Ok(_) => panic!("Substitution of invalid escape suceeded!")
+        }
+    }
+
+    #[test]
+    fn substitute_dangling_escape() {
+        match substitute_escapes("Testing dangling escape \\") {
+            Err(reason) => assert_eq!("Dangling escape", reason.0),
+            Ok(_) => panic!("Substitution of invalid escape suceeded!")
+        }
+    }
+
+    #[test]
+    fn unescape_unquoted_exec() {
+        match unescape_exec("this is unquoted") {
+            Ok(result) => assert_eq!(result, ["this", "is", "unquoted"]),
+            Err(reason) => panic!("Unescaping unquoted exec key failed! {}", reason.0)
+        }
+    }
+
+    #[test]
+    fn unescape_quoted_exec() {
+        match unescape_exec(
+            concat!(
+                r#"Escaped chars: "#,
+                r#""double Quote \"" "#,
+                r#""backtick \`" "#,
+                r#""dollar \$" "#,
+                r#""backslash \\" "#,
+                "\"Reserved chars like \t\n\\\"'\\\\><~|&;\\$*?#()\\` necessitate a quoted string\" "
+            )
+        ) {
+            Ok(result) => assert_eq!(
+                result,
+                [
+                    "Escaped",
+                    "chars:",
+                    "double Quote \"",
+                    "backtick `",
+                    "dollar $",
+                    "backslash \\",
+                    "Reserved chars like \t\n\"'\\><~|&;$*?#()` necessitate a quoted string"
+                ]
+            ),
+            Err(result) => panic!("Unescaping unquoted exec key failed! {}", result.0)
+        }
+    }
+
+    fn make_test_entry() -> DesktopEntry {
+        DesktopEntry {
+            exec: r#"/usr/bin/testdummy "some\smore \\$\\\\" args %i"#.to_owned(),
+            path: None,
+            name: "TestDummy".to_owned(),
+            localized_name: Some("TestPuppe".to_owned()),
+            keywords: [].to_vec(),
+            localized_keywords: None,
+            desc: None,
+            icon: "SomeIconString".to_owned(),
+            term: true,
+            offset: 0,
+            is_action: false
+        }
+    }
+
+    #[test]
+    fn expand_icon_fieldcode () {
+        let test_entry = make_test_entry();
+
+        match expand_exec_fieldcodes(&test_entry, "%i".to_string()) {
+            Ok(result) => assert_eq!(result, "--icon SomeIconString"),
+            Err(error) => panic!("Expanding icon fieldcode failed! {}", error.0)
+        }
+    }
+
+    #[test]
+    fn expand_icon_fieldcode_nonstandalone () {
+        let test_entry = make_test_entry();
+        let arg = "%i-testing";
+
+        match expand_exec_fieldcodes(&test_entry, "%i-testing".to_string()) {
+            Ok(_) => panic!("Expected error on non standalone icon fieldcode!"),
+            Err(error) => assert_eq!(
+                error.0,
+                format!("Encountered field code %i in argument {} with other contents, %i must stand alone.", arg))
+        }
+    }
+
+    #[test]
+    fn expand_localized_name_fieldcode () {
+        let test_entry = make_test_entry();
+
+        match expand_exec_fieldcodes(&test_entry, "%c-testing".to_string()) {
+            Ok(result) => assert_eq!(result, "TestPuppe-testing"),
+            Err(error) => panic!("Expanding localized name fieldcode failed! {}", error.0)
+        }
+    }
+
+    #[test]
+    fn expand_unknown_fieldcode () {
+        let test_entry = make_test_entry();
+
+        match expand_exec_fieldcodes(&test_entry, "%q".to_string()) {
+            Ok(_) => panic!("Expected error on unknown fieldcode!"),
+            Err(error) => assert_eq!(error.0, "Argument %q contains unknown field code %q.")
+        }
+    }
+
+    #[test]
+    fn lower_exec_key () {
+        let test_entry = make_test_entry();
+
+        match lower_exec(&test_entry) {
+            Ok(result) => assert_eq!(
+                result,
+                ("/usr/bin/testdummy".to_owned(), [r#"some more $\"#, "args", "--icon SomeIconString" ]
+                 .into_iter().map(|s| s.to_owned()).collect())
+            ),
+            Err(error) => panic!("Lowering exec key failed! {}", error.0)
+        }
+    }
+}
+
+
+
+#[derive(Debug, Clone)]
+enum ExecKeyState {
+    Waiting,
+    Word,
+    Quoting,
+    Escape,
+}
+
+fn unescape_exec(s: &str) -> Result<Vec<String>, ExecKeyError> {
+    use ExecKeyState::*;
+
+    let mut state = Waiting;
+    let mut out = Vec::<String>::new();
+    let mut buffer = Vec::<char>::new();
+
+    for (i, c) in s.chars().enumerate() {
+        match state {
+            Waiting => {
+                match c {
+                    '"' => {
+                        state = Quoting;
+                        continue;
+                    }
+                    ' ' => continue,
+                    c if EXEC_RESERVED_CHARS.contains(&c) => return Err(ExecKeyError(format!(
+                        "Starting word with reserved character {} at position {}, consider quoting",
+                        c, i
+                    ))),
+                    _ => {
+                        state = Word;
+                    }
+                };
+                buffer.push(c);
+            }
+            Word => match c {
+                ' ' => {
+                    state = Waiting;
+                    out.push(buffer.iter().collect());
+                    buffer.clear();
+                }
+                c if EXEC_RESERVED_CHARS.contains(&c) => {
+                    return Err(ExecKeyError(format!(
+                        "Reserved character {} in unquoted word at position {}",
+                        c, i
+                    )))
+                }
+                _ => buffer.push(c),
+            },
+            Quoting => match c {
+                '"' => {
+                    out.push(buffer.iter().collect());
+                    buffer.clear();
+                    state = Waiting;
+                    continue;
+                }
+                '\\' => state = Escape,
+                c if EXEC_ESCAPE_CHARS.contains(&c) => {
+                    return Err(ExecKeyError(format!(
+                        "Unescaped character {} in quoted string at position {}",
+                        c, i
+                    )));
+                }
+                _ => {
+                    buffer.push(c);
+                }
+            },
+            Escape => match c {
+                c if EXEC_ESCAPE_CHARS.contains(&c) => {
+                    buffer.push(c);
+                    state = Quoting;
+                }
+                _ => {
+                    return Err(ExecKeyError(format!(
+                        "Escaping invalid character {} in quoted string at position {}",
+                        c, i
+                    )))
+                }
+            },
+        }
+    }
+    match state {
+        Waiting => {}
+        Word => {
+            out.push(buffer.iter().collect());
+            buffer.clear();
+        }
+        _ => return Err(ExecKeyError("Invalid state at end of exec key".to_string())),
+    }
+
+    Ok(out)
+}
+
+#[derive(Debug, Clone)]
+enum FieldCodeState {
+    Reading,
+    Percent
+}
+
+fn get_fieldcode(code: char, entry: &DesktopEntry, arg: &str) -> Result<String, ExecKeyError> {
+    let result = match code {
+        'c' => entry.localized_name(),
+        'i' => {
+            if arg.len() > 2 {
+                return Err(
+                    ExecKeyError(
+                        format!(
+                            "Encountered field code %i in argument {} with other contents, %i must stand alone.", arg)
+                    ))
+            }
+            let icon = entry.icon.clone();
+            if icon.is_empty() {
+                "".to_owned()
+            } else {
+                format!("--icon {}", entry.icon.clone())
+            }
+        },
+        c => panic!("Function called with unimplemented field code {}!", c)
+    };
+    Ok(result)
+}
+
+fn expand_exec_fieldcodes(entry: &DesktopEntry, arg: String) -> Result<String, ExecKeyError> {
+    use FieldCodeState::*;
+
+    let mut out = String::new();
+    let mut state = Reading;
+
+    for c in arg.chars() {
+        match state {
+            Reading => {
+                if c == '%' {
+                    state = Percent;
+                } else {
+                    out.push(c);
+                }
+            }
+            Percent => {
+                match c {
+                    '%' => out.push('%'),
+                    c if SUPPORTED_FIELD_CODES.contains(&c) => {
+                       let field_code_content = get_fieldcode(c, &entry, &arg)?;
+                       out.push_str(&field_code_content);
+                    },
+                    c if VALID_FIELD_CODES.contains(&c) => {
+                        eprintln!(
+                            "Argument {} contains field code %{} which is valid but not implemented and will be stripped.",
+                            &arg,
+                            c
+                        )
+                    },
+                    c if DEPRECATED_FIELD_CODES.contains(&c) => {
+                        eprintln!(
+                            "Argument {} contains deprecated field code %{} which will be stripped.",
+                            &arg,
+                            c
+                        )
+                    },
+                    _ => {
+                        return Err(ExecKeyError(format!("Argument {} contains unknown field code %{}.", &arg, c)))
+                    }
+                }
+                state = Reading;
+            }
+        }
+    }
+    if matches!(state, Percent) {
+        return Err(ExecKeyError(format!("Argument {} ends in % which is interpreted as unfinished field code.", &arg)))
+    };
+    return Ok(out)
+}
+
+/*
+1. Substitute general desktop string escapes
+2. Unescape EXEC_ESCAPE_CHARS in exec key quoted strings
+3. Process field codes
+4. Throw away empty args
+*/
+pub(crate) fn lower_exec(entry: &DesktopEntry) -> Result<(String, Vec<String>), ExecKeyError> {
+    let subst = substitute_escapes(&entry.exec)?;
+    let argvec = unescape_exec(&subst)?;
+    if let Some((command, argv)) = argvec.split_first() {
+        if command.contains('=') {
+            return Err(ExecKeyError("Executable program must not contain '=' character.".to_string()))
+        };
+
+        let argv_fieldcodes = argv
+            .into_iter()
+            .map(|arg| expand_exec_fieldcodes(&entry, arg.clone()))
+            .collect::<Result<Vec<_>,_>>()?;
+        let argv_stripped = argv_fieldcodes.into_iter().filter(|arg| !arg.is_empty()).collect();
+        return Ok((command.clone(), argv_stripped));
+    } else {
+        return Err(ExecKeyError("Empty exec key!".to_string()));
+    }
+}
 
 impl DesktopEntry {
     pub fn localized_name(&self) -> String {
@@ -81,14 +502,7 @@ impl DesktopEntry {
                         }
                     {
                         Some(DesktopEntry {
-                            exec: {
-                                let mut exec = map.get("Exec")?.to_string();
-
-                                for field_code in FIELD_CODE_LIST {
-                                    exec = exec.replace(field_code, "");
-                                }
-                                exec
-                            },
+                            exec: map.get("Exec")?.to_string(),
                             path: map.get("Path").map(PathBuf::from),
                             name: map.get("Name")?.to_string(),
                             localized_name: lang_choices
@@ -154,12 +568,7 @@ impl DesktopEntry {
                         ret.push(DesktopEntry {
                             exec: match map.get("Exec") {
                                 Some(exec) => {
-                                    let mut exec = exec.to_string();
-
-                                    for field_code in FIELD_CODE_LIST {
-                                        exec = exec.replace(field_code, "");
-                                    }
-                                    exec
+                                    exec.to_string()
                                 }
                                 None => continue,
                             },
