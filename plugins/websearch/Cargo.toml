@@ -11,6 +11,6 @@ abi_stable    = "0.11.1"
 anyrun-plugin = { path = "../../anyrun-plugin" }
 ron           = "0.8.0"
 serde         = { features = [ "derive" ], version = "1.0.228" }
-strum         = "0.25.0"
+strum         = "0.27.2"
 strum_macros  = "0.25.1"
 urlencoding   = "2.1.3"
