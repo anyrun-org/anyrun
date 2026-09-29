@@ -1,13 +1,12 @@
 use abi_stable::std_types::{ROption, RString, RVec};
 use anyrun_plugin::*;
-use rink_core::{ast, date, gnu_units, CURRENCY_FILE};
 use serde::Deserialize;
 use std::fs;
 
 #[derive(Deserialize, Debug)]
 struct Config {
     prefix: String,
-    #[serde(default = true)]
+    #[serde(default = "Config::default_pull_currencies")]
     pull_currencies: bool,
 }
 
@@ -17,6 +16,12 @@ impl Default for Config {
             prefix: "".to_string(),
             pull_currencies: true,
         }
+    }
+}
+
+impl Config {
+    fn default_pull_currencies() -> bool {
+        true
     }
 }
 
@@ -38,33 +43,28 @@ fn init(config_dir: RString) -> State {
         }
     };
 
-    let mut ctx = rink_core::Context::new();
+    let mut ctx = rink_core::simple_context().unwrap();
 
-    let units = gnu_units::parse_str(rink_core::DEFAULT_FILE.unwrap());
-    let dates = date::parse_datefile(rink_core::DATES_FILE);
-
-    if config.pull_currencies {
-        let mut currency_defs = Vec::new();
-
+    let live_data = if config.pull_currencies {
         match reqwest::blocking::get("https://rinkcalc.app/data/currency.json") {
-            Ok(response) => match response.json::<ast::Defs>() {
-                Ok(mut live_defs) => {
-                    currency_defs.append(&mut live_defs.defs);
-                }
-                Err(why) => eprintln!("[rink] Error parsing currency json: {why}"),
-            },
-            Err(why) => eprintln!("[rink] Error fetching up-to-date currency conversions: {why}",),
+            // The error will just be handled further down the line
+            Ok(response) => Some(response.text().unwrap_or_default()),
+            Err(why) => {
+                eprintln!("[rink] Error fetching up-to-date currency conversions: {why}");
+                None
+            }
         }
+    } else {
+        None
+    };
 
-        currency_defs.append(&mut gnu_units::parse_str(CURRENCY_FILE).defs);
-
-        ctx.load(ast::Defs {
-            defs: currency_defs,
-        });
+    let base_currencies = rink_core::CURRENCY_FILE.unwrap();
+    if let Err(why) = ctx.load_currency(live_data.as_deref(), base_currencies) {
+        eprintln!("[rink] Error loading currencies: {why}, retrying with static currency data");
+        if let Err(why) = ctx.load_currency(None, base_currencies) {
+            eprintln!("[rink] Loading static currency data failed as well: {why}");
+        }
     }
-
-    ctx.load(units);
-    ctx.load_dates(dates);
 
     State { ctx, config }
 }
