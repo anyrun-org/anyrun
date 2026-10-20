@@ -1,6 +1,6 @@
 [package]
 name    = "dictionary"
-version = "26.6.1"
+version = "26.10.0"
 edition = "2021"
 
 [lib]
@@ -14,7 +14,7 @@ anyrun-plugin = { path = "../../anyrun-plugin" }
 reqwest = { default-features = false, features = [
   "blocking",
   "json",
-  "rustls-tls",
-], version = "0.11.16" }
+  "rustls"
+], version = "0.13.5" }
 ron = "0.8.0"
 serde = { features = [ "derive" ], version = "1.0.228" }

@@ -1,6 +1,6 @@
 [package]
 name    = "anyrun-macros"
-version = "26.6.1"
+version = "26.10.0"
 edition = "2021"
 
 [lib]

@@ -1,6 +1,6 @@
 [package]
 name    = "anyrun-plugin"
-version = "26.6.1"
+version = "26.10.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

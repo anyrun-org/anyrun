@@ -50,7 +50,7 @@ fn init(config_dir: RString) -> State {
             // The error will just be handled further down the line
             Ok(response) => Some(response.text().unwrap_or_default()),
             Err(why) => {
-                eprintln!("[rink] Error fetching up-to-date currency conversions: {why}");
+                eprintln!("[rink] Error fetching up-to-date currency conversions: {why:?}");
                 None
             }
         }

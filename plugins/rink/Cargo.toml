@@ -1,6 +1,6 @@
 [package]
 name    = "rink"
-version = "26.6.1"
+version = "26.10.0"
 edition = "2021"
 
 [lib]
@@ -13,8 +13,8 @@ abi_stable = "0.11.1"
 anyrun-plugin = { path = "../../anyrun-plugin" }
 reqwest = { default-features = false, features = [
   "blocking",
-  "rustls-tls",
-], version = "0.11.13" }
+  "rustls"
+], version = "0.13.5" }
 rink-core = { version = "0.9", features = ["bundle-files", "serde_json"] }
 ron = "0.8.0"
 serde = { features = [ "derive" ], version = "1.0.228" }
