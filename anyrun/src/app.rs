@@ -545,7 +545,6 @@ impl Component for App {
                         sender.input(AppMsg::Action(Action::Close));
                     }
                     HandleResult::Stdout(rvec) => {
-                        io::stdout().lock().write_all(&rvec).unwrap();
                         self.post_run_action = PostRunAction::Stdout(rvec.into());
                         sender.input(AppMsg::Action(Action::Close));
                     }
