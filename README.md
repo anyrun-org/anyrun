@@ -268,7 +268,7 @@ The rest of the arguments are automatically generated based on the config, and
 can be used to override configuration parameters. For example if you want to
 temporarily only run the Applications and Symbols plugins on the top side of the
 screen, you would run
-`anyrun --plugins libapplications.so --plugins libsymbols.so --position top`.
+`anyrun --plugins libapplications.so --plugins libsymbols.so --y absolute:0`.
 
 # Plugin development
 
