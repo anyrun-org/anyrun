@@ -241,11 +241,14 @@ fn get_matches(input: RString, state: &State) -> RVec<Match> {
         let futures = matches
             .into_iter()
             .map(|(src, dest)| async move {
-                match src {
-                    Some(src) => 
-                (dest.1, state.client.get(format!("https://translate.googleapis.com/translate_a/single?client=gtx&sl={}&tl={}&dt=t&q={}", src.0, dest.0, text)).send().await),
-                    None => (dest.1, state.client.get(format!("https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={}&dt=t&q={}", dest.0, text)).send().await)
-                }
+                (
+                    dest.1,
+                    state
+                        .client
+                        .get(translation_url(src.map(|src| src.0), dest.0, text))
+                        .send()
+                        .await,
+                )
             });
        
         let res = futures::future::join_all(futures) // Wait for all futures to complete
@@ -292,4 +295,40 @@ fn get_matches(input: RString, state: &State) -> RVec<Match> {
 #[handler]
 fn handler(selection: Match) -> HandleResult {
     HandleResult::Copy(selection.title.into_bytes())
+}
+
+fn translation_url(source: Option<&str>, target: &str, text: &str) -> reqwest::Url {
+    reqwest::Url::parse_with_params(
+        "https://translate.googleapis.com/translate_a/single",
+        &[
+            ("client", "gtx"),
+            ("sl", source.unwrap_or("auto")),
+            ("tl", target),
+            ("dt", "t"),
+            ("q", text),
+        ],
+    )
+    .expect("The translation endpoint is a valid URL")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::translation_url;
+
+    #[test]
+    fn translation_text_is_one_query_parameter() {
+        for source in [None, Some("en")] {
+            for text in ["hello", "salt & pepper", "C++ #1 = 50%", "你好 & café"] {
+                let url = translation_url(source, "fr", text);
+                let pairs: Vec<_> = url.query_pairs().collect();
+                assert_eq!(pairs.len(), 5, "{url}");
+                assert_eq!(url.fragment(), None, "{url}");
+                assert_eq!(pairs[0], ("client".into(), "gtx".into()));
+                assert_eq!(pairs[1], ("sl".into(), source.unwrap_or("auto").into()));
+                assert_eq!(pairs[2], ("tl".into(), "fr".into()));
+                assert_eq!(pairs[3], ("dt".into(), "t".into()));
+                assert_eq!(pairs[4], ("q".into(), text.into()));
+            }
+        }
+    }
 }
