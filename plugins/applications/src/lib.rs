@@ -13,12 +13,23 @@ pub struct Config {
     hide_description: bool,
     terminal: Option<Terminal>,
     preprocess_exec_script: Option<PathBuf>,
+
+    #[serde(default)]
+    entry_priority: EntryPriority,
 }
 
 #[derive(Deserialize)]
 pub struct Terminal {
     command: String,
     args: String,
+}
+
+#[derive(Deserialize, Default)]
+pub enum EntryPriority {
+    #[default]
+    ActionsFirst,
+    ApplicationsFirst,
+    NoPriority,
 }
 
 impl Default for Config {
@@ -29,6 +40,7 @@ impl Default for Config {
             hide_description: false,
             preprocess_exec_script: None,
             terminal: None,
+            entry_priority: EntryPriority::default(),
         }
     }
 }
@@ -207,12 +219,16 @@ pub fn get_matches(input: RString, state: &State) -> RVec<Match> {
                 .max()
                 .unwrap_or(0);
 
-            let mut score = (name_score * 10 + desc_score + keyword_score) - entry.offset;
+            let mut score = (name_score * 10 + desc_score * (if entry.is_action { 5 } else { 1 }) + keyword_score) - entry.offset;
 
-            // prioritize actions
-            if entry.is_action {
-                score *= 2;
-            }
+            // Apply priority
+            score = match (&state.config.entry_priority, entry.is_action) {
+                // Boost the `desc_score` for actions,
+                // since the description of actions is the application name.
+                (EntryPriority::ActionsFirst, true) => score * 2,
+                (EntryPriority::ApplicationsFirst, false) => score * 2,
+                _ => score,
+            };
 
             // Score cutoff
             if score > 0 {
