@@ -9,6 +9,7 @@
   pkg-config,
   librsvg,
   cargo,
+  aws-lc,
   rustc,
   # Runtime deps
   anyrun-provider,
@@ -62,6 +63,7 @@ rustPlatform.buildRustPackage {
     gtk4
     librsvg
     gtk4-layer-shell
+    aws-lc
   ];
 
   cargoBuildFlags = if dontBuildPlugins then [ "-p ${pname}" ] else [ ];

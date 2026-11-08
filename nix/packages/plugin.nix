@@ -12,6 +12,7 @@
   librsvg,
   cargo,
   rustc,
+  aws-lc,
   # Generic args
   name,
   lockFile,
@@ -49,6 +50,7 @@ rustPlatform.buildRustPackage {
     gtk3
     librsvg
     gtk-layer-shell
+    aws-lc
   ]
   ++ extraInputs;
 
