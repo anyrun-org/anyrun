@@ -1,4 +1,10 @@
-use std::{collections::HashMap, env, ffi::OsStr, fs, path::PathBuf};
+use std::{
+    collections::HashMap,
+    env,
+    ffi::{OsStr, OsString},
+    fs,
+    path::PathBuf,
+};
 
 use crate::Config;
 
@@ -269,7 +275,25 @@ pub fn scrubber(config: &Config) -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std
     let lang = env::var("LANG").ok();
     let lang_choices = LangChoices::new(lang.as_deref());
 
-    let mut entries: HashMap<String, DesktopEntry> = match env::var("XDG_DATA_DIRS") {
+    // Desktop entries are identified by their desktop file ID (the file name), and the first
+    // file found for an ID wins, so the user directory comes first, then XDG_DATA_DIRS in order
+    let mut entries: HashMap<OsString, Vec<DesktopEntry>> = HashMap::new();
+
+    match fs::read_dir(&user_path) {
+        Ok(dir_entries) => {
+            for entry in dir_entries.flatten() {
+                entries
+                    .entry(entry.file_name())
+                    .or_insert_with(|| DesktopEntry::from_dir_entry(&entry, config, &lang_choices));
+            }
+        }
+        Err(why) => eprintln!(
+            "[applications] Error reading directory {}: {}",
+            user_path, why
+        ),
+    }
+
+    let system_paths: Vec<_> = match env::var("XDG_DATA_DIRS") {
         Ok(data_dirs) => {
             // The vec for all the DirEntry objects
             let mut paths = Vec::new();
@@ -293,51 +317,18 @@ pub fn scrubber(config: &Config) -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std
             paths
         }
         Err(_) => fs::read_dir("/usr/share/applications")?.collect(),
-    }
-    .into_iter()
-    .filter_map(|entry| {
-        let entry = match entry {
-            Ok(entry) => entry,
-            Err(_why) => return None,
-        };
-        let entries = DesktopEntry::from_dir_entry(&entry, config, &lang_choices);
-        Some(
-            entries
-                .into_iter()
-                .map(|entry| (format!("{}{}", entry.name, entry.icon), entry)),
-        )
-    })
-    .flatten()
-    .collect();
+    };
 
-    // Go through user directory desktop files for overrides
-    match fs::read_dir(&user_path) {
-        Ok(dir_entries) => entries.extend(
-            dir_entries
-                .into_iter()
-                .filter_map(|entry| {
-                    let entry = match entry {
-                        Ok(entry) => entry,
-                        Err(_why) => return None,
-                    };
-                    let entries = DesktopEntry::from_dir_entry(&entry, config, &lang_choices);
-                    Some(
-                        entries
-                            .into_iter()
-                            .map(|entry| (format!("{}{}", entry.name, entry.icon), entry)),
-                    )
-                })
-                .flatten(),
-        ),
-        Err(why) => eprintln!(
-            "[applications] Error reading directory {}: {}",
-            user_path, why
-        ),
+    for entry in system_paths.into_iter().flatten() {
+        entries
+            .entry(entry.file_name())
+            .or_insert_with(|| DesktopEntry::from_dir_entry(&entry, config, &lang_choices));
     }
 
     Ok(entries
-        .into_iter()
+        .into_values()
+        .flatten()
         .enumerate()
-        .map(|(i, (_, entry))| (entry, i as u64))
+        .map(|(i, entry)| (entry, i as u64))
         .collect())
 }
