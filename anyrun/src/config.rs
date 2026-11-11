@@ -160,10 +160,11 @@ pub enum Layer {
     Overlay,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, ValueEnum)]
+#[derive(Deserialize, Serialize, Clone, Debug, ValueEnum, PartialEq, Eq)]
 pub enum KeyboardMode {
     Exclusive,
     OnDemand,
+    NiriFocusOnType,
 }
 
 // Could have a better name

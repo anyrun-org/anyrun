@@ -17,6 +17,7 @@ use std::{
     path::{Path, PathBuf},
     rc::Rc,
     sync::Arc,
+    time::Duration,
 };
 use tokio::sync::mpsc;
 
@@ -147,6 +148,7 @@ impl Component for App {
             set_keyboard_mode: match config.keyboard_mode {
                 config::KeyboardMode::Exclusive => gtk4_layer_shell::KeyboardMode::Exclusive,
                 config::KeyboardMode::OnDemand => gtk4_layer_shell::KeyboardMode::OnDemand,
+                config::KeyboardMode::NiriFocusOnType => gtk4_layer_shell::KeyboardMode::None
             },
             set_namespace: Some("anyrun"),
             // This cannot be fully transparent due to a Sway issue (https://github.com/swaywm/sway/issues/8904)
@@ -337,6 +339,15 @@ impl Component for App {
                 // to do this in a reasonable way.
                 root.set_anchor(Edge::Left, true);
                 root.set_anchor(Edge::Top, true);
+
+                // niri focus-on-type requires the window to be mapped with "none", and then
+                // ondemand to be committed. This does the trick
+                if self.config.keyboard_mode == config::KeyboardMode::NiriFocusOnType {
+                    let win = root.clone();
+                    glib::timeout_add_local_once(Duration::from_millis(5), move || {
+                        win.set_keyboard_mode(gtk4_layer_shell::KeyboardMode::OnDemand);
+                    });
+                }
 
                 if self.config.close_on_click {
                     root.set_default_size(mon_width as i32, mon_height as i32);
