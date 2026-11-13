@@ -1,6 +1,14 @@
-use std::{collections::HashMap, env, ffi::OsStr, fs, path::PathBuf};
+use std::{
+    collections::HashMap,
+    env,
+    ffi::{OsStr, OsString},
+    fs,
+    path::{Path, PathBuf},
+};
 
 use crate::Config;
+
+const DEFAULT_APPLICATION_ICON: &'static str = "application-x-executable";
 
 #[derive(Clone, Debug)]
 pub struct DesktopEntry {
@@ -17,10 +25,6 @@ pub struct DesktopEntry {
     pub is_action: bool,
 }
 
-const FIELD_CODE_LIST: &[&str] = &[
-    "%f", "%F", "%u", "%U", "%d", "%D", "%n", "%N", "%i", "%c", "%k", "%v", "%m",
-];
-
 impl DesktopEntry {
     pub fn localized_name(&self) -> String {
         self.localized_name
@@ -28,187 +32,177 @@ impl DesktopEntry {
             .unwrap_or_else(|| self.name.clone())
     }
 
-    fn from_dir_entry(
-        entry: &fs::DirEntry,
-        config: &Config,
-        lang_choices: &LangChoices,
-    ) -> Vec<Self> {
-        if entry.path().extension() == Some(OsStr::new("desktop")) {
-            let content = match fs::read_to_string(entry.path()) {
-                Ok(content) => content,
-                Err(_) => return Vec::new(),
-            };
+    fn from_path(path: &Path, config: &Config, lang_choices: &LangChoices) -> Vec<Self> {
+        if path.extension() != Some(OsStr::new("desktop")) {
+            return Vec::new();
+        }
 
-            let lines = content.lines().collect::<Vec<_>>();
+        let content = match fs::read_to_string(path) {
+            Ok(content) => content,
+            Err(_) => return Vec::new(),
+        };
 
-            let sections = lines
-                .split_inclusive(|line| line.starts_with('['))
-                .collect::<Vec<_>>();
+        let lines = content
+            .lines()
+            // Ignore comments
+            .filter(|line| !line.starts_with('#') && !line.is_empty())
+            .collect::<Vec<_>>();
 
-            let mut line = None;
-            let mut new_sections = Vec::new();
+        let sections = lines
+            .chunk_by(|_, line| !line.starts_with('['))
+            // Remove the potential lines before the first section
+            // `section` is at least 1 element long so `section[0]` cannot panic
+            .skip_while(|section| !section[0].starts_with('['))
+            .collect::<Vec<_>>();
 
+        let mut ret = Vec::new();
+
+        let Some(entry) = sections.iter().find_map(|section| {
+            if !section[0].starts_with("[Desktop Entry]") {
+                return None;
+            }
+
+            // Let's call them properties as specs call them entries but
+            // it is confusing with DesktopEntry.
+            // (see https://specifications.freedesktop.org/desktop-entry/latest/basic-format.html#entries)
+            let mut props = HashMap::new();
+
+            for line in section.iter().skip(1) {
+                if let Some((key, val)) = line.split_once('=') {
+                    props.insert(key, val);
+                }
+            }
+
+            if *props.get("Type")? != "Application" {
+                return None;
+            }
+
+            if props
+                .get("NoDisplay")
+                .map(|x| x.to_lowercase() == "true")
+                .unwrap_or(false)
+            {
+                return None;
+            }
+
+            DesktopEntry::from_props(&props, lang_choices, None, 0, false)
+        }) else {
+            // If no appropriate [Desktop Entry] section is found
+            return Vec::new();
+        };
+
+        if config.desktop_actions {
             for (i, section) in sections.iter().enumerate() {
-                if let Some(line) = line {
-                    let mut section = section.to_vec();
-                    section.insert(0, line);
+                let mut action_props = HashMap::new();
 
-                    // Only pop the last redundant entry if it isn't the last item
-                    if i < sections.len() - 1 {
-                        section.pop();
+                for line in section.iter().skip(1) {
+                    if let Some((key, val)) = line.split_once('=') {
+                        action_props.insert(key, val);
                     }
-                    new_sections.push(section);
                 }
-                line = Some(section.last().unwrap_or(&""));
-            }
 
-            let mut ret = Vec::new();
-
-            let entry = match new_sections.iter().find_map(|section| {
-                if section[0].starts_with("[Desktop Entry]") {
-                    let mut map = HashMap::new();
-
-                    for line in section.iter().skip(1) {
-                        if let Some((key, val)) = line.split_once('=') {
-                            map.insert(key, val);
-                        }
-                    }
-
-                    if map.get("Type")? == &"Application"
-                        && match map.get("NoDisplay") {
-                            Some(no_display) => !no_display.parse::<bool>().unwrap_or(true),
-                            None => true,
-                        }
-                    {
-                        Some(DesktopEntry {
-                            exec: {
-                                let mut exec = map.get("Exec")?.to_string();
-
-                                for field_code in FIELD_CODE_LIST {
-                                    exec = exec.replace(field_code, "");
-                                }
-                                exec
-                            },
-                            path: map.get("Path").map(PathBuf::from),
-                            name: map.get("Name")?.to_string(),
-                            localized_name: lang_choices
-                                .localized_keys("Name")
-                                .find_map(|key| map.get(&*key))
-                                .map(ToString::to_string),
-                            keywords: map
-                                .get("Keywords")
-                                .map(|keywords| {
-                                    keywords
-                                        .split(';')
-                                        .map(|s| s.to_owned())
-                                        .collect::<Vec<_>>()
-                                })
-                                .unwrap_or_default(),
-                            localized_keywords: lang_choices
-                                .localized_keys("Keywords")
-                                .find_map(|key| map.get(&*key))
-                                .map(|keywords| {
-                                    keywords
-                                        .split(';')
-                                        .map(|s| s.to_owned())
-                                        .collect::<Vec<_>>()
-                                }),
-                            desc: lang_choices
-                                .localized_keys("Comment")
-                                .find_map(|key| map.get(&*key))
-                                .or_else(|| map.get("Comment"))
-                                .map(ToString::to_string),
-                            icon: map
-                                .get("Icon")
-                                .unwrap_or(&"application-x-executable")
-                                .to_string(),
-                            term: map
-                                .get("Terminal")
-                                .map(|val| val.to_lowercase() == "true")
-                                .unwrap_or(false),
-                            offset: 0,
-                            is_action: false,
-                        })
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            }) {
-                Some(entry) => entry,
-                None => return Vec::new(),
-            };
-
-            if config.desktop_actions {
-                for (i, section) in new_sections.iter().enumerate() {
-                    let mut map = HashMap::new();
-
-                    for line in section.iter().skip(1) {
-                        if let Some((key, val)) = line.split_once('=') {
-                            map.insert(key, val);
-                        }
-                    }
-
-                    if section[0].starts_with("[Desktop Action") {
-                        ret.push(DesktopEntry {
-                            exec: match map.get("Exec") {
-                                Some(exec) => {
-                                    let mut exec = exec.to_string();
-
-                                    for field_code in FIELD_CODE_LIST {
-                                        exec = exec.replace(field_code, "");
-                                    }
-                                    exec
-                                }
-                                None => continue,
-                            },
-                            path: entry.path.clone(),
-                            name: match map.get("Name") {
-                                Some(name) => name.to_string(),
-                                None => continue,
-                            },
-                            localized_name: lang_choices
-                                .localized_keys("Name")
-                                .find_map(|key| map.get(&*key))
-                                .map(ToString::to_string),
-                            keywords: map
-                                .get("Keywords")
-                                .map(|keywords| {
-                                    keywords
-                                        .split(';')
-                                        .map(|s| s.to_owned())
-                                        .collect::<Vec<_>>()
-                                })
-                                .unwrap_or_default(),
-                            localized_keywords: lang_choices
-                                .localized_keys("Keywords")
-                                .find_map(|key| map.get(&*key))
-                                .map(|keywords| {
-                                    keywords
-                                        .split(';')
-                                        .map(|s| s.to_owned())
-                                        .collect::<Vec<_>>()
-                                }),
-                            desc: Some(entry.localized_name()),
-                            icon: entry.icon.clone(),
-                            term: map
-                                .get("Terminal")
-                                .map(|val| val.to_lowercase() == "true")
-                                .unwrap_or(false),
-                            offset: i as i64,
-                            is_action: true,
-                        })
+                if section[0].starts_with("[Desktop Action") {
+                    if let Some(action_entry) = DesktopEntry::from_props(
+                        &action_props,
+                        lang_choices,
+                        Some(entry.icon.clone()),
+                        i as i64,
+                        true,
+                    ) {
+                        ret.push(action_entry);
                     }
                 }
             }
+        }
 
-            ret.push(entry);
-            ret
-        } else {
-            Vec::new()
+        ret.push(entry);
+        ret
+    }
+
+    fn from_props(
+        props: &HashMap<&str, &str>,
+        lang_choices: &LangChoices,
+        icon: Option<String>,
+        offset: i64,
+        is_action: bool,
+    ) -> Option<DesktopEntry> {
+        Some(DesktopEntry {
+            exec: parse_exec(props)?,
+            path: props.get("Path").map(PathBuf::from),
+            name: props.get("Name")?.to_string(),
+            localized_name: lang_choices
+                .get_localized(props, "Name")
+                .map(ToString::to_string),
+            keywords: props
+                .get("Keywords")
+                .map(|keywords| {
+                    keywords
+                        .split(';')
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default(),
+            localized_keywords: lang_choices
+                .get_localized(props, "Keywords")
+                .map(|keywords| {
+                    keywords
+                        .split(';')
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                }),
+            desc: lang_choices
+                .get_localized(props, "Comment")
+                .or_else(|| props.get("Comment"))
+                .map(ToString::to_string),
+            icon: icon.unwrap_or_else(|| {
+                props
+                    .get("Icon")
+                    .unwrap_or(&DEFAULT_APPLICATION_ICON)
+                    .to_string()
+            }),
+            term: props
+                .get("Terminal")
+                .map(|val| val.to_lowercase() == "true")
+                .unwrap_or(false),
+            offset,
+            is_action,
+        })
+    }
+}
+
+// Field codes to remove (%f, %F, %u...) because we run the applications with no argument
+// Note: %i, %c and %k could be implemented however
+// (see https://specifications.freedesktop.org/desktop-entry/latest/exec-variables.html)
+const FIELD_CODE_CHARS: &str = "fFuUdDnNickvm";
+
+// Only remove field codes, quotes and escapes will be interpreted by `sh`
+// when we run the command
+fn parse_exec(props: &HashMap<&str, &str>) -> Option<String> {
+    let exec = props.get("Exec")?.to_string();
+    let mut chars = exec.chars().peekable();
+    let mut new_exec = String::with_capacity(exec.len());
+
+    while let Some(ch) = chars.next() {
+        if ch != '%' {
+            new_exec.push(ch);
+            continue;
+        }
+        match chars.peek() {
+            Some(&'%') | None => {
+                new_exec.push('%');
+                chars.next();
+            }
+
+            Some(&next_ch) if FIELD_CODE_CHARS.contains(next_ch) => {
+                chars.next();
+            }
+            Some(_) => {
+                new_exec.push(ch);
+            }
         }
     }
+
+    Some(new_exec)
 }
 
 #[derive(Debug, Default)]
@@ -249,95 +243,56 @@ impl<'a> LangChoices<'a> {
             .chain(self.short);
         choices.map(move |choice| format!("{key}[{choice}]"))
     }
+
+    fn get_localized<'b>(
+        &self,
+        map: &'b HashMap<&'b str, &'b str>,
+        key: &'b str,
+    ) -> Option<&'b &'b str> {
+        self.localized_keys(key).find_map(|key| map.get(&*key))
+    }
 }
 
-pub fn scrubber(config: &Config) -> Result<Vec<(DesktopEntry, u64)>, Box<dyn std::error::Error>> {
-    // Create iterator over all the files in the XDG_DATA_DIRS
-    // XDG compliancy is cool
-    let user_path = match env::var("XDG_DATA_HOME") {
-        Ok(data_home) => {
-            format!("{}/applications/", data_home)
-        }
-        Err(_) => {
-            format!(
-                "{}/.local/share/applications/",
-                env::var("HOME").expect("Unable to determine home directory!")
-            )
-        }
-    };
+pub fn scrubber(config: &Config) -> Vec<DesktopEntry> {
+    let xdg_data_dirs = env::var("XDG_DATA_DIRS").unwrap_or("/usr/share".to_owned());
+
+    let xdg_data_home = env::var("XDG_DATA_HOME").unwrap_or_else(|_why| {
+        format!(
+            "{}/.local/share",
+            env::var("HOME").expect("Unable to determine home directory!")
+        )
+    });
 
     let lang = env::var("LANG").ok();
     let lang_choices = LangChoices::new(lang.as_deref());
 
-    let mut entries: HashMap<String, DesktopEntry> = match env::var("XDG_DATA_DIRS") {
-        Ok(data_dirs) => {
-            // The vec for all the DirEntry objects
-            let mut paths = Vec::new();
-            // Parse the XDG_DATA_DIRS variable and list files of all the paths
-            for dir in data_dirs.split(':') {
-                match fs::read_dir(format!("{}/applications/", dir)) {
-                    Ok(dir) => {
-                        paths.extend(dir);
-                    }
-                    Err(why) => {
-                        eprintln!("[applications] Error reading directory {}: {}", dir, why);
-                    }
-                }
+    // Create iterator over all the applications directories in the XDG_DATA_DIRS (and in XDG_DATA_HOME)
+    // XDG compliancy is cool
+    let entry_dirs = xdg_data_dirs
+        .rsplit(':')
+        .chain(Some(xdg_data_home.as_str()))
+        .map(|dir| format!("{}/applications/", dir));
+
+    let entries_map: HashMap<OsString, Vec<DesktopEntry>> = entry_dirs
+        // Iterate over all files in the entry_dirs
+        .filter_map(|dir| match fs::read_dir(&dir) {
+            Ok(files) => Some(files),
+            Err(why) => {
+                eprintln!("[applications] Error reading directory {}: {}", dir, why);
+                None
             }
-            // Make sure the list of paths isn't empty
-            if paths.is_empty() {
-                return Err("No valid desktop file dirs found!".into());
-            }
+        })
+        .flatten()
+        // Parse these files with DesktopEntry::from_path(), ignoring errors from ReadDir
+        .filter_map(|entry_res| {
+            let entry = entry_res.ok()?;
 
-            // Return it
-            paths
-        }
-        Err(_) => fs::read_dir("/usr/share/applications")?.collect(),
-    }
-    .into_iter()
-    .filter_map(|entry| {
-        let entry = match entry {
-            Ok(entry) => entry,
-            Err(_why) => return None,
-        };
-        let entries = DesktopEntry::from_dir_entry(&entry, config, &lang_choices);
-        Some(
-            entries
-                .into_iter()
-                .map(|entry| (format!("{}{}", entry.name, entry.icon), entry)),
-        )
-    })
-    .flatten()
-    .collect();
+            Some((
+                entry.path().file_name()?.to_owned(),
+                DesktopEntry::from_path(&entry.path(), config, &lang_choices),
+            ))
+        })
+        .collect();
 
-    // Go through user directory desktop files for overrides
-    match fs::read_dir(&user_path) {
-        Ok(dir_entries) => entries.extend(
-            dir_entries
-                .into_iter()
-                .filter_map(|entry| {
-                    let entry = match entry {
-                        Ok(entry) => entry,
-                        Err(_why) => return None,
-                    };
-                    let entries = DesktopEntry::from_dir_entry(&entry, config, &lang_choices);
-                    Some(
-                        entries
-                            .into_iter()
-                            .map(|entry| (format!("{}{}", entry.name, entry.icon), entry)),
-                    )
-                })
-                .flatten(),
-        ),
-        Err(why) => eprintln!(
-            "[applications] Error reading directory {}: {}",
-            user_path, why
-        ),
-    }
-
-    Ok(entries
-        .into_iter()
-        .enumerate()
-        .map(|(i, (_, entry))| (entry, i as u64))
-        .collect())
+    entries_map.into_values().flatten().collect()
 }
